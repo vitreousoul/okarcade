@@ -16,8 +16,14 @@ typedef size_t size;
 typedef s32 bar;
 
 #define EXPANSION_BUFFER_SIZE 1 << 12
-#define EXPANSION_MAX_DEPTH 6
+#define EXPANSION_MAX_DEPTH 7
 #define RULE_SIZE_MAX 16
+
+internal void PrintError_(char *Message, char *FileName, s32 LineNumber)
+{
+    printf("Error in file %s line %d: %s\n", FileName, LineNumber, Message);
+}
+#define PrintError(message) PrintError_((message), __FILE__, __LINE__)
 
 typedef enum
 {
@@ -108,8 +114,26 @@ internal symbol GetSymbolFromRules(symbol Rules[symbol_Count][RULE_SIZE_MAX], ex
     }
 }
 
+internal void PopAndIncrementParent(expansion *Expansion)
+{
+    PopExpansionItem(Expansion);
+    s32 ParentIndex = Expansion->Index - 1;
+
+    if (ParentIndex >= 0 && ParentIndex < EXPANSION_MAX_DEPTH)
+    {
+        Expansion->Items[ParentIndex].Index += 1;
+    }
+}
+
 internal void PrintLSystem(symbol Rules[symbol_Count][RULE_SIZE_MAX], s32 Depth)
 {
+    if (Depth >= EXPANSION_MAX_DEPTH)
+    {
+        s32 MaxDepthMinusOne = EXPANSION_MAX_DEPTH - 1;
+        printf("Max depth for PrintLSystem is %d but was passed a depth of %d\n", MaxDepthMinusOne, Depth);
+        PrintError("DepthError\n");
+    }
+
     expansion Expansion = {0};
 
     {
@@ -117,30 +141,26 @@ internal void PrintLSystem(symbol Rules[symbol_Count][RULE_SIZE_MAX], s32 Depth)
         PushExpansionItem(&Expansion, RootItem);
     }
 
-    s32 FOO = 0;
-
     while (Expansion.Index > 0)
     {
-        if (FOO++ > 100) {printf("max iter count in PrintLSystem\n"); break;}
         expansion_item CurrentItem = PeekExpansionItem(&Expansion);
         b32 RuleIndexInBounds = CurrentItem.Index >= 0 && CurrentItem.Index < RULE_SIZE_MAX;
 
         if (!RuleIndexInBounds)
         {
-            printf("Rule index out of bounds\n");
+            PrintError("Rule index out of bounds\n");
             break;
         }
 
-        if (CurrentItem.Symbol == symbol_Undefined)
+        symbol ChildSymbol = Rules[CurrentItem.Symbol][CurrentItem.Index];
+
+        if (ChildSymbol == symbol_Undefined)
         {
-            PopExpansionItem(&Expansion);
+            PopAndIncrementParent(&Expansion);
         }
         else if (Expansion.Index <= Depth)
         {
-            symbol ChildSymbol = Rules[CurrentItem.Symbol][CurrentItem.Index];
             expansion_item ChildItem = CreateExpansionItem(ChildSymbol, 0);
-
-            Expansion.Items[Expansion.Index].Index += 1;
             PushExpansionItem(&Expansion, ChildItem);
         }
         else
@@ -154,7 +174,6 @@ internal void PrintLSystem(symbol Rules[symbol_Count][RULE_SIZE_MAX], s32 Depth)
                 {
                 case symbol_A: {printf("a");} break;
                 case symbol_B: {printf("b");} break;
-                case symbol_Undefined: {printf("_");} break;
                 default: break;
                 }
 
@@ -162,7 +181,7 @@ internal void PrintLSystem(symbol Rules[symbol_Count][RULE_SIZE_MAX], s32 Depth)
                 OutputSymbol = GetSymbolFromRules(Rules, CurrentItem);
             }
 
-            PopExpansionItem(&Expansion);
+            PopAndIncrementParent(&Expansion);
         }
     }
 
@@ -183,7 +202,7 @@ int main(void)
         [symbol_B] = {B,B,End},
     };
 
-    PrintLSystem(Rules, 1);
+    PrintLSystem(Rules, 6);
 
     return Result;
 }
