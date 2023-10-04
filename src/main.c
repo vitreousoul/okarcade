@@ -11,9 +11,6 @@ typedef uint32_t b32;
 
 typedef int32_t s32;
 
-typedef size_t size;
-
-typedef s32 bar;
 
 #define EXPANSION_BUFFER_SIZE 1 << 12
 #define EXPANSION_MAX_DEPTH 7
