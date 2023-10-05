@@ -1,6 +1,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#include "../lib/raylib.h"
+
 #define internal static
 #define global_variable static
 
@@ -21,6 +23,10 @@ internal void PrintError_(char *Message, char *FileName, s32 LineNumber)
     printf("Error in file %s line %d: %s\n", FileName, LineNumber, Message);
 }
 #define PrintError(message) PrintError_((message), __FILE__, __LINE__)
+
+int SCREEN_WIDTH = 960;
+int SCREEN_HEIGHT = 540;
+#define TARGET_FPS 30
 
 typedef enum
 {
@@ -199,7 +205,21 @@ int main(void)
         [symbol_B] = {B,B,End},
     };
 
+    InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Look at the l-systems");
+    SetTargetFPS(TARGET_FPS);
+
     PrintLSystem(Rules, 6);
+
+    ClearBackground((Color){0,0,0,255});
+
+    while (!WindowShouldClose())
+    {
+        BeginDrawing();
+        EndDrawing();
+    }
+
+    CloseWindow();
+
 
     return Result;
 }
