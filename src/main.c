@@ -14,9 +14,12 @@ typedef uint32_t b32;
 typedef int32_t s32;
 
 
-#define EXPANSION_BUFFER_SIZE 1 << 12
+#define EXPANSION_BUFFER_SIZE (1 << 12)
 #define EXPANSION_MAX_DEPTH 7
 #define RULE_SIZE_MAX 16
+
+global_variable u8 ExpansionBuffer[EXPANSION_BUFFER_SIZE];
+global_variable s32 ExpansionIndex = 0;
 
 internal void PrintError_(char *Message, char *FileName, s32 LineNumber)
 {
@@ -48,6 +51,15 @@ typedef struct
     s32 Index;
     expansion_item Items[EXPANSION_MAX_DEPTH];
 } expansion;
+
+internal void WriteToExpansionBuffer(symbol Symbol)
+{
+    if (ExpansionIndex >= 0 && ExpansionIndex < EXPANSION_BUFFER_SIZE)
+    {
+        ExpansionBuffer[ExpansionIndex] = Symbol;
+        ExpansionIndex += 1;
+    }
+}
 
 internal expansion_item CreateExpansionItem(symbol Symbol, s32 Index)
 {
@@ -173,13 +185,7 @@ internal void PrintLSystem(symbol Rules[symbol_Count][RULE_SIZE_MAX], s32 Depth)
 
             while (OutputSymbol != symbol_Undefined)
             {
-                switch (OutputSymbol)
-                {
-                case symbol_A: {printf("a");} break;
-                case symbol_B: {printf("b");} break;
-                default: break;
-                }
-
+                WriteToExpansionBuffer(OutputSymbol);
                 CurrentItem.Index += 1;
                 OutputSymbol = GetSymbolFromRules(Rules, CurrentItem);
             }
@@ -187,13 +193,13 @@ internal void PrintLSystem(symbol Rules[symbol_Count][RULE_SIZE_MAX], s32 Depth)
             PopAndIncrementParent(&Expansion);
         }
     }
-
-    printf("\n");
 }
 
 int main(void)
 {
     int Result = 0;
+
+    s32 LineDrawsPerFrame = 100;
 
     symbol A = symbol_A;
     symbol B = symbol_B;
@@ -209,6 +215,16 @@ int main(void)
     SetTargetFPS(TARGET_FPS);
 
     PrintLSystem(Rules, 6);
+    for (s32 I = 0; I < ExpansionIndex; I++)
+    {
+        switch(ExpansionBuffer[I])
+        {
+        case symbol_A: {printf("a");} break;
+        case symbol_B: {printf("b");} break;
+        default: break;
+        }
+    };
+    printf("\n");
 
     ClearBackground((Color){0,0,0,255});
 
