@@ -30,8 +30,8 @@ internal void PrintError_(char *Message, char *FileName, s32 LineNumber)
 }
 #define PrintError(message) PrintError_((message), __FILE__, __LINE__)
 
-int SCREEN_WIDTH = 400;
-int SCREEN_HEIGHT = 300;
+int SCREEN_WIDTH = 600;
+int SCREEN_HEIGHT = 400;
 #define TARGET_FPS 30
 
 global_variable Color BackgroundColor = (Color){58, 141, 230, 255};
@@ -197,6 +197,7 @@ internal void PrintLSystem(Image *Canvas, turtle *Turtle, symbol Rules[symbol_Co
                     f32 X = ((f32)rand()/(f32)(RAND_MAX)) * SCREEN_WIDTH;
                     f32 Y = ((f32)rand()/(f32)(RAND_MAX)) * SCREEN_HEIGHT;
                     ImageDrawLine(Canvas, Turtle->Position.x, Turtle->Position.y, X, Y, (Color){0,0,0,255});
+
                     Turtle->Position.x = X;
                     Turtle->Position.y = Y;
                 }
@@ -217,8 +218,18 @@ internal Vector2 CreateVector2(f32 X, f32 Y)
 
 internal void UpdateAndRender()
 {
+    Vector2 MousePosition = GetMousePosition();
+    b32 ButtonDown = IsMouseButtonPressed(0);
+
     BeginDrawing();
-    ClearBackground(ClearColor);
+    ClearBackground(BackgroundColor);
+    ImageDrawLine(&Canvas, 0, 0, MousePosition.x, MousePosition.y, (Color){0,0,0,255});
+
+    if (ButtonDown)
+    {
+        ImageClearBackground(&Canvas, BackgroundColor);
+    }
+
     {
         /* draw simulation image */
         Color *Pixels = LoadImageColors(Canvas);
@@ -252,7 +263,7 @@ int main(void)
     Canvas = GenImageColor(SCREEN_WIDTH, SCREEN_HEIGHT, BackgroundColor);
     FrameBuffer = LoadTextureFromImage(Canvas);
 
-    PrintLSystem(&Canvas, &Turtle, Rules, 6);
+    /* PrintLSystem(&Canvas, &Turtle, Rules, 6); */
 
 #if defined(PLATFORM_WEB)
     emscripten_set_main_loop(UpdateAndRender, 0, 2);

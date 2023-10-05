@@ -5,6 +5,18 @@
     <meta charset="utf-8">
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
     <title>L-Systems are cool</title>
+    <style>
+      html,
+      body {
+          margin: 0;
+          padding: 0;
+      }
+
+      #canvas {
+          width: 600px;
+          height: 400px;
+      }
+    </style>
   </head>
 
   <body>
@@ -22,7 +34,7 @@
               // As a default initial behavior, pop up an alert when webgl context is lost. To make your
               // application robust, you may want to override this behavior before shipping!
               // See http://www.khronos.org/registry/webgl/specs/latest/1.0/#5.15.2
-              canvas.addEventListener("webglcontextlost", webglContextLostHandler, false);
+              canvas.addEventListener('webglcontextlost', webglContextLostHandler, false);
 
               return canvas;
           })(),
