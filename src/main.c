@@ -68,6 +68,29 @@ typedef struct
     Vector2 Heading;
 } turtle;
 
+#if defined(PLATFORM_WEB)
+EM_JS(s32, GetCanvasWidth, (), {
+    var canvas = document.getElementById('canvas');
+    if (canvas) {
+        var rect = canvas.getBoundingClientRect();
+        return canvas.width;
+    } else {
+        return -1.0;
+    }
+});
+
+EM_JS(s32, GetCanvasHeight, (), {
+    var canvas = document.getElementById('canvas');
+    if (canvas) {
+        var rect = canvas.getBoundingClientRect();
+        return canvas.height;
+    } else {
+        return -1.0;
+    }
+});
+
+#endif
+
 internal expansion_item CreateExpansionItem(symbol Symbol, s32 Index)
 {
     expansion_item Item;
@@ -257,6 +280,16 @@ int main(void)
     };
 
     turtle Turtle = {CreateVector2(0.0f, 0.0f), CreateVector2(0.0f, 0.0f)};
+
+#if defined(PLATFORM_WEB)
+    s32 CanvasWidth = GetCanvasWidth();
+    s32 CanvasHeight = GetCanvasHeight();
+    if (CanvasWidth > 0.0f && CanvasHeight > 0.0f)
+    {
+        SCREEN_WIDTH = CanvasWidth;
+        SCREEN_HEIGHT = CanvasHeight;
+    }
+#endif
 
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Look at the l-systems");
 
