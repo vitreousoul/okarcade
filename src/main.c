@@ -3,6 +3,10 @@
 
 #include "../lib/raylib.h"
 
+#if defined(PLATFORM_WEB)
+    #include <emscripten/emscripten.h>
+#endif
+
 #define internal static
 #define global_variable static
 
@@ -13,13 +17,12 @@ typedef uint32_t b32;
 
 typedef int32_t s32;
 
+typedef float f32;
+
 
 #define EXPANSION_BUFFER_SIZE (1 << 12)
 #define EXPANSION_MAX_DEPTH 7
 #define RULE_SIZE_MAX 16
-
-global_variable u8 ExpansionBuffer[EXPANSION_BUFFER_SIZE];
-global_variable s32 ExpansionIndex = 0;
 
 internal void PrintError_(char *Message, char *FileName, s32 LineNumber)
 {
@@ -27,9 +30,16 @@ internal void PrintError_(char *Message, char *FileName, s32 LineNumber)
 }
 #define PrintError(message) PrintError_((message), __FILE__, __LINE__)
 
-int SCREEN_WIDTH = 960;
-int SCREEN_HEIGHT = 540;
+int SCREEN_WIDTH = 400;
+int SCREEN_HEIGHT = 300;
 #define TARGET_FPS 30
+
+global_variable Color BackgroundColor = (Color){58, 141, 230, 255};
+global_variable Color ClearColor = (Color){0, 0, 0, 255};
+
+/* TODO put state into a struct and pass as (void *) arg in emscripten_set_main_loop */
+global_variable Image Canvas;
+global_variable Texture2D FrameBuffer;
 
 typedef enum
 {
@@ -52,14 +62,11 @@ typedef struct
     expansion_item Items[EXPANSION_MAX_DEPTH];
 } expansion;
 
-internal void WriteToExpansionBuffer(symbol Symbol)
+typedef struct
 {
-    if (ExpansionIndex >= 0 && ExpansionIndex < EXPANSION_BUFFER_SIZE)
-    {
-        ExpansionBuffer[ExpansionIndex] = Symbol;
-        ExpansionIndex += 1;
-    }
-}
+    Vector2 Position;
+    Vector2 Heading;
+} turtle;
 
 internal expansion_item CreateExpansionItem(symbol Symbol, s32 Index)
 {
@@ -140,7 +147,7 @@ internal void PopAndIncrementParent(expansion *Expansion)
     }
 }
 
-internal void PrintLSystem(symbol Rules[symbol_Count][RULE_SIZE_MAX], s32 Depth)
+internal void PrintLSystem(Image *Canvas, turtle *Turtle, symbol Rules[symbol_Count][RULE_SIZE_MAX], s32 Depth)
 {
     if (Depth >= EXPANSION_MAX_DEPTH)
     {
@@ -185,7 +192,15 @@ internal void PrintLSystem(symbol Rules[symbol_Count][RULE_SIZE_MAX], s32 Depth)
 
             while (OutputSymbol != symbol_Undefined)
             {
-                WriteToExpansionBuffer(OutputSymbol);
+                {
+                    /* draw random line */
+                    f32 X = ((f32)rand()/(f32)(RAND_MAX)) * SCREEN_WIDTH;
+                    f32 Y = ((f32)rand()/(f32)(RAND_MAX)) * SCREEN_HEIGHT;
+                    ImageDrawLine(Canvas, Turtle->Position.x, Turtle->Position.y, X, Y, (Color){0,0,0,255});
+                    Turtle->Position.x = X;
+                    Turtle->Position.y = Y;
+                }
+
                 CurrentItem.Index += 1;
                 OutputSymbol = GetSymbolFromRules(Rules, CurrentItem);
             }
@@ -193,6 +208,25 @@ internal void PrintLSystem(symbol Rules[symbol_Count][RULE_SIZE_MAX], s32 Depth)
             PopAndIncrementParent(&Expansion);
         }
     }
+}
+
+internal Vector2 CreateVector2(f32 X, f32 Y)
+{
+    return (Vector2){X,Y};
+}
+
+internal void UpdateAndRender()
+{
+    BeginDrawing();
+    ClearBackground(ClearColor);
+    {
+        /* draw simulation image */
+        Color *Pixels = LoadImageColors(Canvas);
+        UpdateTexture(FrameBuffer, Pixels);
+        UnloadImageColors(Pixels);
+        DrawTexture(FrameBuffer, 0, 0, (Color){255,255,255,255});
+    }
+    EndDrawing();
 }
 
 int main(void)
@@ -211,31 +245,26 @@ int main(void)
         [symbol_B] = {B,B,End},
     };
 
+    turtle Turtle = {CreateVector2(0.0f, 0.0f), CreateVector2(0.0f, 0.0f)};
+
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Look at the l-systems");
-    SetTargetFPS(TARGET_FPS);
 
-    PrintLSystem(Rules, 6);
-    for (s32 I = 0; I < ExpansionIndex; I++)
-    {
-        switch(ExpansionBuffer[I])
-        {
-        case symbol_A: {printf("a");} break;
-        case symbol_B: {printf("b");} break;
-        default: break;
-        }
-    };
-    printf("\n");
+    Canvas = GenImageColor(SCREEN_WIDTH, SCREEN_HEIGHT, BackgroundColor);
+    FrameBuffer = LoadTextureFromImage(Canvas);
 
-    ClearBackground((Color){0,0,0,255});
+    PrintLSystem(&Canvas, &Turtle, Rules, 6);
 
+#if defined(PLATFORM_WEB)
+    emscripten_set_main_loop(UpdateAndRender, 0, 2);
+#else
+    SetTargetFPS(60);
     while (!WindowShouldClose())
     {
-        BeginDrawing();
-        EndDrawing();
+        UpdateAndRender();
     }
+#endif
 
     CloseWindow();
-
 
     return Result;
 }

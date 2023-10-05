@@ -4,3 +4,6 @@
 tmp/
 
 dist/
+
+# I think the gch extension is from using emscripten?
+*.gch
