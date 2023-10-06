@@ -19,6 +19,7 @@ typedef int32_t s32;
 
 typedef float f32;
 
+#define ArrayCount(a) (sizeof(a)/sizeof((a)[0]))
 
 #define EXPANSION_BUFFER_SIZE (1 << 12)
 #define EXPANSION_MAX_DEPTH 7
@@ -37,16 +38,14 @@ int SCREEN_HEIGHT = 400;
 global_variable Color BackgroundColor = (Color){58, 141, 230, 255};
 global_variable Color ClearColor = (Color){0, 0, 0, 255};
 
-/* TODO put state into a struct and pass as (void *) arg in emscripten_set_main_loop */
-global_variable Image Canvas;
-global_variable Texture2D FrameBuffer;
-
 typedef enum
 {
     symbol_Undefined,
     symbol_Root,
     symbol_A,
     symbol_B,
+    symbol_Push,
+    symbol_Pop,
     symbol_Count,
 } symbol;
 
@@ -68,9 +67,18 @@ typedef struct
     Vector2 Heading;
 } turtle;
 
+typedef struct
+{
+    turtle Turtle;
+    Image Canvas;
+    Texture2D FrameBuffer;
+    s32 LineDrawsPerFrame;
+    symbol Rules[symbol_Count][RULE_SIZE_MAX];
+} app_state;
+
 #if defined(PLATFORM_WEB)
 EM_JS(s32, GetCanvasWidth, (), {
-    var canvas = document.getElementById('canvas');
+    var canvas = document.getElementById("canvas");
     if (canvas) {
         var rect = canvas.getBoundingClientRect();
         return canvas.width;
@@ -80,7 +88,7 @@ EM_JS(s32, GetCanvasWidth, (), {
 });
 
 EM_JS(s32, GetCanvasHeight, (), {
-    var canvas = document.getElementById('canvas');
+    var canvas = document.getElementById("canvas");
     if (canvas) {
         var rect = canvas.getBoundingClientRect();
         return canvas.height;
@@ -239,47 +247,71 @@ internal Vector2 CreateVector2(f32 X, f32 Y)
     return (Vector2){X,Y};
 }
 
-internal void UpdateAndRender()
+internal void UpdateAndRender(void *VoidAppState)
 {
+    /* we have to pass our data in as a void-star because of emscripten, so we just cast it to app_state and pray */
+    app_state *AppState = (app_state *)VoidAppState;
     Vector2 MousePosition = GetMousePosition();
     b32 ButtonDown = IsMouseButtonPressed(0);
 
     BeginDrawing();
     ClearBackground(BackgroundColor);
-    ImageDrawLine(&Canvas, 0, 0, MousePosition.x, MousePosition.y, (Color){0,0,0,255});
+    ImageDrawLine(&AppState->Canvas, 0, 0, MousePosition.x, MousePosition.y, (Color){0,0,0,255});
 
     if (ButtonDown)
     {
-        ImageClearBackground(&Canvas, BackgroundColor);
+        ImageClearBackground(&AppState->Canvas, BackgroundColor);
     }
 
     {
         /* draw simulation image */
-        Color *Pixels = LoadImageColors(Canvas);
-        UpdateTexture(FrameBuffer, Pixels);
+        Color *Pixels = LoadImageColors(AppState->Canvas);
+        UpdateTexture(AppState->FrameBuffer, Pixels);
         UnloadImageColors(Pixels);
-        DrawTexture(FrameBuffer, 0, 0, (Color){255,255,255,255});
+        DrawTexture(AppState->FrameBuffer, 0, 0, (Color){255,255,255,255});
     }
     EndDrawing();
+}
+
+internal void InitRules(symbol Rules[symbol_Count][RULE_SIZE_MAX])
+{
+    symbol A = symbol_A;
+    symbol B = symbol_B;
+    symbol End = symbol_Undefined;
+
+    symbol InitialRules[symbol_Count][RULE_SIZE_MAX] = {
+        [symbol_Root] = {A,B,A,B,End},
+        [symbol_A] = {A,B,A,End},
+        [symbol_B] = {B,B,End},
+    };
+
+    for (u32 I = 0; I < ArrayCount(InitialRules); I++)
+    {
+        for (u32 J = 0; J < ArrayCount(InitialRules[I]); J++)
+        {
+            Rules[I][J] = InitialRules[I][J];
+        }
+    }
+}
+
+internal app_state InitAppState(void)
+{
+    app_state AppState;
+
+    AppState.Turtle = (turtle){CreateVector2(0.0f, 0.0f), CreateVector2(0.0f, 0.0f)};
+    AppState.LineDrawsPerFrame = 100;
+    AppState.Canvas = GenImageColor(SCREEN_WIDTH, SCREEN_HEIGHT, BackgroundColor);
+    AppState.FrameBuffer = LoadTextureFromImage(AppState.Canvas);
+
+    InitRules(AppState.Rules);
+
+    return AppState;
 }
 
 int main(void)
 {
     int Result = 0;
 
-    s32 LineDrawsPerFrame = 100;
-
-    symbol A = symbol_A;
-    symbol B = symbol_B;
-    symbol End = symbol_Undefined;
-
-    symbol Rules[symbol_Count][RULE_SIZE_MAX] = {
-        [symbol_Root] = {A,B,A,B,End},
-        [symbol_A] = {A,B,A,End},
-        [symbol_B] = {B,B,End},
-    };
-
-    turtle Turtle = {CreateVector2(0.0f, 0.0f), CreateVector2(0.0f, 0.0f)};
 
 #if defined(PLATFORM_WEB)
     s32 CanvasWidth = GetCanvasWidth();
@@ -293,18 +325,17 @@ int main(void)
 
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Look at the l-systems");
 
-    Canvas = GenImageColor(SCREEN_WIDTH, SCREEN_HEIGHT, BackgroundColor);
-    FrameBuffer = LoadTextureFromImage(Canvas);
+    app_state AppState = InitAppState();
 
     /* PrintLSystem(&Canvas, &Turtle, Rules, 6); */
 
 #if defined(PLATFORM_WEB)
-    emscripten_set_main_loop(UpdateAndRender, 0, 2);
+    emscripten_set_main_loop_arg(UpdateAndRender, &AppState, 0, 1);
 #else
     SetTargetFPS(60);
     while (!WindowShouldClose())
     {
-        UpdateAndRender();
+        UpdateAndRender(&AppState);
     }
 #endif
 
