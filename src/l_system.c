@@ -2,18 +2,6 @@
     #include <emscripten/emscripten.h>
 #endif
 
-#define internal static
-#define global_variable static
-
-typedef uint8_t u8;
-typedef uint32_t u32;
-
-typedef uint32_t b32;
-
-typedef int32_t s32;
-
-typedef float f32;
-
 void RUN_LSystem(void);
 
 #define ArrayCount(a) (sizeof(a)/sizeof((a)[0]))
@@ -21,6 +9,8 @@ void RUN_LSystem(void);
 #define EXPANSION_BUFFER_SIZE (1 << 12)
 #define EXPANSION_MAX_DEPTH 7
 #define RULE_SIZE_MAX 16
+
+#define BUTTON_PADDING 8
 
 internal void PrintError_(char *Message, char *FileName, s32 LineNumber)
 {
@@ -60,6 +50,19 @@ typedef struct
     Vector2 Heading;
 } turtle;
 
+typedef enum
+{
+    button_kind_Undefined,
+    button_kind_Expansion,
+    button_kind_Movement,
+    button_kind_Count,
+} button_kind;
+
+char *ButtonText[button_kind_Count] = {
+    [button_kind_Expansion] = "Expansion",
+    [button_kind_Movement] = "Movement",
+};
+
 typedef struct
 {
     turtle Turtle;
@@ -67,14 +70,17 @@ typedef struct
     Texture2D FrameBuffer;
     s32 LineDrawsPerFrame;
     symbol Rules[symbol_Count][RULE_SIZE_MAX];
+    button Buttons[button_kind_Count];
+    s32 FontSize;
 } app_state;
 
 #if defined(PLATFORM_WEB)
 EM_JS(void, UpdateCanvasDimensions, (), {
     var canvas = document.getElementById("canvas");
+    var body = document.querySelector("body");
 
-    if (canvas) {
-        var rect = canvas.getBoundingClientRect();
+    if (canvas && body) {
+        var rect = body.getBoundingClientRect();
         canvas.width = rect.width;
         canvas.height = rect.height;
     }
@@ -273,6 +279,19 @@ internal void UpdateAndRender(void *VoidAppState)
         UnloadImageColors(Pixels);
         DrawTexture(AppState->FrameBuffer, 0, 0, (Color){255,255,255,255});
     }
+    {
+        /* draw ui */
+        for (s32 I = 1; I < button_kind_Count; I++)
+        {
+            button Button = AppState->Buttons[I];
+            Color ButtonColor = (Color){20,180,180,255};
+            Color TextColor = (Color){0,0,0,255};
+            DrawRectangle(Button.Position.x, Button.Position.y, Button.Size.x, Button.Size.y, ButtonColor);
+            DrawText(Button.Text,
+                     Button.Position.x + BUTTON_PADDING, Button.Position.y + BUTTON_PADDING,
+                     AppState->FontSize, TextColor);
+        }
+    }
     EndDrawing();
 }
 
@@ -297,6 +316,26 @@ internal void InitRules(symbol Rules[symbol_Count][RULE_SIZE_MAX])
     }
 }
 
+internal void InitUi(app_state *AppState)
+{
+    s32 Y = 10.0f;
+    s32 TwicePadding = 2 * BUTTON_PADDING;
+
+    for (s32 I = 0; I < button_kind_Count; I++)
+    {
+        char *Text = ButtonText[I];
+        s32 Width = MeasureText(Text, AppState->FontSize);
+
+        AppState->Buttons[I].Text = Text;
+        AppState->Buttons[I].Position = (Vector2){10.0f, Y};
+        AppState->Buttons[I].Size = (Vector2){Width + TwicePadding,
+                                              AppState->FontSize + TwicePadding};
+        AppState->Buttons[I].Active = 0;
+
+        Y += TwicePadding + AppState->FontSize + 10;
+    }
+}
+
 internal app_state InitAppState(void)
 {
     app_state AppState;
@@ -305,6 +344,9 @@ internal app_state InitAppState(void)
     AppState.LineDrawsPerFrame = 100;
     AppState.Canvas = GenImageColor(SCREEN_WIDTH, SCREEN_HEIGHT, BackgroundColor);
     AppState.FrameBuffer = LoadTextureFromImage(AppState.Canvas);
+    AppState.FontSize = 16;
+
+    InitUi(&AppState);
 
     InitRules(AppState.Rules);
 
