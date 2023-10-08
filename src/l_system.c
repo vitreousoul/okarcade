@@ -105,8 +105,19 @@ EM_JS(s32, GetCanvasHeight, (), {
         return -1.0;
     }
 });
-
 #endif
+
+internal char *GetSymbolText(symbol Symbol)
+{
+    switch (Symbol)
+    {
+    case symbol_A: return (char *)"A";
+    case symbol_B: return (char *)"B";
+    case symbol_Push: return (char *)"+";
+    case symbol_Pop: return (char *)"-";
+    default: return 0;
+    }
+}
 
 internal expansion_item CreateExpansionItem(symbol Symbol, s32 Index)
 {
@@ -256,6 +267,47 @@ internal Vector2 CreateVector2(f32 X, f32 Y)
     return (Vector2){X,Y};
 }
 
+internal void DrawRuleSet(app_state *AppState)
+{
+    Color FontColor = (Color){0, 0, 0, 255};
+    Color BackgroundColor = (Color){80, 80, 80, 255};
+    s32 ItemWidth = 24;
+    s32 Padding = 8;
+    s32 Width = (ItemWidth * RULE_SIZE_MAX) + (2 * Padding);
+    s32 Height = (2 * AppState->FontSize) + (3 * Padding);
+    s32 Y = SCREEN_HEIGHT - (Height + Padding);
+    s32 X = Padding;
+    s32 RowIndex = 0;
+
+    DrawRectangle(X, Y, Width, Height, BackgroundColor);
+
+    for (s32 I = symbol_A; I <= symbol_B; I++)
+    {
+        char *LabelText = GetSymbolText(I);
+        s32 LabelX = X + Padding;
+        s32 YOffset = RowIndex * (AppState->FontSize + Padding);
+        RowIndex += 1;
+        s32 LabelY = Y + YOffset + Padding;
+
+        DrawText(LabelText, LabelX, LabelY, AppState->FontSize, FontColor);
+
+        for (s32 J = 0; J < RULE_SIZE_MAX; J++)
+        {
+            char *ItemText = GetSymbolText(AppState->Rules[I][J]);
+
+            if (ItemText)
+            {
+                s32 XOffset = (J + 1) * (ItemWidth + 0);//Padding);
+                DrawText(ItemText, LabelX + XOffset, LabelY, AppState->FontSize, FontColor);
+            }
+            else
+            {
+                break;
+            }
+        }
+    }
+}
+
 internal void UpdateAndRender(void *VoidAppState)
 {
     /* we have to pass our data in as a void-star because of emscripten, so we just cast it to app_state and pray */
@@ -290,6 +342,8 @@ internal void UpdateAndRender(void *VoidAppState)
             DrawText(Button.Text,
                      Button.Position.x + BUTTON_PADDING, Button.Position.y + BUTTON_PADDING,
                      AppState->FontSize, TextColor);
+
+            DrawRuleSet(AppState);
         }
     }
     EndDrawing();
