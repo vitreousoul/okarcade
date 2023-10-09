@@ -19,21 +19,29 @@ typedef struct
 } pre_processor;
 
 
-void PreprocessFile(char *FilePath, char *OutputFilePath);
+b32 PreprocessFile(u8 *FilePath, u8 *OutputFilePath);
 void TestPreprocessor(void);
 
-void PreprocessFile(char *FilePath, char *OutputFilePath)
+
+b32 PreprocessFile(u8 *FilePath, u8 *OutputFilePath)
 {
     buffer *Buffer = ReadFileIntoBuffer(FilePath);
+    b32 Error = 0;
 
     if (!Buffer)
     {
         printf("Error in PreprocessFile: null buffer\n");
-        return;
+        Error = 1;
     }
+
+    /* TODO process data */
+    WriteFile(OutputFilePath, Buffer);
+
+    return Error;
 }
 
 void TestPreprocessor(void)
 {
-    printf("testing preprocessor.....\n");
+    EnsureDirectoryExists((u8 *)"../gen");
+    PreprocessFile((u8 *)"../src/l_system.html", (u8 *)"../gen/l_system.html");
 }

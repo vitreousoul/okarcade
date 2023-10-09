@@ -3,7 +3,10 @@
 *.log
 tmp/
 
+# "dist" is where the final static-site files will be written to
 dist/
+# "gen" is where generated files are written to
+gen/
 
 # I think the gch extension is from using emscripten?
 *.gch

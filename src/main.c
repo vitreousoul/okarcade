@@ -90,8 +90,18 @@ int main(s32 ArgCount, char **Args)
 
     switch(CommandLineArgs.Type)
     {
-    case command_line_arg_type_Preprocess: { TestPreprocessor(); } break;
-    case command_line_arg_type_LSystem: { RUN_LSystem(); } break;
+    case command_line_arg_type_Preprocess:
+    {
+        TestPreprocessor();
+    } break;
+    case command_line_arg_type_LSystem:
+    {
+        RUN_LSystem();
+    } break;
+    default:
+    {
+        printf("Un-handled command line arg type: %d\n", CommandLineArgs.Type);
+    } break;
     }
 
 
