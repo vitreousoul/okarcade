@@ -17,3 +17,23 @@ typedef struct
     u8 *Bra;
     u8 *Ket;
 } pre_processor;
+
+
+void PreprocessFile(char *FilePath, char *OutputFilePath);
+void TestPreprocessor(void);
+
+void PreprocessFile(char *FilePath, char *OutputFilePath)
+{
+    buffer *Buffer = ReadFileIntoBuffer(FilePath);
+
+    if (!Buffer)
+    {
+        printf("Error in PreprocessFile: null buffer\n");
+        return;
+    }
+}
+
+void TestPreprocessor(void)
+{
+    printf("testing preprocessor.....\n");
+}

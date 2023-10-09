@@ -1,3 +1,4 @@
 #!/usr/bin/env sh
 
-./dist/main.out
+cd dist
+./main.out
