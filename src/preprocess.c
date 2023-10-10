@@ -99,19 +99,27 @@ b32 PreprocessFile(pre_processor PreProcessor, u8 *FilePath, u8 *OutputFilePath)
     for (s32 I = 0; I < Buffer->Size; I++)
     {
         b32 FoundBra = CheckIfStringIsPrefix(PreProcessor.Bra, Buffer, I);
-        b32 FoundKet = CheckIfStringIsPrefix(PreProcessor.Ket, Buffer, I);
 
         if (FoundBra)
         {
-            printf("FoundBra\n");
-        }
-        else if (FoundKet)
-        {
-            printf("FoundKet\n");
+            s32 CommandStart = I + PreProcessor.BraCount;
+            for (s32 J = CommandStart; J < Buffer->Size; J++)
+            {
+                b32 FoundKet = CheckIfStringIsPrefix(PreProcessor.Ket, Buffer, J);
+
+                if (FoundKet)
+                {
+                    for (s32 K = CommandStart; K < J; K++)
+                    {
+                        printf("%c", Buffer->Data[K]);
+                    }
+                    printf("\n");
+                    break;
+                }
+            }
         }
     }
 
-    /* TODO process data */
     WriteFile(OutputFilePath, Buffer);
 
     return Error;
