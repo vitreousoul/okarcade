@@ -3,7 +3,6 @@
   This is something
 |*/
 
-#include <stdlib.h>
 #include <stdio.h>
 
 #include "../lib/raylib.h"
