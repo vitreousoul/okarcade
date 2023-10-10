@@ -3,8 +3,9 @@
 
 #include "../lib/raylib.h"
 
-#include "./types.h"
+#include "types.h"
 #include "platform.h"
+#include "core.c"
 #include "preprocess.c"
 #include "ui.c"
 

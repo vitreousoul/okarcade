@@ -6,20 +6,7 @@
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
     <title>L-Systems are cool</title>
     <style>
-      html,
-      body {
-          margin: 0;
-          padding: 0;
-      }
-
-      body {
-          width: 100vw;
-          height: 100vh;
-          overflow: hidden;
-      }
-
-      #canvas {
-      }
+      {| include ./raylib_app.css |}
     </style>
   </head>
 
@@ -27,22 +14,7 @@
     <canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex=-1></canvas>
 
     <script type='text/javascript'>
-      var Module = {
-          canvas: (() => {
-              var canvas = document.getElementById('canvas');
-              var webglContextLostHandler = (e) => {
-                  alert('WebGL context lost. You will need to reload the page.');
-                  e.preventDefault();
-              };
-
-              // As a default initial behavior, pop up an alert when webgl context is lost. To make your
-              // application robust, you may want to override this behavior before shipping!
-              // See http://www.khronos.org/registry/webgl/specs/latest/1.0/#5.15.2
-              canvas.addEventListener('webglcontextlost', webglContextLostHandler, false);
-
-              return canvas;
-          })(),
-      };
+      {| include ./raylib_app.js |}
     </script>
 
     {{{ SCRIPT }}}

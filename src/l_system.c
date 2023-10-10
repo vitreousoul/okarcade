@@ -9,8 +9,6 @@
 
 void RUN_LSystem(void);
 
-#define ArrayCount(a) (sizeof(a)/sizeof((a)[0]))
-
 #define EXPANSION_BUFFER_SIZE (1 << 12)
 #define EXPANSION_MAX_DEPTH 7
 #define RULE_SIZE_MAX 16
