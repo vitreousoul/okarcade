@@ -4,9 +4,11 @@
   - documentation generation
 */
 
+#define IS_SPACE(c) ((c) == ' ' || (c) == '\t' || (c) == '\n' || (c) == '\r')
+
 typedef enum
 {
-    pre_processor_command_Null,
+    pre_processor_command_Undefined,
     pre_processor_command_Include,
     pre_processor_command_Docgen,
     pre_processor_command_Count,
@@ -20,6 +22,8 @@ typedef struct
 
 #define PRE_PROCESSOR_COMMAND_MAX 16
 
+#define OUTPUT_BUFFER_MAX (1 << 15) /* TODO delete this when we have expandable array */
+
 typedef struct
 {
     u8 *Bra;
@@ -30,6 +34,16 @@ typedef struct
     s32 CommandCount;
 } pre_processor;
 
+typedef enum
+{
+    command_result_Undefined,
+    command_result_Count,
+} command_result_type;
+
+typedef struct
+{
+
+} command_result;
 
 b32 PreprocessFile(pre_processor PreProcessor, u8 *FilePath, u8 *OutputFilePath);
 void TestPreprocessor(void);
@@ -61,6 +75,21 @@ internal void AddPreProcessorCommand(pre_processor *PreProcessor, pre_processor_
     PreProcessor->CommandCount += 1;
 }
 
+internal void SkipSpace(buffer *Buffer, s32 *Index)
+{
+    while (*Index < Buffer->Size)
+    {
+        if (!IS_SPACE(Buffer->Data[*Index]))
+        {
+            break;
+        }
+        else
+        {
+            *Index += 1;
+        }
+    }
+}
+
 internal b32 CheckIfStringIsPrefix(u8 *String, buffer *Buffer, s32 BufferOffset)
 {
     b32 IsPrefix = 1;
@@ -85,10 +114,76 @@ internal b32 CheckIfStringIsPrefix(u8 *String, buffer *Buffer, s32 BufferOffset)
     return IsPrefix;
 }
 
+internal buffer *GetCommandToken(pre_processor PreProcessor, buffer *Buffer, s32 Offset)
+{
+    SkipSpace(Buffer, &Offset);
+
+    buffer *TokenBuffer = AllocateMemory(sizeof(buffer));
+
+    TokenBuffer->Size = 0;
+    TokenBuffer->Data = 0;
+
+    for (; TokenBuffer->Size < Buffer->Size - Offset; TokenBuffer->Size++)
+    {
+        b32 IsKet = CheckIfStringIsPrefix(PreProcessor.Ket, Buffer, TokenBuffer->Size);
+        b32 IsSpace = IS_SPACE(Buffer->Data[Offset + TokenBuffer->Size]);
+
+        if (IsKet || IsSpace)
+        {
+            TokenBuffer->Data = AllocateMemory(TokenBuffer->Size + 1);
+            TokenBuffer->Data[TokenBuffer->Size] = 0;
+            CopyMemory(Buffer->Data + Offset, TokenBuffer->Data, TokenBuffer->Size);
+            break;
+        }
+    }
+
+    return TokenBuffer;
+}
+
+internal void HandlePreProcessCommand(pre_processor PreProcessor, buffer *Buffer, s32 Offset, s32 CommandSize, buffer *OutputBuffer)
+{
+    s32 Index = Offset;
+    s32 MaxIndex = Offset + CommandSize;
+    u8 *IncludeName = (u8 *)"include";
+
+    SkipSpace(Buffer, &Index);
+
+    if (Index < MaxIndex && CheckIfStringIsPrefix(IncludeName, Buffer, Index))
+    {
+        Index += GetStringLength(IncludeName);
+        SkipSpace(Buffer, &Index);
+
+        buffer *Token = GetCommandToken(PreProcessor, Buffer, Index);
+        buffer *Buffer = ReadFileIntoBuffer(Token->Data);
+
+        if (Buffer)
+        {
+            Assert(Buffer->Size + OutputBuffer->Size < OUTPUT_BUFFER_MAX);
+            CopyMemory(Buffer->Data, OutputBuffer->Data + OutputBuffer->Size, Buffer->Size);
+            OutputBuffer->Size += Buffer->Size;
+            FreeBuffer(Buffer);
+        }
+        else
+        {
+            LogError("include file not found");
+        }
+    }
+    else
+    {
+        LogError("Unknown command");
+    }
+}
+
 b32 PreprocessFile(pre_processor PreProcessor, u8 *FilePath, u8 *OutputFilePath)
 {
     buffer *Buffer = ReadFileIntoBuffer(FilePath);
+
+    buffer OutputBuffer;
+    OutputBuffer.Data = AllocateMemory(OUTPUT_BUFFER_MAX);
+    OutputBuffer.Size = 0;
+
     b32 Error = 0;
+    s32 WriteIndex = 0;
 
     if (!Buffer)
     {
@@ -109,18 +204,46 @@ b32 PreprocessFile(pre_processor PreProcessor, u8 *FilePath, u8 *OutputFilePath)
 
                 if (FoundKet)
                 {
-                    for (s32 K = CommandStart; K < J; K++)
-                    {
-                        printf("%c", Buffer->Data[K]);
-                    }
-                    printf("\n");
+                    u8 *BufferStart = Buffer->Data + WriteIndex;
+                    u8 *OutputBufferStart = OutputBuffer.Data + OutputBuffer.Size;
+                    s32 JustPastKet = J + PreProcessor.KetCount;
+                    s32 Size = I - WriteIndex;
+
+                    Assert(OutputBuffer.Size + Size < OUTPUT_BUFFER_MAX);
+
+                    CopyMemory(BufferStart, OutputBufferStart, Size);
+                    OutputBuffer.Size += Size;
+                    WriteIndex = JustPastKet;
+                    I = JustPastKet;
+
+                    HandlePreProcessCommand(PreProcessor, Buffer, CommandStart, J, &OutputBuffer);
+
                     break;
                 }
             }
         }
     }
 
-    WriteFile(OutputFilePath, Buffer);
+    if (WriteIndex < Buffer->Size)
+    {
+        u8 *OutputBufferStart = OutputBuffer.Data + OutputBuffer.Size;
+        s32 Size = Buffer->Size - WriteIndex;
+
+        CopyMemory(Buffer->Data + WriteIndex, OutputBufferStart, Size);
+        OutputBuffer.Size += Size;
+    }
+
+    if(0){ /* debug printing */
+        for (s32 I = 0; I < OutputBuffer.Size; I++)
+        {
+            printf("%c", OutputBuffer.Data[I]);
+        }
+        printf("\n");
+    }
+
+    WriteFile(OutputFilePath, &OutputBuffer);
+    FreeMemory(OutputBuffer.Data);
+    FreeBuffer(Buffer);
 
     return Error;
 }

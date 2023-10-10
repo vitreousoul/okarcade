@@ -7,8 +7,10 @@ typedef struct
 } buffer;
 
 void *AllocateMemory(u64 Size);
+void FreeMemory(void *Ref);
 void CopyMemory(u8 *Source, u8 *Destination, u64 Size);
 buffer *ReadFileIntoBuffer(u8 *FilePath);
+void FreeBuffer(buffer *Buffer);
 void WriteFile(u8 *FilePath, buffer *Buffer);
 void EnsureDirectoryExists(u8 *DirectoryPath);
 
@@ -16,6 +18,12 @@ void *AllocateMemory(u64 Size)
 {
     /* just use malloc for now... */
     return malloc(Size);
+}
+
+void FreeMemory(void *Ref)
+{
+    /* just use free for now... */
+    free(Ref);
 }
 
 void CopyMemory(u8 *Source, u8 *Destination, u64 Size)
@@ -37,17 +45,23 @@ buffer *ReadFileIntoBuffer(u8 *FilePath)
         return 0;
     }
 
-    buffer *Buffer = malloc(sizeof(buffer));
+    buffer *Buffer = AllocateMemory(sizeof(buffer));
     FILE *file = fopen((char *)FilePath, "rb");
 
     Buffer->Size = StatResult.st_size;
-    Buffer->Data = malloc(Buffer->Size + 1);
+    Buffer->Data = AllocateMemory(Buffer->Size + 1);
     fread(Buffer->Data, 1, Buffer->Size, file);
     Buffer->Data[Buffer->Size] = 0; // null terminate
 
     fclose(file);
 
     return Buffer;
+}
+
+void FreeBuffer(buffer *Buffer)
+{
+    FreeMemory(Buffer->Data);
+    FreeMemory(Buffer);
 }
 
 void WriteFile(u8 *FilePath, buffer *Buffer)

@@ -3,11 +3,22 @@
   This is something
 |*/
 
+#include <stdlib.h>
+#include <stdio.h>
+
+#include "../lib/raylib.h"
+
 #if defined(PLATFORM_WEB)
     #include <emscripten/emscripten.h>
 #endif
 
-void RUN_LSystem(void);
+#include "types.h"
+#include "core.c"
+#include "ui.c"
+
+int SCREEN_WIDTH = 600;
+int SCREEN_HEIGHT = 400;
+#define TARGET_FPS 30
 
 #define EXPANSION_BUFFER_SIZE (1 << 12)
 #define EXPANSION_MAX_DEPTH 7
@@ -410,7 +421,7 @@ internal app_state InitAppState(void)
     return AppState;
 }
 
-void RUN_LSystem(void)
+int main(void)
 {
 #if defined(PLATFORM_WEB)
     UpdateCanvasDimensions();

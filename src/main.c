@@ -1,25 +1,15 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#include "../lib/raylib.h"
-
 #include "types.h"
 #include "platform.h"
 #include "core.c"
 #include "preprocess.c"
-#include "ui.c"
-
-int SCREEN_WIDTH = 600;
-int SCREEN_HEIGHT = 400;
-#define TARGET_FPS 30
-
-#include "./l_system.c"
 
 typedef enum
 {
     command_line_arg_type_Undefined,
     command_line_arg_type_Preprocess,
-    command_line_arg_type_LSystem,
     command_line_arg_type_Count,
 } command_line_arg_type;
 
@@ -71,10 +61,6 @@ internal command_line_args ParseCommandLineArgs(s32 ArgCount, char **Args)
         {
             CommandLineArgs.Type = command_line_arg_type_Preprocess;
         }
-        else if (StringsEqual(FirstArg, "lsystem"))
-        {
-            CommandLineArgs.Type = command_line_arg_type_LSystem;
-        }
         else
         {
             printf("Command line parse error: unexpected command \"%s\"\n", FirstArg);
@@ -94,10 +80,6 @@ int main(s32 ArgCount, char **Args)
     case command_line_arg_type_Preprocess:
     {
         TestPreprocessor();
-    } break;
-    case command_line_arg_type_LSystem:
-    {
-        RUN_LSystem();
     } break;
     default:
     {
