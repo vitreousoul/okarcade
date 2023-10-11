@@ -1,5 +1,10 @@
 #!/usr/bin/env sh
 
+cd dist
+echo "Preprocessing..."
+./main.out preprocess
+cd ..
+
 RAYLIB_LIB="./lib/libraylibweb.a"
 RAYLIB_INCLUDE="-I. -I./lib/raylib.h -L. -L$RAYLIB_LIB"
 WEB_CONFIG="-s USE_GLFW=3 -s ASYNCIFY"

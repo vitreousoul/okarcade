@@ -235,6 +235,7 @@ b32 PreprocessFile(pre_processor PreProcessor, u8 *FilePath, u8 *OutputFilePath)
         OutputBuffer.Size += Size;
     }
 
+    printf("Writing pre-processed file %s\n", OutputFilePath);
     WriteFile(OutputFilePath, &OutputBuffer);
     FreeMemory(OutputBuffer.Data);
     FreeBuffer(Buffer);
@@ -245,8 +246,12 @@ b32 PreprocessFile(pre_processor PreProcessor, u8 *FilePath, u8 *OutputFilePath)
 void TestPreprocessor(void)
 {
     u8 *GenDirectory = (u8 *)"../gen";
-    u8 *LSystemInputHtml = (u8 *)"../src/l_system.html";
-    u8 *LSystemOutputHtml = (u8 *)"../gen/l_system.html";
+
+    u8 *IndexIn = (u8 *)"../src/index.html";
+    u8 *IndexOut = (u8 *)"../dist/index.html";
+
+    u8 *LSystemIn = (u8 *)"../src/l_system.html";
+    u8 *LSystemOut = (u8 *)"../gen/l_system.html";
 
     u8 *Bra = (u8 *)"{|";
     u8 *Ket = (u8 *)"|}";
@@ -256,5 +261,7 @@ void TestPreprocessor(void)
     AddPreProcessorCommand(&PreProcessor, pre_processor_command_Docgen, (u8 *)"docgen");
 
     EnsureDirectoryExists(GenDirectory);
-    PreprocessFile(PreProcessor, LSystemInputHtml, LSystemOutputHtml);
+
+    PreprocessFile(PreProcessor, IndexIn, IndexOut);
+    PreprocessFile(PreProcessor, LSystemIn, LSystemOut);
 }
