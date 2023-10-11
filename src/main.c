@@ -19,31 +19,6 @@ typedef struct
     command_line_arg_type Type;
 } command_line_args;
 
-/* TODO StringsEqual should maybe live in a more core location */
-internal b32 StringsEqual(char *StringA, char *StringB)
-{
-    s32 AreEqual = 1;
-    s32 Index = 0;
-
-    for(;;)
-    {
-        char CharA = StringA[Index];
-        char CharB = StringB[Index];
-
-        if (CharA != CharB)
-        {
-            AreEqual = 0;
-        }
-
-        if (CharA == 0 || CharB == 0)
-        {
-            break;
-        }
-
-        Index += 1;
-    }
-    return AreEqual;
-}
 
 internal command_line_args ParseCommandLineArgs(s32 ArgCount, char **Args)
 {
@@ -86,7 +61,6 @@ int main(s32 ArgCount, char **Args)
         printf("Un-handled command line arg type: %d\n", CommandLineArgs.Type);
     } break;
     }
-
 
     return Result;
 }

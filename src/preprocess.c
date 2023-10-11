@@ -159,6 +159,7 @@ internal void HandlePreProcessCommand(pre_processor PreProcessor, buffer *Buffer
         if (Buffer)
         {
             Assert(Buffer->Size + OutputBuffer->Size < OUTPUT_BUFFER_MAX);
+
             CopyMemory(Buffer->Data, OutputBuffer->Data + OutputBuffer->Size, Buffer->Size);
             OutputBuffer->Size += Buffer->Size;
             FreeBuffer(Buffer);
@@ -198,6 +199,7 @@ b32 PreprocessFile(pre_processor PreProcessor, u8 *FilePath, u8 *OutputFilePath)
         if (FoundBra)
         {
             s32 CommandStart = I + PreProcessor.BraCount;
+
             for (s32 J = CommandStart; J < Buffer->Size; J++)
             {
                 b32 FoundKet = CheckIfStringIsPrefix(PreProcessor.Ket, Buffer, J);
@@ -231,14 +233,6 @@ b32 PreprocessFile(pre_processor PreProcessor, u8 *FilePath, u8 *OutputFilePath)
 
         CopyMemory(Buffer->Data + WriteIndex, OutputBufferStart, Size);
         OutputBuffer.Size += Size;
-    }
-
-    if(0){ /* debug printing */
-        for (s32 I = 0; I < OutputBuffer.Size; I++)
-        {
-            printf("%c", OutputBuffer.Data[I]);
-        }
-        printf("\n");
     }
 
     WriteFile(OutputFilePath, &OutputBuffer);

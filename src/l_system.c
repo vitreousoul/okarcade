@@ -3,6 +3,7 @@
   This is something
 |*/
 
+#include <stdlib.h>
 #include <stdio.h>
 
 #include "../lib/raylib.h"
@@ -24,12 +25,6 @@ int SCREEN_HEIGHT = 400;
 #define RULE_SIZE_MAX 16
 
 #define BUTTON_PADDING 8
-
-internal void PrintError_(char *Message, char *FileName, s32 LineNumber)
-{
-    printf("Error in file %s line %d: %s\n", FileName, LineNumber, Message);
-}
-#define PrintError(message) PrintError_((message), __FILE__, __LINE__)
 
 global_variable Color BackgroundColor = (Color){58, 141, 230, 255};
 global_variable Color ClearColor = (Color){0, 0, 0, 255};
@@ -160,6 +155,7 @@ internal expansion_item PopExpansionItem(expansion *Expansion)
     else
     {
         expansion_item Item;
+
         Item.Symbol = Expansion->Items[Expansion->Index].Symbol;
         Item.Index = Expansion->Items[Expansion->Index].Index;
         Expansion->Index -= 1;
@@ -179,6 +175,7 @@ internal expansion_item PeekExpansionItem(expansion *Expansion)
     else
     {
         expansion_item Item;
+
         Item.Symbol = Expansion->Items[PeekIndex].Symbol;
         Item.Index = Expansion->Items[PeekIndex].Index;
 
@@ -217,7 +214,7 @@ internal void PrintLSystem(Image *Canvas, turtle *Turtle, symbol Rules[symbol_Co
     {
         s32 MaxDepthMinusOne = EXPANSION_MAX_DEPTH - 1;
         printf("Max depth for PrintLSystem is %d but was passed a depth of %d\n", MaxDepthMinusOne, Depth);
-        PrintError("DepthError\n");
+        LogError("DepthError\n");
     }
 
     expansion Expansion = {0};
@@ -234,7 +231,7 @@ internal void PrintLSystem(Image *Canvas, turtle *Turtle, symbol Rules[symbol_Co
 
         if (!RuleIndexInBounds)
         {
-            PrintError("Rule index out of bounds\n");
+            LogError("Rule index out of bounds\n");
             break;
         }
 
