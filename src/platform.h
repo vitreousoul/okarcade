@@ -24,11 +24,31 @@ typedef struct
 void *AllocateMemory(u64 Size);
 void FreeMemory(void *Ref);
 void CopyMemory(u8 *Source, u8 *Destination, u64 Size);
+void CopyString(u8 *Source, u8 *Destination, s32 DestinationSize);
 buffer *ReadFileIntoBuffer(u8 *FilePath);
 void FreeBuffer(buffer *Buffer);
 void WriteFile(u8 *FilePath, buffer *Buffer);
 void EnsureDirectoryExists(u8 *DirectoryPath);
+void FreeFileArray(file_array FileArray);
 file_array WalkDirectory(u8 *Path);
+
+#define LogError(s) LogError_((u8 *)s, __LINE__, __FILE__)
+internal void LogError_(u8 *Message, s32 Line, char *File)
+{
+    printf("Error at line %d in %s: %s\n", Line, File, Message);
+}
+
+#define Assert(p) Assert_(p, __FILE__, __LINE__)
+internal void Assert_(b32 Proposition, char *FilePath, s32 LineNumber)
+{
+    if (!Proposition)
+    {
+        b32 *NullPtr = 0;
+        printf("Assertion failed on line %d in %s\n", LineNumber, FilePath);
+        /* this should break the program... */
+        Proposition = *NullPtr;
+    }
+}
 
 void *AllocateMemory(u64 Size)
 {
@@ -47,6 +67,31 @@ void CopyMemory(u8 *Source, u8 *Destination, u64 Size)
     for (u64 I = 0; I < Size; I++)
     {
         Destination[I] = Source[I];
+    }
+}
+
+void CopyString(u8 *Source, u8 *Destination, s32 DestinationSize)
+{
+    /* NOTE we assume strings are null-terminated */
+    s32 I = 0;
+
+    if (!(Source && Destination)) return;
+
+    for (;;)
+    {
+        if (I >= DestinationSize)
+        {
+            break;
+        }
+
+        Destination[I] = Source[I];
+
+        if (!Source[I])
+        {
+            break;
+        }
+
+        I += 1;
     }
 }
 
@@ -101,43 +146,103 @@ void EnsureDirectoryExists(u8 *DirectoryPath)
     }
 }
 
+void FreeFileArray(file_array FileArray)
+{
+    free(FileArray.Files);
+}
+
+internal b32 IsRelativePathName(char *PathName)
+{
+    s32 Length = -1;
+    while (PathName[++Length]);
+
+    b32 SingleDot = Length == 1 && PathName[0] == '.';
+    b32 DoubleDot = Length == 2 && PathName[0] == '.' && PathName[1] == '.';
+    b32 IsRelative = SingleDot || DoubleDot;
+
+    return IsRelative;
+}
+
 file_array WalkDirectory(u8 *Path)
 {
-    s32 FileArraySize = 64;
+    u8 ActivePaths[64][1024]; /* TODO only allow for a depth of 64 in the file tree... this should be dynamic..... */
+    s32 ActivePathIndex = 0;
+
+    s32 FileArrayCount = 64;
 
     file_array FileArray;
     FileArray.Count = 0;
-    FileArray.Capacity = 0;
-    FileArray.Files = malloc(sizeof(file_data) * FileArraySize);
+    FileArray.Capacity = FileArrayCount;
+    FileArray.Files = malloc(sizeof(file_data) * FileArrayCount);
 
     struct dirent *DirectoryEntry = 0;
 
-    DIR *Directory = opendir((char *)Path);
+    CopyString(Path, ActivePaths[ActivePathIndex], 1024);
 
-    if (!Directory)
+    while (ActivePathIndex >= 0 && ActivePathIndex < 64)
     {
-        printf("Platform error opening directory \"%s\"", Path);
-    }
+        char *CurrentPath = (char *)ActivePaths[ActivePathIndex];
+        DIR *Directory = opendir(CurrentPath);
+        ActivePathIndex -= 1;
 
-    for (;;)
-    {
-        struct stat Stat;
-
-        DirectoryEntry = readdir(Directory);
-
-        if (!DirectoryEntry)
+        if (!Directory)
         {
-            break;
+            printf("Platform error opening directory \"%s\"\n", CurrentPath);
+            continue;
         }
-        else if (fstatat(dirfd(Directory), DirectoryEntry->d_name, &Stat, 0) < 0)
+
+        while (1)
         {
-            printf("fstatat error in directory \"%s\" with child \"%s\"\n", Path, DirectoryEntry->d_name);
-        }
-        else
-        {
-            /* TODO if file, push to files array */
-            /* TODO if directory, recurse/push-to-stack */
-            printf("%s\n", DirectoryEntry->d_name);
+            struct stat Stat;
+
+            DirectoryEntry = readdir(Directory);
+
+            if (!DirectoryEntry)
+            {
+                break;
+            }
+            else if (fstatat(dirfd(Directory), DirectoryEntry->d_name, &Stat, 0) < 0)
+            {
+                printf("fstatat error in directory \"%s\" with child \"%s\"\n", Path, DirectoryEntry->d_name);
+            }
+            else if (S_ISREG(Stat.st_mode))
+            {
+                if (FileArray.Count >= FileArray.Capacity)
+                {
+                    FileArrayCount *= 2;
+                    FileArray.Files = realloc(FileArray.Files, sizeof(file_data) * FileArrayCount);
+                }
+
+                FileArray.Files[FileArray.Count].Name = (u8 *)DirectoryEntry->d_name;
+                FileArray.Count += 1;
+            }
+            else if (IsRelativePathName(DirectoryEntry->d_name))
+            {
+                continue;
+            }
+            else if (S_ISDIR(Stat.st_mode))
+            {
+                ActivePathIndex += 1;
+                Assert(ActivePathIndex < 64);
+
+                s32 CurrentPathLength = -1;
+                while (CurrentPath[++CurrentPathLength]);
+                s32 DirectoryPathLength = -1;
+                while (DirectoryEntry->d_name[++DirectoryPathLength ]);
+
+                s32 TotalLength = CurrentPathLength + DirectoryPathLength + 2; /* plus two for slash between paths and null-char */
+
+                if (TotalLength > 1024)
+                {
+                    printf("WalkDirectory error: working path exceeds max length of 1024 \"%s/%s\"\n", CurrentPath, DirectoryEntry->d_name);
+                    continue;
+                }
+
+                u8 TempString[1024];
+                sprintf((char *)TempString, "%s/%s", CurrentPath, DirectoryEntry->d_name);
+                TempString[TotalLength - 1] = 0;
+                CopyString(TempString, ActivePaths[ActivePathIndex], TotalLength);
+            }
         }
     }
 

@@ -14,7 +14,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/dist/main.out",
-            "args": [],
+            "args": ["code"],
             "stopAtEntry": false,
             "cwd": "${fileDirname}",
             "environment": [],

@@ -63,7 +63,14 @@ int main(s32 ArgCount, char **Args)
     } break;
     case command_line_arg_type_CreateCodePages:
     {
-        WalkDirectory((u8 *)"../src");
+        file_array FileArray = WalkDirectory((u8 *)"../src");
+
+        for (s32 I = 0; I < FileArray.Count; I++)
+        {
+            printf("file: %s\n", FileArray.Files[I].Name);
+        }
+
+        FreeFileArray(FileArray);
     } break;
     default:
     {
