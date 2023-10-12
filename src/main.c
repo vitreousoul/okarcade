@@ -10,6 +10,7 @@ typedef enum
 {
     command_line_arg_type_Undefined,
     command_line_arg_type_Preprocess,
+    command_line_arg_type_CreateCodePages,
     command_line_arg_type_Count,
 } command_line_arg_type;
 
@@ -36,6 +37,10 @@ internal command_line_args ParseCommandLineArgs(s32 ArgCount, char **Args)
         {
             CommandLineArgs.Type = command_line_arg_type_Preprocess;
         }
+        else if (StringsEqual(FirstArg, "code"))
+        {
+            CommandLineArgs.Type = command_line_arg_type_CreateCodePages;
+        }
         else
         {
             printf("Command line parse error: unexpected command \"%s\"\n", FirstArg);
@@ -55,6 +60,10 @@ int main(s32 ArgCount, char **Args)
     case command_line_arg_type_Preprocess:
     {
         TestPreprocessor();
+    } break;
+    case command_line_arg_type_CreateCodePages:
+    {
+        WalkDirectory((u8 *)"../src");
     } break;
     default:
     {
