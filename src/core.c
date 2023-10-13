@@ -3,6 +3,12 @@
 u64 GetStringLength(u8 *String);
 b32 StringsEqual(char *StringA, char *StringB);
 
+#define LogError(s) LogError_((u8 *)s, __LINE__, __FILE__)
+internal void LogError_(u8 *Message, s32 Line, char *File)
+{
+    printf("Error at line %d in %s: %s\n", Line, File, Message);
+}
+
 u64 GetStringLength(u8 *String)
 {
     u64 Length = 0;

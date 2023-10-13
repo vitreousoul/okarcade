@@ -246,9 +246,10 @@ b32 PreprocessFile(pre_processor PreProcessor, u8 *FilePath, u8 *OutputFilePath)
 void TestPreprocessor(void)
 {
     u8 *GenDirectory = (u8 *)"../gen";
+    u8 *SiteDirectory = (u8 *)"../site";
 
     u8 *IndexIn = (u8 *)"../src/index.html";
-    u8 *IndexOut = (u8 *)"../dist/index.html";
+    u8 *IndexOut = (u8 *)"../site/index.html";
 
     u8 *LSystemIn = (u8 *)"../src/l_system.html";
     u8 *LSystemOut = (u8 *)"../gen/l_system.html";
@@ -261,6 +262,7 @@ void TestPreprocessor(void)
     AddPreProcessorCommand(&PreProcessor, pre_processor_command_Docgen, (u8 *)"docgen");
 
     EnsureDirectoryExists(GenDirectory);
+    EnsureDirectoryExists(SiteDirectory);
 
     PreprocessFile(PreProcessor, IndexIn, IndexOut);
     PreprocessFile(PreProcessor, LSystemIn, LSystemOut);

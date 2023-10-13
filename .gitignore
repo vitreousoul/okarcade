@@ -3,10 +3,15 @@
 *.log
 tmp/
 
-# "dist" is where the final static-site files will be written to
+# "dist" is where compiled executables and other types of files are stored
 dist/
+
 # "gen" is where generated files are written to
 gen/
+
+# "site" is where the actual site files go, there should _only_ be files in "site" that are intended to be served
+site/
+
 
 # I think the gch extension is from using emscripten?
 *.gch

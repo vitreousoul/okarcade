@@ -32,12 +32,6 @@ void EnsureDirectoryExists(u8 *DirectoryPath);
 void FreeFileArray(file_array FileArray);
 file_array WalkDirectory(u8 *Path);
 
-#define LogError(s) LogError_((u8 *)s, __LINE__, __FILE__)
-internal void LogError_(u8 *Message, s32 Line, char *File)
-{
-    printf("Error at line %d in %s: %s\n", Line, File, Message);
-}
-
 #define Assert(p) Assert_(p, __FILE__, __LINE__)
 internal void Assert_(b32 Proposition, char *FilePath, s32 LineNumber)
 {
