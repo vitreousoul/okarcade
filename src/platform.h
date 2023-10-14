@@ -33,6 +33,7 @@ void GetResourceUsage(void);
 void CopyString(u8 *Source, u8 *Destination, s32 DestinationSize);
 
 buffer *ReadFileIntoBuffer(u8 *FilePath);
+u64 ReadFileIntoData(u8 *FilePath, u8 *Bytes, u64 MaxBytes);
 void FreeBuffer(buffer *Buffer);
 void WriteFile(u8 *FilePath, buffer *Buffer);
 void EnsureDirectoryExists(u8 *DirectoryPath);
@@ -157,21 +158,49 @@ buffer *ReadFileIntoBuffer(u8 *FilePath)
 
     if (StatError)
     {
-        printf("ReadFile stat error\n");
+        printf("ReadFileIntoBuffer stat error\n");
         return 0;
     }
 
     buffer *Buffer = AllocateMemory(sizeof(buffer));
-    FILE *file = fopen((char *)FilePath, "rb");
+    FILE *File = fopen((char *)FilePath, "rb");
 
     Buffer->Size = StatResult.st_size;
     Buffer->Data = AllocateMemory(Buffer->Size + 1);
-    fread(Buffer->Data, 1, Buffer->Size, file);
+    fread(Buffer->Data, 1, Buffer->Size, File);
     Buffer->Data[Buffer->Size] = 0; // null terminate
 
-    fclose(file);
+    fclose(File);
 
     return Buffer;
+}
+
+u64 ReadFileIntoData(u8 *FilePath, u8 *Bytes, u64 MaxBytes)
+{
+    u64 FileSize;
+    struct stat StatResult;
+    int StatError = stat((char *)FilePath, &StatResult);
+
+    if (StatError)
+    {
+        printf("ReadFileIntoData stat error\n");
+        return 0;
+    }
+
+    FileSize = StatResult.st_size;
+
+    if (FileSize > MaxBytes)
+    {
+        printf("Errof in ReadFileIntoData: file size exceeds max-bytes\n");
+        return 0;
+    }
+
+    FILE *File = fopen((char *)FilePath, "rb");
+
+    fread(Bytes, 1, FileSize, File);
+    fclose(File);
+
+    return FileSize;
 }
 
 void FreeBuffer(buffer *Buffer)
