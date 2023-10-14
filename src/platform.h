@@ -26,7 +26,7 @@ typedef struct
 void *AllocateMemory(u64 Size);
 void FreeMemory(void *Ref);
 void CopyMemory(u8 *Source, u8 *Destination, u64 Size);
-void *AllocateVirtualMemory(size_t Size);
+void *AllocateVirtualMemory(size Size);
 
 void GetResourceUsage(void);
 
@@ -46,7 +46,8 @@ void CopyString(u8 *Source, u8 *Destination, s32 DestinationSize);
 buffer *ReadFileIntoBuffer(u8 *FilePath);
 u64 ReadFileIntoData(u8 *FilePath, u8 *Bytes, u64 MaxBytes);
 void FreeBuffer(buffer *Buffer);
-void WriteFile(u8 *FilePath, buffer *Buffer);
+void WriteFile(u8 *FilePath, u8 *Data, size Size);
+void WriteFileFromBuffer(u8 *FilePath, buffer *Buffer);
 void EnsureDirectoryExists(u8 *DirectoryPath);
 void FreeFileArray(file_array FileArray);
 file_array WalkDirectory(u8 *Path);
@@ -83,7 +84,7 @@ void CopyMemory(u8 *Source, u8 *Destination, u64 Size)
     }
 }
 
-void *AllocateVirtualMemory(size_t Size)
+void *AllocateVirtualMemory(size Size)
 {
     /* TODO allow setting specific address for debugging with stable pointer values */
     u8 *Address = 0;
@@ -256,12 +257,24 @@ void FreeBuffer(buffer *Buffer)
     FreeMemory(Buffer);
 }
 
-void WriteFile(u8 *FilePath, buffer *Buffer)
+void WriteFile(u8 *FilePath, u8 *Data, size Size)
 {
     FILE *File = fopen((char *)FilePath, "wb");
 
-    fwrite(Buffer->Data, 1, Buffer->Size, File);
-    fclose(File);
+    if (File)
+    {
+        fwrite(Data, 1, Size, File);
+        fclose(File);
+    }
+    else
+    {
+        printf("Error in WriteFile: file not found\n");
+    }
+}
+
+void WriteFileFromBuffer(u8 *FilePath, buffer *Buffer)
+{
+    WriteFile(FilePath, Buffer->Data, Buffer->Size);
 }
 
 void EnsureDirectoryExists(u8 *DirectoryPath)

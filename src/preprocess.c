@@ -22,8 +22,6 @@ typedef struct
 
 #define PRE_PROCESSOR_COMMAND_MAX 16
 
-#define OUTPUT_BUFFER_MAX (1 << 15) /* TODO delete this when we have expandable array */
-
 typedef struct
 {
     u8 *Bra;
@@ -32,7 +30,9 @@ typedef struct
     s32 KetCount;
     pre_processor_command Commands[PRE_PROCESSOR_COMMAND_MAX];
     s32 CommandCount;
+
     linear_allocator StringAllocator;
+    linear_allocator OutputAllocator;
 } pre_processor;
 
 typedef enum
@@ -61,7 +61,17 @@ internal pre_processor CreatePreProcessor(u8 *Bra, u8 *Ket)
 
     PreProcessor.CommandCount = 0;
 
-    PreProcessor.StringAllocator = CreateLinearAllocator(Gigabytes(1));
+    { /* allocator setup */
+        u64 StringAllocatorVirtualSize = Gigabytes(1);
+        u64 OutputBufferVirtualSize = Gigabytes(1);
+        u64 TotalVirtualSize = StringAllocatorVirtualSize + OutputBufferVirtualSize;
+
+        PreProcessor.StringAllocator = CreateLinearAllocator(TotalVirtualSize);
+        PreProcessor.StringAllocator.Capacity = StringAllocatorVirtualSize;
+
+        PreProcessor.OutputAllocator = CreateLinearAllocator(Gigabytes(1));
+        PreProcessor.OutputAllocator.Capacity = OutputBufferVirtualSize;
+    }
 
     return PreProcessor;
 }
@@ -142,11 +152,12 @@ internal buffer GetCommandToken(pre_processor *PreProcessor, buffer *Buffer, s32
     return TokenBuffer;
 }
 
-internal void HandlePreProcessCommand(pre_processor *PreProcessor, buffer *Buffer, s32 Offset, s32 CommandSize, buffer *OutputBuffer)
+internal void HandlePreProcessCommand(pre_processor *PreProcessor, buffer *Buffer, s32 Offset, s32 CommandSize)
 {
     s32 Index = Offset;
     s32 MaxIndex = Offset + CommandSize;
     u8 *IncludeName = (u8 *)"include";
+    linear_allocator *OutputAllocator = &PreProcessor->OutputAllocator;
 
     SkipSpace(Buffer, &Index);
 
@@ -160,11 +171,16 @@ internal void HandlePreProcessCommand(pre_processor *PreProcessor, buffer *Buffe
 
         if (Buffer)
         {
-            Assert(Buffer->Size + OutputBuffer->Size < OUTPUT_BUFFER_MAX);
-
-            CopyMemory(Buffer->Data, OutputBuffer->Data + OutputBuffer->Size, Buffer->Size);
-            OutputBuffer->Size += Buffer->Size;
-            FreeBuffer(Buffer);
+            u8 *WhereToWrite = PushLinearAllocator(OutputAllocator, Buffer->Size);
+            if (WhereToWrite)
+            {
+                CopyMemory(Buffer->Data, WhereToWrite, Buffer->Size);
+                FreeBuffer(Buffer);
+            }
+            else
+            {
+                LogError("failed to write to output\n");
+            }
         }
         else
         {
@@ -179,11 +195,8 @@ internal void HandlePreProcessCommand(pre_processor *PreProcessor, buffer *Buffe
 
 b32 PreprocessFile(pre_processor *PreProcessor, u8 *FilePath, u8 *OutputFilePath)
 {
+    linear_allocator *OutputAllocator = &PreProcessor->OutputAllocator;
     buffer *Buffer = ReadFileIntoBuffer(FilePath);
-
-    buffer OutputBuffer;
-    OutputBuffer.Data = AllocateMemory(OUTPUT_BUFFER_MAX);
-    OutputBuffer.Size = 0;
 
     b32 Error = 0;
     s32 WriteIndex = 0;
@@ -209,18 +222,26 @@ b32 PreprocessFile(pre_processor *PreProcessor, u8 *FilePath, u8 *OutputFilePath
                 if (FoundKet)
                 {
                     u8 *BufferStart = Buffer->Data + WriteIndex;
-                    u8 *OutputBufferStart = OutputBuffer.Data + OutputBuffer.Size;
+                    u8 *OutputAllocatorStart = OutputAllocator->Data + OutputAllocator->Offset;
                     s32 JustPastKet = J + PreProcessor->KetCount;
                     s32 Size = I - WriteIndex;
 
-                    Assert(OutputBuffer.Size + Size < OUTPUT_BUFFER_MAX);
+                    u8 *WhereToWrite = PushLinearAllocator(OutputAllocator, Size);
 
-                    CopyMemory(BufferStart, OutputBufferStart, Size);
-                    OutputBuffer.Size += Size;
+                    if (WhereToWrite)
+                    {
+                        CopyMemory(BufferStart, OutputAllocatorStart, Size);
+                    }
+                    else
+                    {
+                        LogError("failed to write to output");
+                        break;
+                    }
+
                     WriteIndex = JustPastKet;
                     I = JustPastKet;
 
-                    HandlePreProcessCommand(PreProcessor, Buffer, CommandStart, J, &OutputBuffer);
+                    HandlePreProcessCommand(PreProcessor, Buffer, CommandStart, J);
 
                     break;
                 }
@@ -230,17 +251,22 @@ b32 PreprocessFile(pre_processor *PreProcessor, u8 *FilePath, u8 *OutputFilePath
 
     if (WriteIndex < Buffer->Size)
     {
-        u8 *OutputBufferStart = OutputBuffer.Data + OutputBuffer.Size;
+        u8 *OutputAllocatorStart = OutputAllocator->Data + OutputAllocator->Offset;
         s32 Size = Buffer->Size - WriteIndex;
+        u8 *WhereToWrite = PushLinearAllocator(OutputAllocator, Size);
 
-        CopyMemory(Buffer->Data + WriteIndex, OutputBufferStart, Size);
-        OutputBuffer.Size += Size;
+        if (WhereToWrite)
+        {
+            CopyMemory(Buffer->Data + WriteIndex, OutputAllocatorStart, Size);
+        }
+        else
+        {
+            LogError("failed to write to output");
+        }
     }
 
     printf("Writing pre-processed file %s\n", OutputFilePath);
-    WriteFile(OutputFilePath, &OutputBuffer);
-    FreeMemory(OutputBuffer.Data);
-    FreeBuffer(Buffer);
+    WriteFile(OutputFilePath, OutputAllocator->Data, OutputAllocator->Offset);
 
     return Error;
 }
