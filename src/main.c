@@ -5,6 +5,7 @@
 #include "platform.h"
 #include "core.c"
 #include "preprocess.c"
+#include "code_pages.c"
 
 typedef enum
 {
@@ -52,31 +53,26 @@ internal command_line_args ParseCommandLineArgs(s32 ArgCount, char **Args)
 
 int main(s32 ArgCount, char **Args)
 {
+    GetResourceUsage();
+
     int Result = 0;
     command_line_args CommandLineArgs = ParseCommandLineArgs(ArgCount, Args);
 
     switch(CommandLineArgs.Type)
     {
     case command_line_arg_type_Preprocess:
-    {
         TestPreprocessor();
-    } break;
+        break;
     case command_line_arg_type_CreateCodePages:
-    {
-        file_array FileArray = WalkDirectory((u8 *)"../src");
-
-        for (s32 I = 0; I < FileArray.Count; I++)
-        {
-            printf("file: %s\n", FileArray.Files[I].Name);
-        }
-
-        FreeFileArray(FileArray);
-    } break;
+        TestCodePages();
+        break;
     default:
-    {
         printf("Un-handled command line arg type: %d\n", CommandLineArgs.Type);
-    } break;
+        break;
     }
 
+    GetResourceUsage();
+
+    printf("\n\nDone...\n"); getchar();
     return Result;
 }

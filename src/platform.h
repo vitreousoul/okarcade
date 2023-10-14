@@ -1,5 +1,7 @@
 #include <sys/stat.h>
 #include <dirent.h>
+#include <sys/mman.h>
+#include <errno.h>
 
 typedef struct
 {
@@ -24,7 +26,12 @@ typedef struct
 void *AllocateMemory(u64 Size);
 void FreeMemory(void *Ref);
 void CopyMemory(u8 *Source, u8 *Destination, u64 Size);
+void *AllocateVirtualMemory(size_t Size);
+
+void GetResourceUsage(void);
+
 void CopyString(u8 *Source, u8 *Destination, s32 DestinationSize);
+
 buffer *ReadFileIntoBuffer(u8 *FilePath);
 void FreeBuffer(buffer *Buffer);
 void WriteFile(u8 *FilePath, buffer *Buffer);
@@ -61,6 +68,60 @@ void CopyMemory(u8 *Source, u8 *Destination, u64 Size)
     for (u64 I = 0; I < Size; I++)
     {
         Destination[I] = Source[I];
+    }
+}
+
+void *AllocateVirtualMemory(size_t Size)
+{
+    printf("allocating virtual memory %ld\n", Size);
+    /* TODO allow setting specific address for debugging with stable pointer values */
+    u8 *Address = 0;
+    int Protections = PROT_READ | PROT_WRITE;
+    int Flags = MAP_ANON | MAP_PRIVATE;
+    int FileDescriptor = 0;
+    int Offset = 0;
+
+    u8 *Result = mmap(Address, Size, Protections, Flags, FileDescriptor, Offset);
+
+    if (Result == MAP_FAILED)
+    {
+        char *ErrorName = 0;
+
+        switch(errno)
+        {
+
+        case EACCES: ErrorName = "EACCES"; break;
+        case EBADF: ErrorName = "EBADF"; break;
+        case EINVAL: ErrorName = "EINVAL"; break;
+        case ENODEV: ErrorName = "ENODEV"; break;
+        case ENOMEM: ErrorName = "ENOMEM"; break;
+        case ENXIO: ErrorName = "ENXIO"; break;
+        case EOVERFLOW: ErrorName = "EOVERFLOW"; break;
+        default: ErrorName = "<Unknown errno>"; break;
+        }
+
+        printf("Error in AllocateVirtualMemory: failed to map memory with errno = \"%s\"\n", ErrorName);
+        return 0;
+    }
+    else
+    {
+        return Result;
+    }
+}
+
+void GetResourceUsage(void)
+{
+    struct rusage ResourceUsageInfo;
+    s32 Code = getrusage(RUSAGE_SELF, &ResourceUsageInfo);
+
+    if (Code == 0)
+    {
+        printf("Page reclaims %ld\n", ResourceUsageInfo.ru_minflt);
+        printf("Page faults %ld\n", ResourceUsageInfo.ru_majflt);
+    }
+    else
+    {
+        printf("GetResourceUsage error %d\n", Code);
     }
 }
 
