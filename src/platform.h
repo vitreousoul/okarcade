@@ -30,6 +30,17 @@ void *AllocateVirtualMemory(size_t Size);
 
 void GetResourceUsage(void);
 
+typedef struct
+{
+    u64 Offset;
+    u64 Capacity;
+    u8 *Data;
+} linear_allocator;
+
+linear_allocator CreateLinearAllocator(u64 Size);
+u8 *PushLinearAllocator(linear_allocator *LinearAllocator, u64 Size);
+void FreeLinearAllocator(linear_allocator LinearAllocator);
+
 void CopyString(u8 *Source, u8 *Destination, s32 DestinationSize);
 
 buffer *ReadFileIntoBuffer(u8 *FilePath);
@@ -74,7 +85,6 @@ void CopyMemory(u8 *Source, u8 *Destination, u64 Size)
 
 void *AllocateVirtualMemory(size_t Size)
 {
-    printf("allocating virtual memory %ld\n", Size);
     /* TODO allow setting specific address for debugging with stable pointer values */
     u8 *Address = 0;
     int Protections = PROT_READ | PROT_WRITE;
@@ -125,6 +135,43 @@ void GetResourceUsage(void)
         printf("GetResourceUsage error %d\n", Code);
     }
 }
+
+/*| v Linear Allocator v |*/
+
+linear_allocator CreateLinearAllocator(u64 Size)
+{
+    linear_allocator LinearAllocator;
+
+    LinearAllocator.Offset = 0;
+    LinearAllocator.Capacity = Size;
+    LinearAllocator.Data = AllocateVirtualMemory(Size);
+
+    return LinearAllocator;
+}
+
+u8 *PushLinearAllocator(linear_allocator *LinearAllocator, u64 Size)
+{
+    u8 *Result = 0;
+
+    if ((Size + LinearAllocator->Offset) > LinearAllocator->Capacity)
+    {
+        printf("Error in PushLinearAllocator: allocator is full\n");
+    }
+    else
+    {
+        Result = &LinearAllocator->Data[LinearAllocator->Offset];
+        LinearAllocator->Offset += Size;
+    }
+
+    return Result;
+}
+
+void FreeLinearAllocator(linear_allocator LinearAllocator)
+{
+    munmap(LinearAllocator.Data, LinearAllocator.Capacity);
+}
+
+/*| ^ Linear Allocator ^ |*/
 
 void CopyString(u8 *Source, u8 *Destination, s32 DestinationSize)
 {

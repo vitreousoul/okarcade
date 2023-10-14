@@ -32,6 +32,7 @@ typedef struct
     s32 KetCount;
     pre_processor_command Commands[PRE_PROCESSOR_COMMAND_MAX];
     s32 CommandCount;
+    linear_allocator StringAllocator;
 } pre_processor;
 
 typedef enum
@@ -45,7 +46,7 @@ typedef struct
 
 } command_result;
 
-b32 PreprocessFile(pre_processor PreProcessor, u8 *FilePath, u8 *OutputFilePath);
+b32 PreprocessFile(pre_processor *PreProcessor, u8 *FilePath, u8 *OutputFilePath);
 void TestPreprocessor(void);
 
 internal pre_processor CreatePreProcessor(u8 *Bra, u8 *Ket)
@@ -59,6 +60,8 @@ internal pre_processor CreatePreProcessor(u8 *Bra, u8 *Ket)
     PreProcessor.KetCount = GetStringLength(Ket);
 
     PreProcessor.CommandCount = 0;
+
+    PreProcessor.StringAllocator = CreateLinearAllocator(Gigabytes(1));
 
     return PreProcessor;
 }
@@ -114,25 +117,24 @@ internal b32 CheckIfStringIsPrefix(u8 *String, buffer *Buffer, s32 BufferOffset)
     return IsPrefix;
 }
 
-internal buffer *GetCommandToken(pre_processor PreProcessor, buffer *Buffer, s32 Offset)
+internal buffer GetCommandToken(pre_processor *PreProcessor, buffer *Buffer, s32 Offset)
 {
+    buffer TokenBuffer;
+    TokenBuffer.Size = 0;
+    TokenBuffer.Data = 0;
+
     SkipSpace(Buffer, &Offset);
 
-    buffer *TokenBuffer = AllocateMemory(sizeof(buffer));
-
-    TokenBuffer->Size = 0;
-    TokenBuffer->Data = 0;
-
-    for (; TokenBuffer->Size < Buffer->Size - Offset; TokenBuffer->Size++)
+    for (; TokenBuffer.Size < Buffer->Size - Offset; TokenBuffer.Size++)
     {
-        b32 IsKet = CheckIfStringIsPrefix(PreProcessor.Ket, Buffer, TokenBuffer->Size);
-        b32 IsSpace = IS_SPACE(Buffer->Data[Offset + TokenBuffer->Size]);
+        b32 IsKet = CheckIfStringIsPrefix(PreProcessor->Ket, Buffer, TokenBuffer.Size);
+        b32 IsSpace = IS_SPACE(Buffer->Data[Offset + TokenBuffer.Size]);
 
         if (IsKet || IsSpace)
         {
-            TokenBuffer->Data = AllocateMemory(TokenBuffer->Size + 1);
-            TokenBuffer->Data[TokenBuffer->Size] = 0;
-            CopyMemory(Buffer->Data + Offset, TokenBuffer->Data, TokenBuffer->Size);
+            TokenBuffer.Data = PushLinearAllocator(&PreProcessor->StringAllocator, TokenBuffer.Size + 1);
+            TokenBuffer.Data[TokenBuffer.Size] = 0;
+            CopyMemory(Buffer->Data + Offset, TokenBuffer.Data, TokenBuffer.Size);
             break;
         }
     }
@@ -140,7 +142,7 @@ internal buffer *GetCommandToken(pre_processor PreProcessor, buffer *Buffer, s32
     return TokenBuffer;
 }
 
-internal void HandlePreProcessCommand(pre_processor PreProcessor, buffer *Buffer, s32 Offset, s32 CommandSize, buffer *OutputBuffer)
+internal void HandlePreProcessCommand(pre_processor *PreProcessor, buffer *Buffer, s32 Offset, s32 CommandSize, buffer *OutputBuffer)
 {
     s32 Index = Offset;
     s32 MaxIndex = Offset + CommandSize;
@@ -153,8 +155,8 @@ internal void HandlePreProcessCommand(pre_processor PreProcessor, buffer *Buffer
         Index += GetStringLength(IncludeName);
         SkipSpace(Buffer, &Index);
 
-        buffer *Token = GetCommandToken(PreProcessor, Buffer, Index);
-        buffer *Buffer = ReadFileIntoBuffer(Token->Data);
+        buffer Token = GetCommandToken(PreProcessor, Buffer, Index);
+        buffer *Buffer = ReadFileIntoBuffer(Token.Data);
 
         if (Buffer)
         {
@@ -175,7 +177,7 @@ internal void HandlePreProcessCommand(pre_processor PreProcessor, buffer *Buffer
     }
 }
 
-b32 PreprocessFile(pre_processor PreProcessor, u8 *FilePath, u8 *OutputFilePath)
+b32 PreprocessFile(pre_processor *PreProcessor, u8 *FilePath, u8 *OutputFilePath)
 {
     buffer *Buffer = ReadFileIntoBuffer(FilePath);
 
@@ -194,21 +196,21 @@ b32 PreprocessFile(pre_processor PreProcessor, u8 *FilePath, u8 *OutputFilePath)
 
     for (s32 I = 0; I < Buffer->Size; I++)
     {
-        b32 FoundBra = CheckIfStringIsPrefix(PreProcessor.Bra, Buffer, I);
+        b32 FoundBra = CheckIfStringIsPrefix(PreProcessor->Bra, Buffer, I);
 
         if (FoundBra)
         {
-            s32 CommandStart = I + PreProcessor.BraCount;
+            s32 CommandStart = I + PreProcessor->BraCount;
 
             for (s32 J = CommandStart; J < Buffer->Size; J++)
             {
-                b32 FoundKet = CheckIfStringIsPrefix(PreProcessor.Ket, Buffer, J);
+                b32 FoundKet = CheckIfStringIsPrefix(PreProcessor->Ket, Buffer, J);
 
                 if (FoundKet)
                 {
                     u8 *BufferStart = Buffer->Data + WriteIndex;
                     u8 *OutputBufferStart = OutputBuffer.Data + OutputBuffer.Size;
-                    s32 JustPastKet = J + PreProcessor.KetCount;
+                    s32 JustPastKet = J + PreProcessor->KetCount;
                     s32 Size = I - WriteIndex;
 
                     Assert(OutputBuffer.Size + Size < OUTPUT_BUFFER_MAX);
@@ -264,6 +266,6 @@ void TestPreprocessor(void)
     EnsureDirectoryExists(GenDirectory);
     EnsureDirectoryExists(SiteDirectory);
 
-    PreprocessFile(PreProcessor, IndexIn, IndexOut);
-    PreprocessFile(PreProcessor, LSystemIn, LSystemOut);
+    PreprocessFile(&PreProcessor, IndexIn, IndexOut);
+    PreprocessFile(&PreProcessor, LSystemIn, LSystemOut);
 }

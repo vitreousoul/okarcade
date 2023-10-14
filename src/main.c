@@ -73,6 +73,5 @@ int main(s32 ArgCount, char **Args)
 
     GetResourceUsage();
 
-    printf("\n\nDone...\n"); getchar();
     return Result;
 }
