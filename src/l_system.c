@@ -320,6 +320,7 @@ internal void DrawRuleSet(app_state *AppState)
 
 internal void UpdateUI(app_state *AppState)
 {
+    AppState->UI.Hot = -1;
     AppState->UI.MouseButtonPressed = IsMouseButtonPressed(0);
     AppState->UI.MouseButtonReleased = IsMouseButtonReleased(0);
     AppState->UI.MousePosition = GetMousePosition();
@@ -340,11 +341,6 @@ internal void UpdateAndRender(void *VoidAppState)
         ImageDrawLine(&AppState->Canvas, 0, 0, X, Y, (Color){0,0,0,255});
     }
 
-    if (AppState->UI.MouseButtonPressed)
-    {
-        ImageClearBackground(&AppState->Canvas, BackgroundColor);
-    }
-
     { /* draw simulation image */
         Color *Pixels = LoadImageColors(AppState->Canvas);
         UpdateTexture(AppState->FrameBuffer, Pixels);
@@ -360,7 +356,7 @@ internal void UpdateAndRender(void *VoidAppState)
 
             if (DoButton(UI, Button))
             {
-                printf("button id %d was pressed\n", I);
+                ImageClearBackground(&AppState->Canvas, BackgroundColor);
             }
         }
 
@@ -396,7 +392,9 @@ internal void InitUi(app_state *AppState)
     s32 Y = 10.0f;
     s32 TwicePadding = 2 * BUTTON_PADDING;
 
-    for (s32 I = 0; I < button_kind_Count; I++)
+    AppState->UI.Active = 0;
+
+    for (s32 I = 1; I < button_kind_Count; I++)
     {
         char *Text = ButtonText[I];
         s32 Width = MeasureText(Text, AppState->UI.FontSize);
