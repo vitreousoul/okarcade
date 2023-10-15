@@ -24,7 +24,6 @@ int SCREEN_HEIGHT = 400;
 #define EXPANSION_MAX_DEPTH 7
 #define RULE_SIZE_MAX 16
 
-#define BUTTON_PADDING 8
 
 global_variable Color BackgroundColor = (Color){58, 141, 230, 255};
 global_variable Color ClearColor = (Color){0, 0, 0, 255};
@@ -79,8 +78,9 @@ typedef struct
     s32 LineDrawsPerFrame;
     symbol Rules[symbol_Count][RULE_SIZE_MAX];
     button Buttons[button_kind_Count];
-    s32 FontSize;
+    ui UI;
 } app_state;
+
 
 #if defined(PLATFORM_WEB)
 EM_JS(void, UpdateCanvasDimensions, (), {
@@ -284,7 +284,7 @@ internal void DrawRuleSet(app_state *AppState)
     s32 ItemWidth = 24;
     s32 Padding = 8;
     s32 Width = (ItemWidth * RULE_SIZE_MAX) + (2 * Padding);
-    s32 Height = (2 * AppState->FontSize) + (3 * Padding);
+    s32 Height = (2 * AppState->UI.FontSize) + (3 * Padding);
     s32 Y = SCREEN_HEIGHT - (Height + Padding);
     s32 X = Padding;
     s32 RowIndex = 0;
@@ -295,11 +295,11 @@ internal void DrawRuleSet(app_state *AppState)
     {
         char *LabelText = GetSymbolText(I);
         s32 LabelX = X + Padding;
-        s32 YOffset = RowIndex * (AppState->FontSize + Padding);
+        s32 YOffset = RowIndex * (AppState->UI.FontSize + Padding);
         RowIndex += 1;
         s32 LabelY = Y + YOffset + Padding;
 
-        DrawText(LabelText, LabelX, LabelY, AppState->FontSize, FontColor);
+        DrawText(LabelText, LabelX, LabelY, AppState->UI.FontSize, FontColor);
 
         for (s32 J = 0; J < RULE_SIZE_MAX; J++)
         {
@@ -308,7 +308,7 @@ internal void DrawRuleSet(app_state *AppState)
             if (ItemText)
             {
                 s32 XOffset = (J + 1) * (ItemWidth + 0);//Padding);
-                DrawText(ItemText, LabelX + XOffset, LabelY, AppState->FontSize, FontColor);
+                DrawText(ItemText, LabelX + XOffset, LabelY, AppState->UI.FontSize, FontColor);
             }
             else
             {
@@ -318,44 +318,55 @@ internal void DrawRuleSet(app_state *AppState)
     }
 }
 
+internal void UpdateUI(app_state *AppState)
+{
+    AppState->UI.MouseButtonPressed = IsMouseButtonPressed(0);
+    AppState->UI.MouseButtonReleased = IsMouseButtonReleased(0);
+    AppState->UI.MousePosition = GetMousePosition();
+}
+
 internal void UpdateAndRender(void *VoidAppState)
 {
     /* we have to pass our data in as a void-star because of emscripten, so we just cast it to app_state and pray */
     app_state *AppState = (app_state *)VoidAppState;
-    Vector2 MousePosition = GetMousePosition();
-    b32 ButtonDown = IsMouseButtonPressed(0);
+    UpdateUI(AppState);
 
     BeginDrawing();
     ClearBackground(BackgroundColor);
-    ImageDrawLine(&AppState->Canvas, 0, 0, MousePosition.x, MousePosition.y, (Color){0,0,0,255});
 
-    if (ButtonDown)
+    { /* debug line drawing */
+        f32 X = AppState->UI.MousePosition.x;
+        f32 Y = AppState->UI.MousePosition.y;
+        ImageDrawLine(&AppState->Canvas, 0, 0, X, Y, (Color){0,0,0,255});
+    }
+
+    if (AppState->UI.MouseButtonPressed)
     {
         ImageClearBackground(&AppState->Canvas, BackgroundColor);
     }
 
-    {
-        /* draw simulation image */
+    { /* draw simulation image */
         Color *Pixels = LoadImageColors(AppState->Canvas);
         UpdateTexture(AppState->FrameBuffer, Pixels);
         UnloadImageColors(Pixels);
         DrawTexture(AppState->FrameBuffer, 0, 0, (Color){255,255,255,255});
     }
-    {
-        /* draw ui */
+
+    { /* draw ui */
+        ui *UI = &AppState->UI;
         for (s32 I = 1; I < button_kind_Count; I++)
         {
             button Button = AppState->Buttons[I];
-            Color ButtonColor = (Color){20,180,180,255};
-            Color TextColor = (Color){0,0,0,255};
-            DrawRectangle(Button.Position.x, Button.Position.y, Button.Size.x, Button.Size.y, ButtonColor);
-            DrawText(Button.Text,
-                     Button.Position.x + BUTTON_PADDING, Button.Position.y + BUTTON_PADDING,
-                     AppState->FontSize, TextColor);
 
-            DrawRuleSet(AppState);
+            if (DoButton(UI, Button))
+            {
+                printf("button id %d was pressed\n", I);
+            }
         }
+
+        DrawRuleSet(AppState);
     }
+
     EndDrawing();
 }
 
@@ -388,15 +399,16 @@ internal void InitUi(app_state *AppState)
     for (s32 I = 0; I < button_kind_Count; I++)
     {
         char *Text = ButtonText[I];
-        s32 Width = MeasureText(Text, AppState->FontSize);
+        s32 Width = MeasureText(Text, AppState->UI.FontSize);
 
+        AppState->Buttons[I].Id = I;
         AppState->Buttons[I].Text = Text;
         AppState->Buttons[I].Position = (Vector2){10.0f, Y};
         AppState->Buttons[I].Size = (Vector2){Width + TwicePadding,
-                                              AppState->FontSize + TwicePadding};
+                                              AppState->UI.FontSize + TwicePadding};
         AppState->Buttons[I].Active = 0;
 
-        Y += TwicePadding + AppState->FontSize + 10;
+        Y += TwicePadding + AppState->UI.FontSize + 10;
     }
 }
 
@@ -408,7 +420,7 @@ internal app_state InitAppState(void)
     AppState.LineDrawsPerFrame = 100;
     AppState.Canvas = GenImageColor(SCREEN_WIDTH, SCREEN_HEIGHT, BackgroundColor);
     AppState.FrameBuffer = LoadTextureFromImage(AppState.Canvas);
-    AppState.FontSize = 16;
+    AppState.UI.FontSize = 16;
 
     InitUi(&AppState);
 
