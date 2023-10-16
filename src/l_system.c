@@ -5,6 +5,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <math.h>
 
 #include "../lib/raylib.h"
 
@@ -14,6 +15,7 @@
 
 #include "types.h"
 #include "core.c"
+#include "math.c"
 #include "ui.c"
 
 int SCREEN_WIDTH = 600;
@@ -208,12 +210,12 @@ internal void PopAndIncrementParent(expansion *Expansion)
     }
 }
 
-internal void PrintLSystem(Image *Canvas, turtle *Turtle, symbol Rules[symbol_Count][RULE_SIZE_MAX], s32 Depth)
+internal void DrawLSystem(Image *Canvas, turtle *Turtle, symbol Rules[symbol_Count][RULE_SIZE_MAX], s32 Depth)
 {
     if (Depth >= EXPANSION_MAX_DEPTH)
     {
         s32 MaxDepthMinusOne = EXPANSION_MAX_DEPTH - 1;
-        printf("Max depth for PrintLSystem is %d but was passed a depth of %d\n", MaxDepthMinusOne, Depth);
+        printf("Max depth for DrawLSystem is %d but was passed a depth of %d\n", MaxDepthMinusOne, Depth);
         LogError("DepthError\n");
     }
 
@@ -253,15 +255,22 @@ internal void PrintLSystem(Image *Canvas, turtle *Turtle, symbol Rules[symbol_Co
 
             while (OutputSymbol != symbol_Undefined)
             {
+                switch(OutputSymbol)
                 {
-                    /* draw random line */
-                    f32 X = ((f32)rand()/(f32)(RAND_MAX)) * SCREEN_WIDTH;
-                    f32 Y = ((f32)rand()/(f32)(RAND_MAX)) * SCREEN_HEIGHT;
-                    ImageDrawLine(Canvas, Turtle->Position.x, Turtle->Position.y, X, Y, (Color){0,0,0,255});
-
-                    Turtle->Position.x = X;
-                    Turtle->Position.y = Y;
+                case symbol_A:
+                {
+                    Turtle->Heading = RotateVector2(Turtle->Heading, 0.3f);
+                } break;
+                case symbol_B:
+                {
+                    Turtle->Heading = RotateVector2(Turtle->Heading, -0.3f);
+                } break;
+                default: break;
                 }
+                f32 NewX = Turtle->Position.x + (10.0f * Turtle->Heading.x);
+                f32 NewY = Turtle->Position.y + (10.0f * Turtle->Heading.y);
+                printf("drawing line...\n");
+                ImageDrawLine(Canvas, Turtle->Position.x, Turtle->Position.y, NewX, NewY, (Color){0,0,0,255});
 
                 CurrentItem.Index += 1;
                 OutputSymbol = GetSymbolFromRules(Rules, CurrentItem);
@@ -280,7 +289,7 @@ internal Vector2 CreateVector2(f32 X, f32 Y)
 internal void DrawRuleSet(app_state *AppState)
 {
     Color FontColor = (Color){0, 0, 0, 255};
-    Color BackgroundColor = (Color){80, 80, 80, 255};
+    Color BackgroundColor = (Color){180, 160, 160, 255};
     s32 ItemWidth = 24;
     s32 Padding = 8;
     s32 Width = (ItemWidth * RULE_SIZE_MAX) + (2 * Padding);
@@ -334,12 +343,6 @@ internal void UpdateAndRender(void *VoidAppState)
 
     BeginDrawing();
     ClearBackground(BackgroundColor);
-
-    { /* debug line drawing */
-        f32 X = AppState->UI.MousePosition.x;
-        f32 Y = AppState->UI.MousePosition.y;
-        ImageDrawLine(&AppState->Canvas, 0, 0, X, Y, (Color){0,0,0,255});
-    }
 
     { /* draw simulation image */
         Color *Pixels = LoadImageColors(AppState->Canvas);
@@ -414,7 +417,10 @@ internal app_state InitAppState(void)
 {
     app_state AppState;
 
-    AppState.Turtle = (turtle){CreateVector2(0.0f, 0.0f), CreateVector2(0.0f, 0.0f)};
+    Vector2 TurtlePosition = CreateVector2(SCREEN_WIDTH / 2.0f, SCREEN_HEIGHT / 2.0f);
+    Vector2 TurtleHeading = CreateVector2(1.0f, 0.0f);
+
+    AppState.Turtle = (turtle){TurtlePosition, TurtleHeading};
     AppState.LineDrawsPerFrame = 100;
     AppState.Canvas = GenImageColor(SCREEN_WIDTH, SCREEN_HEIGHT, BackgroundColor);
     AppState.FrameBuffer = LoadTextureFromImage(AppState.Canvas);
@@ -446,7 +452,7 @@ int main(void)
 
     app_state AppState = InitAppState();
 
-    /* PrintLSystem(&Canvas, &Turtle, Rules, 6); */
+    DrawLSystem(&AppState.Canvas, &AppState.Turtle, AppState.Rules, 2);
 
 #if defined(PLATFORM_WEB)
     emscripten_set_main_loop_arg(UpdateAndRender, &AppState, 0, 1);
