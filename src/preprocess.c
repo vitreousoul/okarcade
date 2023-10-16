@@ -276,10 +276,10 @@ void TestPreprocessor(void)
     u8 *GenDirectory = (u8 *)"../gen";
     u8 *SiteDirectory = (u8 *)"../site";
 
-    u8 *IndexIn = (u8 *)"../src/index.html";
+    u8 *IndexIn = (u8 *)"../src/layout/index.html";
     u8 *IndexOut = (u8 *)"../site/index.html";
 
-    u8 *LSystemIn = (u8 *)"../src/l_system.html";
+    u8 *LSystemIn = (u8 *)"../src/layout/l_system.html";
     u8 *LSystemOut = (u8 *)"../gen/l_system.html";
 
     u8 *Bra = (u8 *)"{|";
