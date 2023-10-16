@@ -41,6 +41,7 @@ internal b32 PositionIsInsideButton(Vector2 Position, button Button)
 b32 DoButton(ui *UI, button Button)
 {
     b32 ButtonPressed = 0;
+    Color UnderColor = (Color){20,20,20,225};
     Color InactiveColor = (Color){20,180,180,255};
     Color HotColor = (Color){40,120,120,255};
     Color ActiveColor = (Color){40,120,120,255};
@@ -81,13 +82,17 @@ b32 DoButton(ui *UI, button Button)
 
     Rectangle Rect = (Rectangle){Button.Position.x, Button.Position.y,
                                  Button.Size.x, Button.Size.y};
+    Rectangle UnderRect = (Rectangle){Button.Position.x + 2.0f, Button.Position.y + 2.0f,
+                                      Button.Size.x, Button.Size.y};
+
     Color ButtonColor = IsActive ? ActiveColor : InactiveColor;
 
+    DrawRectangleLinesEx(UnderRect, 2.0f, UnderColor);
     DrawRectangle(Rect.x, Rect.y, Rect.width, Rect.height, ButtonColor);
 
     if (IsHot && (IsActive || !UI->Active))
     {
-        DrawRectangleLinesEx(Rect, 3.0f, HotColor);
+        DrawRectangleLinesEx(Rect, 2.0f, HotColor);
     }
 
     DrawText(Button.Text,

@@ -418,7 +418,7 @@ internal app_state InitAppState(void)
     AppState.LineDrawsPerFrame = 100;
     AppState.Canvas = GenImageColor(SCREEN_WIDTH, SCREEN_HEIGHT, BackgroundColor);
     AppState.FrameBuffer = LoadTextureFromImage(AppState.Canvas);
-    AppState.UI.FontSize = 16;
+    AppState.UI.FontSize = 18;
 
     InitUi(&AppState);
 
