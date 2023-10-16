@@ -242,7 +242,6 @@ b32 PreprocessFile(pre_processor *PreProcessor, u8 *FilePath, u8 *OutputFilePath
                     I = JustPastKet;
 
                     HandlePreProcessCommand(PreProcessor, Buffer, CommandStart, J);
-
                     break;
                 }
             }
@@ -267,6 +266,7 @@ b32 PreprocessFile(pre_processor *PreProcessor, u8 *FilePath, u8 *OutputFilePath
 
     printf("Writing pre-processed file %s\n", OutputFilePath);
     WriteFile(OutputFilePath, OutputAllocator->Data, OutputAllocator->Offset);
+    OutputAllocator->Offset = 0;
 
     return Error;
 }
