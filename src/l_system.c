@@ -25,6 +25,7 @@ int SCREEN_HEIGHT = 400;
 #define EXPANSION_BUFFER_SIZE (1 << 12)
 #define EXPANSION_MAX_DEPTH 7
 #define RULE_SIZE_MAX 16
+#define TURTLE_STACK_MAX 16
 
 
 global_variable Color BackgroundColor = (Color){58, 141, 230, 255};
@@ -210,7 +211,16 @@ internal void PopAndIncrementParent(expansion *Expansion)
     }
 }
 
-internal void DrawLSystem(Image *Canvas, turtle *Turtle, symbol Rules[symbol_Count][RULE_SIZE_MAX], s32 Depth)
+internal void CopyTurtle(turtle *SourceTurtle, turtle *DestinationTurtle)
+{
+    DestinationTurtle->Position.x = SourceTurtle->Position.x;
+    DestinationTurtle->Position.y = SourceTurtle->Position.y;
+
+    DestinationTurtle->Heading.x = SourceTurtle->Heading.x;
+    DestinationTurtle->Heading.y = SourceTurtle->Heading.y;
+}
+
+internal void DrawLSystem(Image *Canvas, turtle *InitialTurtle, symbol Rules[symbol_Count][RULE_SIZE_MAX], s32 Depth)
 {
     if (Depth >= EXPANSION_MAX_DEPTH)
     {
@@ -220,6 +230,9 @@ internal void DrawLSystem(Image *Canvas, turtle *Turtle, symbol Rules[symbol_Cou
     }
 
     expansion Expansion = {0};
+    turtle TurtleStack[TURTLE_STACK_MAX];
+    s32 TurtleStackIndex = 0;
+    CopyTurtle(InitialTurtle, &TurtleStack[TurtleStackIndex]);
 
     {
         expansion_item RootItem = CreateExpansionItem(symbol_Root, 0);
@@ -255,22 +268,49 @@ internal void DrawLSystem(Image *Canvas, turtle *Turtle, symbol Rules[symbol_Cou
 
             while (OutputSymbol != symbol_Undefined)
             {
+                turtle *Turtle = &TurtleStack[TurtleStackIndex];
+                b32 ShouldDraw = 0;
+
                 switch(OutputSymbol)
                 {
                 case symbol_A:
                 {
-                    Turtle->Heading = RotateVector2(Turtle->Heading, 0.3f);
+                    Turtle->Heading = RotateVector2(Turtle->Heading, 0.5f);
+                    ShouldDraw = 1;
                 } break;
                 case symbol_B:
                 {
-                    Turtle->Heading = RotateVector2(Turtle->Heading, -0.3f);
+                    Turtle->Heading = RotateVector2(Turtle->Heading, -0.5f);
+                    ShouldDraw = 1;
+                } break;
+                case symbol_Push:
+                {
+                    if (TurtleStackIndex < TURTLE_STACK_MAX - 1)
+                    {
+                        TurtleStackIndex += 1;
+                        CopyTurtle(Turtle, &TurtleStack[TurtleStackIndex]);
+                    }
+                } break;
+                case symbol_Pop:
+                {
+                    if (TurtleStackIndex > 0)
+                    {
+                        TurtleStackIndex -= 1;
+                    }
                 } break;
                 default: break;
                 }
-                f32 NewX = Turtle->Position.x + (10.0f * Turtle->Heading.x);
-                f32 NewY = Turtle->Position.y + (10.0f * Turtle->Heading.y);
-                printf("drawing line...\n");
-                ImageDrawLine(Canvas, Turtle->Position.x, Turtle->Position.y, NewX, NewY, (Color){0,0,0,255});
+
+                if (ShouldDraw)
+                {
+                    f32 NewX = Turtle->Position.x + (10.0f * Turtle->Heading.x);
+                    f32 NewY = Turtle->Position.y + (10.0f * Turtle->Heading.y);
+
+                    ImageDrawLine(Canvas, Turtle->Position.x, Turtle->Position.y, NewX, NewY, (Color){0,0,0,255});
+
+                    Turtle->Position.x = NewX;
+                    Turtle->Position.y = NewY;
+                }
 
                 CurrentItem.Index += 1;
                 OutputSymbol = GetSymbolFromRules(Rules, CurrentItem);
@@ -373,12 +413,14 @@ internal void InitRules(symbol Rules[symbol_Count][RULE_SIZE_MAX])
 {
     symbol A = symbol_A;
     symbol B = symbol_B;
+    symbol Push = symbol_Push;
+    symbol Pop = symbol_Pop;
     symbol End = symbol_Undefined;
 
     symbol InitialRules[symbol_Count][RULE_SIZE_MAX] = {
         [symbol_Root] = {A,B,A,B,End},
-        [symbol_A] = {A,B,A,End},
-        [symbol_B] = {B,B,End},
+        [symbol_A] = {A,Push,B,A,Pop,End},
+        [symbol_B] = {B,B,A,End},
     };
 
     for (u32 I = 0; I < ArrayCount(InitialRules); I++)
