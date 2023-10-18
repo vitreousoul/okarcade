@@ -274,12 +274,10 @@ internal void DrawLSystem(Image *Canvas, turtle *InitialTurtle, symbol Rules[sym
                 {
                 case symbol_A:
                 {
-                    /* Turtle->Heading = RotateVector2(Turtle->Heading, 0.5f); */
                     ShouldDraw = 1;
                 } break;
                 case symbol_B:
                 {
-                    /* Turtle->Heading = RotateVector2(Turtle->Heading, -0.5f); */
                     ShouldDraw = 1;
                 } break;
                 case symbol_Push:
@@ -309,8 +307,9 @@ internal void DrawLSystem(Image *Canvas, turtle *InitialTurtle, symbol Rules[sym
                     turtle *Turtle = &TurtleStack[TurtleStackIndex];
                     f32 NewX = Turtle->Position.x + (10.0f * Turtle->Heading.x);
                     f32 NewY = Turtle->Position.y + (10.0f * Turtle->Heading.y);
+                    Color LineColor = (Color){0,0,0,255};
 
-                    ImageDrawLine(Canvas, Turtle->Position.x, Turtle->Position.y, NewX, NewY, (Color){0,0,0,255});
+                    ImageDrawLine(Canvas, Turtle->Position.x, Turtle->Position.y, NewX, NewY, LineColor);
 
                     Turtle->Position.x = NewX;
                     Turtle->Position.y = NewY;
@@ -422,6 +421,8 @@ internal void InitRules(symbol Rules[symbol_Count][RULE_SIZE_MAX])
         [symbol_Root] = {A,End},
         [symbol_A] = {B,Push,A,Pop,A,End},
         [symbol_B] = {B,B,End},
+        [symbol_Push] = {symbol_Push,End},
+        [symbol_Pop] = {symbol_Pop,End},
     };
 
     for (u32 I = 0; I < ArrayCount(InitialRules); I++)
@@ -492,7 +493,7 @@ int main(void)
 
     app_state AppState = InitAppState();
 
-    DrawLSystem(&AppState.Canvas, &AppState.Turtle, AppState.Rules, 3);
+    DrawLSystem(&AppState.Canvas, &AppState.Turtle, AppState.Rules, 5);
 
 #if defined(PLATFORM_WEB)
     emscripten_set_main_loop_arg(UpdateAndRender, &AppState, 0, 1);
