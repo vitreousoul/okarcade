@@ -18,12 +18,12 @@
 #include "math.c"
 #include "ui.c"
 
-int SCREEN_WIDTH = 600;
-int SCREEN_HEIGHT = 400;
+int SCREEN_WIDTH = 1200;
+int SCREEN_HEIGHT = 700;
 #define TARGET_FPS 30
 
 #define EXPANSION_BUFFER_SIZE (1 << 12)
-#define EXPANSION_MAX_DEPTH 7
+#define EXPANSION_MAX_DEPTH 16
 #define RULE_SIZE_MAX 16
 #define TURTLE_STACK_MAX 16
 
@@ -233,6 +233,8 @@ internal void DrawLSystem(Image *Canvas, turtle *InitialTurtle, symbol Rules[sym
     s32 TurtleStackIndex = 0;
     CopyTurtle(InitialTurtle, &TurtleStack[TurtleStackIndex]);
 
+    f32 TurtleSpeed = 1.0f;
+
     {
         expansion_item RootItem = CreateExpansionItem(symbol_Root, 0);
         PushExpansionItem(&Expansion, RootItem);
@@ -305,8 +307,8 @@ internal void DrawLSystem(Image *Canvas, turtle *InitialTurtle, symbol Rules[sym
                 if (ShouldDraw)
                 {
                     turtle *Turtle = &TurtleStack[TurtleStackIndex];
-                    f32 NewX = Turtle->Position.x + (10.0f * Turtle->Heading.x);
-                    f32 NewY = Turtle->Position.y + (10.0f * Turtle->Heading.y);
+                    f32 NewX = Turtle->Position.x + (TurtleSpeed * Turtle->Heading.x);
+                    f32 NewY = Turtle->Position.y + (TurtleSpeed * Turtle->Heading.y);
                     Color LineColor = (Color){0,0,0,255};
 
                     ImageDrawLine(Canvas, Turtle->Position.x, Turtle->Position.y, NewX, NewY, LineColor);
@@ -421,6 +423,7 @@ internal void InitRules(symbol Rules[symbol_Count][RULE_SIZE_MAX])
         [symbol_Root] = {A,End},
         [symbol_A] = {B,Push,A,Pop,A,End},
         [symbol_B] = {B,B,End},
+        /* NOTE: For now we must define constant symbols as rules that expand to themselves. We could _maybe_ change the expansion algorithm to treat symbols without a rule as constant, but that might cause confusion. Maybe we should just error if we find a symbol without a rule... */
         [symbol_Push] = {symbol_Push,End},
         [symbol_Pop] = {symbol_Pop,End},
     };
@@ -458,7 +461,7 @@ internal app_state InitAppState(void)
 {
     app_state AppState;
 
-    Vector2 TurtlePosition = CreateVector2(SCREEN_WIDTH / 2.0f, SCREEN_HEIGHT / 2.0f);
+    Vector2 TurtlePosition = CreateVector2(20.0f, SCREEN_HEIGHT / 2.0f);
     Vector2 TurtleHeading = CreateVector2(1.0f, 0.0f);
 
     AppState.Turtle = (turtle){TurtlePosition, TurtleHeading};
@@ -493,7 +496,7 @@ int main(void)
 
     app_state AppState = InitAppState();
 
-    DrawLSystem(&AppState.Canvas, &AppState.Turtle, AppState.Rules, 5);
+    DrawLSystem(&AppState.Canvas, &AppState.Turtle, AppState.Rules, 10);
 
 #if defined(PLATFORM_WEB)
     emscripten_set_main_loop_arg(UpdateAndRender, &AppState, 0, 1);
