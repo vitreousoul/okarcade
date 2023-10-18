@@ -29,7 +29,6 @@ int SCREEN_HEIGHT = 400;
 
 
 global_variable Color BackgroundColor = (Color){58, 141, 230, 255};
-global_variable Color ClearColor = (Color){0, 0, 0, 255};
 
 typedef enum
 {
@@ -68,9 +67,9 @@ typedef enum
     button_kind_Count,
 } button_kind;
 
-char *ButtonText[button_kind_Count] = {
-    [button_kind_Expansion] = "Expansion",
-    [button_kind_Movement] = "Movement",
+u8 *ButtonText[button_kind_Count] = {
+    [button_kind_Expansion] = (u8 *)"Expansion",
+    [button_kind_Movement] = (u8 *)"Movement",
 };
 
 typedef struct
@@ -118,14 +117,14 @@ EM_JS(s32, GetCanvasHeight, (), {
 });
 #endif
 
-internal char *GetSymbolText(symbol Symbol)
+internal u8 *GetSymbolText(symbol Symbol)
 {
     switch (Symbol)
     {
-    case symbol_A: return (char *)"A";
-    case symbol_B: return (char *)"B";
-    case symbol_Push: return (char *)"+";
-    case symbol_Pop: return (char *)"-";
+    case symbol_A: return (u8 *)"A";
+    case symbol_B: return (u8 *)"B";
+    case symbol_Push: return (u8 *)"+";
+    case symbol_Pop: return (u8 *)"-";
     default: return 0;
     }
 }
@@ -275,20 +274,22 @@ internal void DrawLSystem(Image *Canvas, turtle *InitialTurtle, symbol Rules[sym
                 {
                 case symbol_A:
                 {
-                    Turtle->Heading = RotateVector2(Turtle->Heading, 0.5f);
+                    /* Turtle->Heading = RotateVector2(Turtle->Heading, 0.5f); */
                     ShouldDraw = 1;
                 } break;
                 case symbol_B:
                 {
-                    Turtle->Heading = RotateVector2(Turtle->Heading, -0.5f);
+                    /* Turtle->Heading = RotateVector2(Turtle->Heading, -0.5f); */
                     ShouldDraw = 1;
                 } break;
                 case symbol_Push:
                 {
                     if (TurtleStackIndex < TURTLE_STACK_MAX - 1)
                     {
+                        Vector2 NewHeading = RotateVector2(Turtle->Heading, 0.75f);
                         TurtleStackIndex += 1;
                         CopyTurtle(Turtle, &TurtleStack[TurtleStackIndex]);
+                        TurtleStack[TurtleStackIndex].Heading = NewHeading;
                     }
                 } break;
                 case symbol_Pop:
@@ -296,6 +297,8 @@ internal void DrawLSystem(Image *Canvas, turtle *InitialTurtle, symbol Rules[sym
                     if (TurtleStackIndex > 0)
                     {
                         TurtleStackIndex -= 1;
+                        Vector2 NewHeading = RotateVector2(TurtleStack[TurtleStackIndex].Heading, -0.75f);
+                        TurtleStack[TurtleStackIndex].Heading = NewHeading;
                     }
                 } break;
                 default: break;
@@ -303,6 +306,7 @@ internal void DrawLSystem(Image *Canvas, turtle *InitialTurtle, symbol Rules[sym
 
                 if (ShouldDraw)
                 {
+                    turtle *Turtle = &TurtleStack[TurtleStackIndex];
                     f32 NewX = Turtle->Position.x + (10.0f * Turtle->Heading.x);
                     f32 NewY = Turtle->Position.y + (10.0f * Turtle->Heading.y);
 
@@ -321,43 +325,40 @@ internal void DrawLSystem(Image *Canvas, turtle *InitialTurtle, symbol Rules[sym
     }
 }
 
-internal Vector2 CreateVector2(f32 X, f32 Y)
-{
-    return (Vector2){X,Y};
-}
-
 internal void DrawRuleSet(app_state *AppState)
 {
     Color FontColor = (Color){0, 0, 0, 255};
-    Color BackgroundColor = (Color){180, 160, 160, 255};
     s32 ItemWidth = 24;
     s32 Padding = 8;
-    s32 Width = (ItemWidth * RULE_SIZE_MAX) + (2 * Padding);
     s32 Height = (2 * AppState->UI.FontSize) + (3 * Padding);
     s32 Y = SCREEN_HEIGHT - (Height + Padding);
     s32 X = Padding;
     s32 RowIndex = 0;
 
-    DrawRectangle(X, Y, Width, Height, BackgroundColor);
+    /* DrawRectangle(X, Y, Width, Height, BackgroundColor); */
 
     for (s32 I = symbol_A; I <= symbol_B; I++)
     {
-        char *LabelText = GetSymbolText(I);
+        u8 *LabelText = GetSymbolText(I);
         s32 LabelX = X + Padding;
         s32 YOffset = RowIndex * (AppState->UI.FontSize + Padding);
         RowIndex += 1;
         s32 LabelY = Y + YOffset + Padding;
 
-        DrawText(LabelText, LabelX, LabelY, AppState->UI.FontSize, FontColor);
+        ui_id RuleButtonId = button_kind_Count + 1 + I;
+        Vector2 ButtonPosition = CreateVector2(LabelX, LabelY);
+        button RuleButton = CreateButton(ButtonPosition, LabelText, RuleButtonId);
+
+        DoButton(&AppState->UI, RuleButton, AppState->UI.FontSize);
 
         for (s32 J = 0; J < RULE_SIZE_MAX; J++)
         {
-            char *ItemText = GetSymbolText(AppState->Rules[I][J]);
+            u8 *ItemText = GetSymbolText(AppState->Rules[I][J]);
 
             if (ItemText)
             {
                 s32 XOffset = (J + 1) * (ItemWidth + 0);//Padding);
-                DrawText(ItemText, LabelX + XOffset, LabelY, AppState->UI.FontSize, FontColor);
+                DrawText((char *)ItemText, LabelX + XOffset, LabelY, AppState->UI.FontSize, FontColor);
             }
             else
             {
@@ -397,7 +398,7 @@ internal void UpdateAndRender(void *VoidAppState)
         {
             button Button = AppState->Buttons[I];
 
-            if (DoButton(UI, Button))
+            if (DoButton(UI, Button, AppState->UI.FontSize))
             {
                 ImageClearBackground(&AppState->Canvas, BackgroundColor);
             }
@@ -418,9 +419,9 @@ internal void InitRules(symbol Rules[symbol_Count][RULE_SIZE_MAX])
     symbol End = symbol_Undefined;
 
     symbol InitialRules[symbol_Count][RULE_SIZE_MAX] = {
-        [symbol_Root] = {A,B,A,B,End},
-        [symbol_A] = {A,Push,B,A,Pop,End},
-        [symbol_B] = {B,B,A,End},
+        [symbol_Root] = {A,End},
+        [symbol_A] = {B,Push,A,Pop,A,End},
+        [symbol_B] = {B,B,End},
     };
 
     for (u32 I = 0; I < ArrayCount(InitialRules); I++)
@@ -441,14 +442,11 @@ internal void InitUi(app_state *AppState)
 
     for (s32 I = 1; I < button_kind_Count; I++)
     {
-        char *Text = ButtonText[I];
-        s32 Width = MeasureText(Text, AppState->UI.FontSize);
+        u8 *Text = ButtonText[I];
 
         AppState->Buttons[I].Id = I;
         AppState->Buttons[I].Text = Text;
         AppState->Buttons[I].Position = (Vector2){10.0f, Y};
-        AppState->Buttons[I].Size = (Vector2){Width + TwicePadding,
-                                              AppState->UI.FontSize + TwicePadding};
         AppState->Buttons[I].Active = 0;
 
         Y += TwicePadding + AppState->UI.FontSize + 10;
@@ -494,7 +492,7 @@ int main(void)
 
     app_state AppState = InitAppState();
 
-    DrawLSystem(&AppState.Canvas, &AppState.Turtle, AppState.Rules, 2);
+    DrawLSystem(&AppState.Canvas, &AppState.Turtle, AppState.Rules, 3);
 
 #if defined(PLATFORM_WEB)
     emscripten_set_main_loop_arg(UpdateAndRender, &AppState, 0, 1);

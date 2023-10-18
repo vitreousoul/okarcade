@@ -2,6 +2,7 @@
 
 u64 GetStringLength(u8 *String);
 b32 StringsEqual(char *StringA, char *StringB);
+Vector2 CreateVector2(f32 X, f32 Y);
 
 #define LogError(s) LogError_((u8 *)s, __LINE__, __FILE__)
 internal void LogError_(u8 *Message, s32 Line, char *File)
@@ -50,4 +51,9 @@ b32 StringsEqual(char *StringA, char *StringB)
     }
 
     return AreEqual;
+}
+
+Vector2 CreateVector2(f32 X, f32 Y)
+{
+    return (Vector2){X,Y};
 }
