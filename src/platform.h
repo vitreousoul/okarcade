@@ -15,12 +15,21 @@ typedef struct
     buffer *Buffer;
 } file_data;
 
+struct file_list_item;
+
+struct file_list_item
+{
+    struct file_list_item *Next;
+    u8 Name[];
+};
+
+typedef struct file_list_item file_list_item;
+
 typedef struct
 {
-    s32 Count;
-    s32 Capacity;
-    file_data *Files;
-} file_array;
+    size Capacity;
+    file_list_item *First;
+} file_list;
 
 
 void *AllocateMemory(u64 Size);
@@ -49,8 +58,9 @@ void FreeBuffer(buffer *Buffer);
 void WriteFile(u8 *FilePath, u8 *Data, size Size);
 void WriteFileFromBuffer(u8 *FilePath, buffer *Buffer);
 void EnsureDirectoryExists(u8 *DirectoryPath);
-void FreeFileArray(file_array FileArray);
-file_array WalkDirectory(u8 *Path);
+void FreeFileList(file_list *FileList);
+
+file_list WalkDirectory(u8 *Path);
 
 #define Assert(p) Assert_(p, __FILE__, __LINE__)
 internal void Assert_(b32 Proposition, char *FilePath, s32 LineNumber)
@@ -290,9 +300,9 @@ void EnsureDirectoryExists(u8 *DirectoryPath)
     }
 }
 
-void FreeFileArray(file_array FileArray)
+void FreeFileList(file_list *FileList)
 {
-    free(FileArray.Files);
+    munmap(FileList->First, FileList->Capacity);
 }
 
 internal b32 IsRelativePathName(char *PathName)
@@ -307,17 +317,19 @@ internal b32 IsRelativePathName(char *PathName)
     return IsRelative;
 }
 
-file_array WalkDirectory(u8 *Path)
+file_list WalkDirectory(u8 *Path)
 {
+    linear_allocator Allocator = CreateLinearAllocator(Gigabytes(1)); /* should we pass the allocator into WalkDirectory */
+    file_list FileList;
+    FileList.Capacity = Allocator.Capacity;
+    FileList.First = (file_list_item *)Allocator.Data;
+
+    file_list_item *CurrentFileListItem = FileList.First;
+
     u8 ActivePaths[64][1024]; /* TODO only allow for a depth of 64 in the file tree... this should be dynamic..... */
     s32 ActivePathIndex = 0;
 
-    s32 FileArrayCount = 64;
-
-    file_array FileArray;
-    FileArray.Count = 0;
-    FileArray.Capacity = FileArrayCount;
-    FileArray.Files = malloc(sizeof(file_data) * FileArrayCount);
+    u8 TempString[1024];
 
     struct dirent *DirectoryEntry = 0;
 
@@ -345,20 +357,29 @@ file_array WalkDirectory(u8 *Path)
             {
                 break;
             }
-            else if (fstatat(dirfd(Directory), DirectoryEntry->d_name, &Stat, 0) < 0)
+
+            s32 CurrentPathLength = -1;
+            while (CurrentPath[++CurrentPathLength]);
+            s32 DirectoryPathLength = -1;
+            while (DirectoryEntry->d_name[++DirectoryPathLength]);
+            s32 TotalLength = CurrentPathLength + DirectoryPathLength + 2; /* plus two for slash between paths and null-char */
+
+            sprintf((char *)TempString, "%s/%s", CurrentPath, DirectoryEntry->d_name);
+            TempString[TotalLength - 1] = 0;
+
+            if (TotalLength > 1024)
+            {
+                printf("WalkDirectory error: working path exceeds max length of 1024 \"%s/%s\"\n", CurrentPath, DirectoryEntry->d_name);
+                continue;
+            }
+
+            if (fstatat(dirfd(Directory), DirectoryEntry->d_name, &Stat, 0) < 0)
             {
                 printf("fstatat error in directory \"%s\" with child \"%s\"\n", Path, DirectoryEntry->d_name);
             }
             else if (S_ISREG(Stat.st_mode))
             {
-                if (FileArray.Count >= FileArray.Capacity)
-                {
-                    FileArrayCount *= 2;
-                    FileArray.Files = realloc(FileArray.Files, sizeof(file_data) * FileArrayCount);
-                }
-
-                FileArray.Files[FileArray.Count].Name = (u8 *)DirectoryEntry->d_name;
-                FileArray.Count += 1;
+                /* TODO append file_list_item */
             }
             else if (IsRelativePathName(DirectoryEntry->d_name))
             {
@@ -369,26 +390,10 @@ file_array WalkDirectory(u8 *Path)
                 ActivePathIndex += 1;
                 Assert(ActivePathIndex < 64);
 
-                s32 CurrentPathLength = -1;
-                while (CurrentPath[++CurrentPathLength]);
-                s32 DirectoryPathLength = -1;
-                while (DirectoryEntry->d_name[++DirectoryPathLength ]);
-
-                s32 TotalLength = CurrentPathLength + DirectoryPathLength + 2; /* plus two for slash between paths and null-char */
-
-                if (TotalLength > 1024)
-                {
-                    printf("WalkDirectory error: working path exceeds max length of 1024 \"%s/%s\"\n", CurrentPath, DirectoryEntry->d_name);
-                    continue;
-                }
-
-                u8 TempString[1024];
-                sprintf((char *)TempString, "%s/%s", CurrentPath, DirectoryEntry->d_name);
-                TempString[TotalLength - 1] = 0;
                 CopyString(TempString, ActivePaths[ActivePathIndex], TotalLength);
             }
         }
     }
 
-    return FileArray;
+    return FileList;
 }

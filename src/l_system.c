@@ -15,6 +15,7 @@
 
 #include "types.h"
 #include "core.c"
+#include "raylib_helpers.h"
 #include "math.c"
 #include "ui.c"
 
