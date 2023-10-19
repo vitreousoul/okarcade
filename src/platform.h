@@ -47,7 +47,7 @@ typedef struct
 } linear_allocator;
 
 linear_allocator CreateLinearAllocator(u64 Size);
-u8 *PushLinearAllocator(linear_allocator *LinearAllocator, u64 Size);
+void *PushLinearAllocator(linear_allocator *LinearAllocator, u64 Size);
 void FreeLinearAllocator(linear_allocator LinearAllocator);
 
 void CopyString(u8 *Source, u8 *Destination, s32 DestinationSize);
@@ -160,7 +160,7 @@ linear_allocator CreateLinearAllocator(u64 Size)
     return LinearAllocator;
 }
 
-u8 *PushLinearAllocator(linear_allocator *LinearAllocator, u64 Size)
+void *PushLinearAllocator(linear_allocator *LinearAllocator, u64 Size)
 {
     u8 *Result = 0;
 
@@ -324,7 +324,7 @@ file_list WalkDirectory(u8 *Path)
     FileList.Capacity = Allocator.Capacity;
     FileList.First = (file_list_item *)Allocator.Data;
 
-    file_list_item *CurrentFileListItem = FileList.First;
+    file_list_item *CurrentFileListItem = 0;
 
     u8 ActivePaths[64][1024]; /* TODO only allow for a depth of 64 in the file tree... this should be dynamic..... */
     s32 ActivePathIndex = 0;
@@ -379,7 +379,19 @@ file_list WalkDirectory(u8 *Path)
             }
             else if (S_ISREG(Stat.st_mode))
             {
-                /* TODO append file_list_item */
+                if (!CurrentFileListItem)
+                {
+                    CurrentFileListItem = FileList.First;
+                }
+                else
+                {
+                    file_list_item *PreviousItem = CurrentFileListItem;
+                    size TotalSize = sizeof(file_list_item) + TotalLength;
+                    CurrentFileListItem = PushLinearAllocator(&Allocator, TotalSize);
+                    PreviousItem->Next = CurrentFileListItem;
+                }
+
+                CopyMemory(TempString, CurrentFileListItem->Name, TotalLength);
             }
             else if (IsRelativePathName(DirectoryEntry->d_name))
             {
