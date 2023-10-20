@@ -64,7 +64,7 @@ int main(s32 ArgCount, char **Args)
         TestPreprocessor();
         break;
     case command_line_arg_type_CreateCodePages:
-        TestCodePages();
+        GenerateCodePages();
         break;
     default:
         printf("Un-handled command line arg type: %d\n", CommandLineArgs.Type);

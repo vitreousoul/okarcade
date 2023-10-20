@@ -1,19 +1,14 @@
-void TestCodePages(void);
 void GenerateCodePages(void);
-
-void TestCodePages(void)
-{
-    file_list FileList = WalkDirectory((u8 *)"../src");
-
-    for (file_list_item *CurrentItem = FileList.First; CurrentItem; CurrentItem = CurrentItem->Next)
-    {
-        printf("file: %s\n", CurrentItem->Name);
-    }
-
-    FreeFileList(&FileList);
-}
 
 void GenerateCodePages(void)
 {
+    linear_allocator FileAllocator = WalkDirectory((u8 *)"../src");
+    file_list *FileList = (file_list *)FileAllocator.Data;
 
+    for (; FileList; FileList = FileList->Next)
+    {
+        printf("%s\n", FileList->Name);
+    }
+
+    FreeLinearAllocator(FileAllocator);
 }

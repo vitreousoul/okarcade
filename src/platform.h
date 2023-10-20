@@ -2,6 +2,9 @@
 #include <dirent.h>
 #include <sys/mman.h>
 #include <errno.h>
+#include <string.h>
+#include <unistd.h>
+#include <fts.h>
 
 typedef struct
 {
@@ -15,29 +18,15 @@ typedef struct
     buffer *Buffer;
 } file_data;
 
-struct file_list_item;
+struct file_list;
 
-struct file_list_item
+struct file_list
 {
-    struct file_list_item *Next;
+    struct file_list *Next;
     u8 Name[];
 };
 
-typedef struct file_list_item file_list_item;
-
-typedef struct
-{
-    size Capacity;
-    file_list_item *First;
-} file_list;
-
-
-void *AllocateMemory(u64 Size);
-void FreeMemory(void *Ref);
-void CopyMemory(u8 *Source, u8 *Destination, u64 Size);
-void *AllocateVirtualMemory(size Size);
-
-void GetResourceUsage(void);
+typedef struct file_list file_list;
 
 typedef struct
 {
@@ -46,11 +35,19 @@ typedef struct
     u8 *Data;
 } linear_allocator;
 
+void *AllocateMemory(u64 Size);
+void FreeMemory(void *Ref);
+void CopyMemory(u8 *Source, u8 *Destination, u64 Size);
+void *AllocateVirtualMemory(size Size);
+
+void GetResourceUsage(void);
+
 linear_allocator CreateLinearAllocator(u64 Size);
 void *PushLinearAllocator(linear_allocator *LinearAllocator, u64 Size);
 void FreeLinearAllocator(linear_allocator LinearAllocator);
 
 void CopyString(u8 *Source, u8 *Destination, s32 DestinationSize);
+void StringLength(u8 *String);
 
 buffer *ReadFileIntoBuffer(u8 *FilePath);
 u64 ReadFileIntoData(u8 *FilePath, u8 *Bytes, u64 MaxBytes);
@@ -58,9 +55,8 @@ void FreeBuffer(buffer *Buffer);
 void WriteFile(u8 *FilePath, u8 *Data, size Size);
 void WriteFileFromBuffer(u8 *FilePath, buffer *Buffer);
 void EnsureDirectoryExists(u8 *DirectoryPath);
-void FreeFileList(file_list *FileList);
 
-file_list WalkDirectory(u8 *Path);
+linear_allocator WalkDirectory(u8 *Path);
 
 #define Assert(p) Assert_(p, __FILE__, __LINE__)
 internal void Assert_(b32 Proposition, char *FilePath, s32 LineNumber)
@@ -148,7 +144,6 @@ void GetResourceUsage(void)
 }
 
 /*| v Linear Allocator v |*/
-
 linear_allocator CreateLinearAllocator(u64 Size)
 {
     linear_allocator LinearAllocator;
@@ -181,7 +176,6 @@ void FreeLinearAllocator(linear_allocator LinearAllocator)
 {
     munmap(LinearAllocator.Data, LinearAllocator.Capacity);
 }
-
 /*| ^ Linear Allocator ^ |*/
 
 void CopyString(u8 *Source, u8 *Destination, s32 DestinationSize)
@@ -300,11 +294,6 @@ void EnsureDirectoryExists(u8 *DirectoryPath)
     }
 }
 
-void FreeFileList(file_list *FileList)
-{
-    munmap(FileList->First, FileList->Capacity);
-}
-
 internal b32 IsRelativePathName(char *PathName)
 {
     s32 Length = -1;
@@ -317,95 +306,68 @@ internal b32 IsRelativePathName(char *PathName)
     return IsRelative;
 }
 
-file_list WalkDirectory(u8 *Path)
+/* NOTE copypasta from a post about fts... */
+linear_allocator WalkDirectory(u8 *Path)
 {
-    linear_allocator Allocator = CreateLinearAllocator(Gigabytes(1)); /* should we pass the allocator into WalkDirectory */
-    file_list FileList;
-    FileList.Capacity = Allocator.Capacity;
-    FileList.First = (file_list_item *)Allocator.Data;
+    linear_allocator Allocator = CreateLinearAllocator(Gigabytes(1));
+    /* NOTE: we call the variable "Paths", but it's only every inteded to contain 1 path. */
+    char *Paths[] = { (char *)Path, 0 };
+    u32 FtsFlags = FTS_PHYSICAL | FTS_NOCHDIR | FTS_XDEV;
+    FTS *Fts = fts_open(Paths, FtsFlags, 0);
+    file_list *PreviousFileItem = (file_list *)(Allocator.Data + Allocator.Offset);
 
-    file_list_item *CurrentFileListItem = 0;
-
-    u8 ActivePaths[64][1024]; /* TODO only allow for a depth of 64 in the file tree... this should be dynamic..... */
-    s32 ActivePathIndex = 0;
-
-    u8 TempString[1024];
-
-    struct dirent *DirectoryEntry = 0;
-
-    CopyString(Path, ActivePaths[ActivePathIndex], 1024);
-
-    while (ActivePathIndex >= 0 && ActivePathIndex < 64)
+    if (!Fts)
     {
-        char *CurrentPath = (char *)ActivePaths[ActivePathIndex];
-        DIR *Directory = opendir(CurrentPath);
-        ActivePathIndex -= 1;
-
-        if (!Directory)
+        printf("Error in WalkDirectory: error calling fts_open\n");
+        return Allocator;
+    }
+    else
+    {
+        FTSENT *p;
+        while ((p = fts_read(Fts)) != 0)
         {
-            printf("Platform error opening directory \"%s\"\n", CurrentPath);
-            continue;
-        }
-
-        while (1)
-        {
-            struct stat Stat;
-
-            DirectoryEntry = readdir(Directory);
-
-            if (!DirectoryEntry)
+            switch (p->fts_info)
             {
-                break;
-            }
-
-            s32 CurrentPathLength = -1;
-            while (CurrentPath[++CurrentPathLength]);
-            s32 DirectoryPathLength = -1;
-            while (DirectoryEntry->d_name[++DirectoryPathLength]);
-            s32 TotalLength = CurrentPathLength + DirectoryPathLength + 2; /* plus two for slash between paths and null-char */
-
-            sprintf((char *)TempString, "%s/%s", CurrentPath, DirectoryEntry->d_name);
-            TempString[TotalLength - 1] = 0;
-
-            if (TotalLength > 1024)
+            case FTS_F:
             {
-                printf("WalkDirectory error: working path exceeds max length of 1024 \"%s/%s\"\n", CurrentPath, DirectoryEntry->d_name);
-                continue;
-            }
-
-            if (fstatat(dirfd(Directory), DirectoryEntry->d_name, &Stat, 0) < 0)
-            {
-                printf("fstatat error in directory \"%s\" with child \"%s\"\n", Path, DirectoryEntry->d_name);
-            }
-            else if (S_ISREG(Stat.st_mode))
-            {
-                if (!CurrentFileListItem)
+                struct file_list
                 {
-                    CurrentFileListItem = FileList.First;
+                    struct file_list *Next;
+                    u8 Name[];
+                };
+                b32 IsFirstAllocation = Allocator.Offset == 0;
+                s32 FilePathLength = strlen(p->fts_path);
+                size FileItemSize = sizeof(file_list) + FilePathLength + 1;
+                file_list *FileItem = PushLinearAllocator(&Allocator, FileItemSize);
+
+                CopyMemory((u8 *)p->fts_path, FileItem->Name, FilePathLength);
+                FileItem->Name[FileItemSize] = 0;
+
+                if (IsFirstAllocation)
+                {
+                    FileItem->Next = 0;
                 }
                 else
                 {
-                    file_list_item *PreviousItem = CurrentFileListItem;
-                    size TotalSize = sizeof(file_list_item) + TotalLength;
-                    CurrentFileListItem = PushLinearAllocator(&Allocator, TotalSize);
-                    PreviousItem->Next = CurrentFileListItem;
+                    PreviousFileItem->Next = FileItem;
                 }
 
-                CopyMemory(TempString, CurrentFileListItem->Name, TotalLength);
-            }
-            else if (IsRelativePathName(DirectoryEntry->d_name))
+                PreviousFileItem = FileItem;
+            } break;
+            case FTS_DP:
             {
-                continue;
-            }
-            else if (S_ISDIR(Stat.st_mode))
+                /* directory */
+            } break;
+            case FTS_SL:
+            case FTS_SLNONE:
             {
-                ActivePathIndex += 1;
-                Assert(ActivePathIndex < 64);
-
-                CopyString(TempString, ActivePaths[ActivePathIndex], TotalLength);
+                /* symbolic link */
+            } break;
             }
         }
+
+        fts_close(Fts);
     }
 
-    return FileList;
+    return Allocator;
 }
