@@ -294,18 +294,6 @@ void EnsureDirectoryExists(u8 *DirectoryPath)
     }
 }
 
-internal b32 IsRelativePathName(char *PathName)
-{
-    s32 Length = -1;
-    while (PathName[++Length]);
-
-    b32 SingleDot = Length == 1 && PathName[0] == '.';
-    b32 DoubleDot = Length == 2 && PathName[0] == '.' && PathName[1] == '.';
-    b32 IsRelative = SingleDot || DoubleDot;
-
-    return IsRelative;
-}
-
 /* NOTE copypasta from a post about fts... */
 linear_allocator WalkDirectory(u8 *Path)
 {
