@@ -86,16 +86,46 @@ internal file_list *SortFileList(file_list *Files)
     return SortedFiles;
 }
 
+internal s32 GetLengthOfPathWithoutExtension(u8 *Path)
+{
+    s32 LastDotIndex = 0;
+    s32 I = 0;
+
+    while (Path[I])
+    {
+        if (Path[I] == '.')
+        {
+            LastDotIndex = I;
+        }
+
+        I += 1;
+    }
+
+    return LastDotIndex + 1;
+}
+
 void GenerateCodePages(void)
 {
-    linear_allocator FileAllocator = WalkDirectory((u8 *)"../src");
+    u8 *SourceCodePath = (u8 *)"../src";
+    u8 *CodePageListingPath = (u8 *)"../gen/code_page_links.html";
+
+    linear_allocator FileAllocator = WalkDirectory(SourceCodePath);
+    linear_allocator RootCodePage = CreateLinearAllocator(Gigabytes(1));
+
     file_list *FileList = (file_list *)FileAllocator.Data;
     file_list *SortedFileList = SortFileList(FileList);
 
     for (; SortedFileList; SortedFileList = SortedFileList->Next)
     {
-        printf("%s\n", SortedFileList->Name);
+        s32 PathLength = GetLengthOfPathWithoutExtension(SortedFileList->Name);
+        PushString(&RootCodePage, (u8 *)"<p><a href=\"");
+        PushString_(&RootCodePage, SortedFileList->Name, PathLength);
+        PushString(&RootCodePage, (u8 *)"html\">");
+        PushString(&RootCodePage, SortedFileList->Name);
+        PushString(&RootCodePage, (u8 *)"</a></p>");
     }
+
+    WriteFile(CodePageListingPath, RootCodePage.Data, RootCodePage.Offset);
 
     FreeLinearAllocator(FileAllocator);
 }

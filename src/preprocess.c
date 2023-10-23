@@ -279,6 +279,9 @@ void TestPreprocessor(void)
     u8 *IndexIn = (u8 *)"../src/layout/index.html";
     u8 *IndexOut = (u8 *)"../site/index.html";
 
+    u8 *CodeIn = (u8 *)"../src/layout/code.html";
+    u8 *CodeOut = (u8 *)"../site/code.html";
+
     u8 *LSystemIn = (u8 *)"../src/layout/l_system.html";
     u8 *LSystemOut = (u8 *)"../gen/l_system.html";
 
@@ -293,5 +296,6 @@ void TestPreprocessor(void)
     EnsureDirectoryExists(SiteDirectory);
 
     PreprocessFile(&PreProcessor, IndexIn, IndexOut);
+    PreprocessFile(&PreProcessor, CodeIn, CodeOut);
     PreprocessFile(&PreProcessor, LSystemIn, LSystemOut);
 }

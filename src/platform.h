@@ -47,7 +47,7 @@ void *PushLinearAllocator(linear_allocator *LinearAllocator, u64 Size);
 void FreeLinearAllocator(linear_allocator LinearAllocator);
 
 void CopyString(u8 *Source, u8 *Destination, s32 DestinationSize);
-void StringLength(u8 *String);
+s32 GetStringLength(u8 *String);
 
 buffer *ReadFileIntoBuffer(u8 *FilePath);
 u64 ReadFileIntoData(u8 *FilePath, u8 *Bytes, u64 MaxBytes);
@@ -201,6 +201,20 @@ void CopyString(u8 *Source, u8 *Destination, s32 DestinationSize)
 
         I += 1;
     }
+}
+
+s32 GetStringLength(u8 *String)
+{
+    s32 StringLength = -1;
+    while (String[++StringLength]);
+    return StringLength;
+}
+
+#define PushString(a, s) PushString_((a), (s), GetStringLength(s))
+internal void PushString_(linear_allocator *LinearAllocator, u8 *String, s32 StringLength)
+{
+    u8 *WhereToWrite = PushLinearAllocator(LinearAllocator, StringLength);
+    CopyMemory(String, WhereToWrite, StringLength);
 }
 
 buffer *ReadFileIntoBuffer(u8 *FilePath)
