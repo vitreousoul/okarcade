@@ -50,11 +50,13 @@ void CopyString(u8 *Source, u8 *Destination, s32 DestinationSize);
 s32 GetStringLength(u8 *String);
 
 buffer *ReadFileIntoBuffer(u8 *FilePath);
+u64 GetFileSize(u8 *FilePath);
 u64 ReadFileIntoData(u8 *FilePath, u8 *Bytes, u64 MaxBytes);
 void FreeBuffer(buffer *Buffer);
 void WriteFile(u8 *FilePath, u8 *Data, size Size);
 void WriteFileFromBuffer(u8 *FilePath, buffer *Buffer);
 void EnsureDirectoryExists(u8 *DirectoryPath);
+void EnsurePathDirectoriesExist(u8 *Path);
 
 linear_allocator WalkDirectory(u8 *Path);
 
@@ -241,7 +243,7 @@ buffer *ReadFileIntoBuffer(u8 *FilePath)
     return Buffer;
 }
 
-u64 ReadFileIntoData(u8 *FilePath, u8 *Bytes, u64 MaxBytes)
+u64 GetFileSize(u8 *FilePath)
 {
     u64 FileSize;
     struct stat StatResult;
@@ -249,11 +251,18 @@ u64 ReadFileIntoData(u8 *FilePath, u8 *Bytes, u64 MaxBytes)
 
     if (StatError)
     {
-        printf("ReadFileIntoData stat error\n");
+        printf("GetFileSize stat error\n");
         return 0;
     }
 
     FileSize = StatResult.st_size;
+
+    return FileSize;
+}
+
+u64 ReadFileIntoData(u8 *FilePath, u8 *Bytes, u64 MaxBytes)
+{
+    u64 FileSize = GetFileSize(FilePath);
 
     if (FileSize > MaxBytes)
     {
@@ -286,7 +295,7 @@ void WriteFile(u8 *FilePath, u8 *Data, size Size)
     }
     else
     {
-        printf("Error in WriteFile: file not found\n");
+        printf("Error in WriteFile: trying to open file \"%s\"\n", FilePath);
     }
 }
 
@@ -305,6 +314,29 @@ void EnsureDirectoryExists(u8 *DirectoryPath)
         printf("Making directory \"%s\"\n", DirectoryPath);
         s32 Mode755 = S_IRWXU | S_IRUSR | S_IXUSR | S_IRGRP | S_IXGRP;
         mkdir((char *)DirectoryPath, Mode755);
+    }
+}
+
+void EnsurePathDirectoriesExist(u8 *Path)
+{
+    u8 TempBuffer[1024];
+    s32 PathLength = GetStringLength(Path);
+
+    for (s32 I = 0; I < PathLength; I++)
+    {
+        if (Path[I] == '/')
+        {
+            if (I + 1 > 1024)
+            {
+                printf("Error in EnsurePathDirectoriesExist: sub-path exceeds temp buffer\n");
+                continue;
+            }
+
+            CopyMemory(Path, TempBuffer, I);
+            TempBuffer[I] = 0;
+
+            EnsureDirectoryExists(TempBuffer);
+        }
     }
 }
 
