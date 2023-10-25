@@ -121,16 +121,16 @@ internal u8 *CodePageEnd(void)
     return (u8 *)"</pre></body></html>";
 }
 
-#define EXT_SIZE 5
-#define PATH_BUFFER_SIZE 1024
-internal void GetCodePageOutputPathName(u8 *SourceCodePath, u8 *CodePagePath, u8 *PathBuffer)
+internal buffer GetCodePageOutputPathName(linear_allocator *TempString, u8 *SourceCodePath, u8 *CodePagePath)
 {
     u8 *GenPath = (u8 *)"../gen";
-    u64 PrefixLength = GetStringLength(GenPath);
-
     u8 *Extension = (u8 *)".html";
 
-    u64 CodePagePathLength = GetStringLength(CodePagePath);
+    buffer Buffer;
+    Buffer.Size = 0;
+    Buffer.Data = TempString->Data + TempString->Offset;
+
+    s32 BeginOffset = TempString->Offset;
     s32 I = 0;
 
     /* We want to replace the source code path prefix "../src" with the "../gen" prefix.
@@ -150,20 +150,17 @@ internal void GetCodePageOutputPathName(u8 *SourceCodePath, u8 *CodePagePath, u8
     }
 
     s32 CodePagePathOffset = I;
-    u64 CodePageSubPathLength = CodePagePathLength - CodePagePathOffset;
 
-    if (PrefixLength + CodePageSubPathLength + EXT_SIZE + 1 > PATH_BUFFER_SIZE)
-    {
-        LogError("Code page path name exceeds temp buffer size\n");
-        PathBuffer[0] = 0;
-        return;
-    }
+    PushString(TempString, GenPath);
+    PushString(TempString, CodePagePath + CodePagePathOffset);
+    PushString(TempString, Extension);
+    u8 Null = 0;
+    PushString(TempString, &Null);
 
-    CopyMemory(GenPath, PathBuffer, PrefixLength);
-    CopyMemory(CodePagePath + CodePagePathOffset, PathBuffer + PrefixLength, CodePageSubPathLength);
-    CopyMemory(Extension, PathBuffer + PrefixLength + CodePageSubPathLength, EXT_SIZE);
+    Buffer.Size = TempString->Offset - BeginOffset;
+    CopyMemory(TempString->Data + BeginOffset, Buffer.Data, Buffer.Size);
 
-    PathBuffer[PrefixLength + CodePageSubPathLength + EXT_SIZE] = 0;
+    return Buffer;
 }
 
 void GenerateCodePages(void)
@@ -172,6 +169,7 @@ void GenerateCodePages(void)
 
     linear_allocator FileAllocator = WalkDirectory(SourceCodePath);
     linear_allocator CodePage = CreateLinearAllocator(Gigabytes(1));
+    linear_allocator TempString = CreateLinearAllocator(Gigabytes(1));
 
     file_list *FileList = (file_list *)FileAllocator.Data;
     file_list *SortedFileList = SortFileList(FileList);
@@ -196,9 +194,8 @@ void GenerateCodePages(void)
     { /* inidividual code page docs */
         for (file_list *CurrentFile = SortedFileList; CurrentFile; CurrentFile = CurrentFile->Next)
         {
-            u8 CodePagePathName[PATH_BUFFER_SIZE];
-            GetCodePageOutputPathName(SourceCodePath, CurrentFile->Name, (u8 *)CodePagePathName);
-            EnsurePathDirectoriesExist(CodePagePathName);
+            buffer Buffer = GetCodePageOutputPathName(&TempString, SourceCodePath, CurrentFile->Name);
+            EnsurePathDirectoriesExist(Buffer.Data);
 
             u64 CodeFileSize = GetFileSize(CurrentFile->Name);
 
@@ -207,8 +204,7 @@ void GenerateCodePages(void)
             ReadFileIntoData(CurrentFile->Name, CodePageData, CodeFileSize);
             PushString(&CodePage, CodePageEnd());
 
-            printf("writing file %s\n", CodePagePathName);
-            WriteFile(CodePagePathName, CodePage.Data, CodePage.Offset);
+            WriteFile(Buffer.Data, CodePage.Data, CodePage.Offset);
             CodePage.Offset = 0;
         }
 
@@ -216,6 +212,3 @@ void GenerateCodePages(void)
 
     FreeLinearAllocator(FileAllocator);
 }
-
-#undef EXT_SIZE
-#undef PATH_BUFFER_SIZE
