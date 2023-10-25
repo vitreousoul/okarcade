@@ -121,6 +121,12 @@ internal u8 *CodePageEnd(void)
     return (u8 *)"</pre></body></html>";
 }
 
+internal void PushNullTerminator(linear_allocator *Allocator)
+{
+    Allocator->Data[Allocator->Offset] = 0;
+    Allocator->Offset += 1;
+}
+
 internal buffer GetCodePageOutputPathName(linear_allocator *TempString, u8 *SourceCodePath, u8 *CodePagePath)
 {
     u8 *GenPath = (u8 *)"../gen";
@@ -154,11 +160,57 @@ internal buffer GetCodePageOutputPathName(linear_allocator *TempString, u8 *Sour
     PushString(TempString, GenPath);
     PushString(TempString, CodePagePath + CodePagePathOffset);
     PushString(TempString, Extension);
-    u8 Null = 0;
-    PushString(TempString, &Null);
+
+    PushNullTerminator(TempString);
 
     Buffer.Size = TempString->Offset - BeginOffset;
     CopyMemory(TempString->Data + BeginOffset, Buffer.Data, Buffer.Size);
+
+    return Buffer;
+}
+
+internal buffer EscapeHtmlString(linear_allocator *TempString, u8 *HtmlString, s32 Length)
+{
+    s32 HtmlStringBegin = 0;
+    s32 InitialOffset = TempString->Offset;
+    s32 I;
+
+    buffer Buffer;
+    Buffer.Size = 0;
+    Buffer.Data = TempString->Data + TempString->Offset;
+
+    for (I = 0; I < Length; I++)
+    {
+        u8 *EscapeString = 0;
+
+        switch(HtmlString[I])
+        {
+        case '<': EscapeString = (u8 *)"&lt;"; break;
+        case '>': EscapeString = (u8 *)"&gt;"; break;
+        default:
+            break;
+        }
+
+        if (EscapeString)
+        {
+            u8 *BeginData = HtmlString + HtmlStringBegin;
+            s32 Size = I - HtmlStringBegin;
+            u8 *Data = PushLinearAllocator(TempString, Size);
+            CopyMemory(BeginData, Data, Size);
+            PushString(TempString, EscapeString);
+            HtmlStringBegin = I + 1;
+        }
+    }
+
+    s32 RemainingLength = I - HtmlStringBegin;
+
+    if (RemainingLength)
+    {
+        u8 *Data = PushLinearAllocator(TempString, RemainingLength);
+        CopyMemory(HtmlString + HtmlStringBegin, Data, RemainingLength);
+    }
+
+    Buffer.Size = TempString->Offset - InitialOffset;
 
     return Buffer;
 }
@@ -197,15 +249,21 @@ void GenerateCodePages(void)
             buffer Buffer = GetCodePageOutputPathName(&TempString, SourceCodePath, CurrentFile->Name);
             EnsurePathDirectoriesExist(Buffer.Data);
 
-            u64 CodeFileSize = GetFileSize(CurrentFile->Name);
-
             PushString(&CodePage, CodePageBegin());
-            u8 *CodePageData = PushLinearAllocator(&CodePage, CodeFileSize);
-            ReadFileIntoData(CurrentFile->Name, CodePageData, CodeFileSize);
+
+            buffer *CodePageBuffer = ReadFileIntoBuffer(CurrentFile->Name);
+            buffer EscapedHtmlBuffer = EscapeHtmlString(&TempString, CodePageBuffer->Data, CodePageBuffer->Size);
+
+            u8 *CodePageData = PushLinearAllocator(&CodePage, EscapedHtmlBuffer.Size);
+            CopyMemory(EscapedHtmlBuffer.Data, CodePageData, EscapedHtmlBuffer.Size);
+
             PushString(&CodePage, CodePageEnd());
 
             WriteFile(Buffer.Data, CodePage.Data, CodePage.Offset);
+            FreeBuffer(CodePageBuffer);
+
             CodePage.Offset = 0;
+            TempString.Offset = 0;
         }
 
     }
