@@ -1,4 +1,4 @@
-void GenerateCodePages(void);
+void GenerateCodePages(linear_allocator *TempString);
 
 internal s32 CompareString(u8 *StringA, u8 *StringB)
 {
@@ -127,9 +127,17 @@ internal void PushNullTerminator(linear_allocator *Allocator)
     Allocator->Offset += 1;
 }
 
-internal buffer GetCodePageOutputPathName(linear_allocator *TempString, u8 *SourceCodePath, u8 *CodePagePath)
+internal b32 PathHasExtension(u8 *Path, u8 *Extension)
 {
-    u8 *GenPath = (u8 *)"../gen";
+    s32 PathLength = GetStringLength(Path);
+    u8 *OffsetPath = Path + PathLength;
+    b32 AreEqual = StringsEqual(OffsetPath, Extension);
+
+    return AreEqual;
+}
+
+internal buffer GetOutputHtmlPath(linear_allocator *TempString, u8 *OldRootPath, u8 *NewRootPath, u8 *CodePagePath, b32 AddHtmlExtension)
+{
     u8 *Extension = (u8 *)".html";
 
     buffer Buffer;
@@ -144,8 +152,8 @@ internal buffer GetCodePageOutputPathName(linear_allocator *TempString, u8 *Sour
      */
     for (;;)
     {
-        b32 SomethingIsNull = !(SourceCodePath[I] && CodePagePath[I]);
-        b32 CharsNotEqual = SourceCodePath[I] != CodePagePath[I];
+        b32 SomethingIsNull = !(OldRootPath[I] && CodePagePath[I]);
+        b32 CharsNotEqual = OldRootPath[I] != CodePagePath[I];
 
         if (SomethingIsNull || CharsNotEqual)
         {
@@ -157,9 +165,12 @@ internal buffer GetCodePageOutputPathName(linear_allocator *TempString, u8 *Sour
 
     s32 CodePagePathOffset = I;
 
-    PushString(TempString, GenPath);
+    PushString(TempString, NewRootPath);
     PushString(TempString, CodePagePath + CodePagePathOffset);
-    PushString(TempString, Extension);
+    if (AddHtmlExtension)
+    {
+        PushString(TempString, Extension);
+    }
 
     PushNullTerminator(TempString);
 
@@ -215,13 +226,13 @@ internal buffer EscapeHtmlString(linear_allocator *TempString, u8 *HtmlString, s
     return Buffer;
 }
 
-void GenerateCodePages(void)
+void GenerateCodePages(linear_allocator *TempString)
 {
     u8 *SourceCodePath = (u8 *)"../src";
+    u8 *GenPath = (u8 *)"../gen/code_pages";
 
     linear_allocator FileAllocator = WalkDirectory(SourceCodePath);
     linear_allocator CodePage = CreateLinearAllocator(Gigabytes(1));
-    linear_allocator TempString = CreateLinearAllocator(Gigabytes(1));
 
     file_list *FileList = (file_list *)FileAllocator.Data;
     file_list *SortedFileList = SortFileList(FileList);
@@ -230,11 +241,12 @@ void GenerateCodePages(void)
         u8 *CodePageListingPath = (u8 *)"../gen/code_page_links.html";
         for (file_list *CurrentFile = SortedFileList; CurrentFile; CurrentFile = CurrentFile->Next)
         {
-            s32 PathLength = GetLengthOfPathWithoutExtension(CurrentFile->Name);
+            s32 PathLength = GetStringLength(CurrentFile->Name);
 
             PushString(&CodePage, (u8 *)"<p><a href=\"");
+            /* TODO remove the "../src" prefix on the file name, and that should help fix the broken links! */
             PushString_(&CodePage, CurrentFile->Name, PathLength);
-            PushString(&CodePage, (u8 *)"html\">");
+            PushString(&CodePage, (u8 *)".html\">");
             PushString(&CodePage, CurrentFile->Name);
             PushString(&CodePage, (u8 *)"</a></p>");
         }
@@ -246,13 +258,13 @@ void GenerateCodePages(void)
     { /* inidividual code page docs */
         for (file_list *CurrentFile = SortedFileList; CurrentFile; CurrentFile = CurrentFile->Next)
         {
-            buffer Buffer = GetCodePageOutputPathName(&TempString, SourceCodePath, CurrentFile->Name);
+            buffer Buffer = GetOutputHtmlPath(TempString, SourceCodePath, GenPath, CurrentFile->Name, 1);
             EnsurePathDirectoriesExist(Buffer.Data);
 
             PushString(&CodePage, CodePageBegin());
 
             buffer *CodePageBuffer = ReadFileIntoBuffer(CurrentFile->Name);
-            buffer EscapedHtmlBuffer = EscapeHtmlString(&TempString, CodePageBuffer->Data, CodePageBuffer->Size);
+            buffer EscapedHtmlBuffer = EscapeHtmlString(TempString, CodePageBuffer->Data, CodePageBuffer->Size);
 
             u8 *CodePageData = PushLinearAllocator(&CodePage, EscapedHtmlBuffer.Size);
             CopyMemory(EscapedHtmlBuffer.Data, CodePageData, EscapedHtmlBuffer.Size);
@@ -263,7 +275,7 @@ void GenerateCodePages(void)
             FreeBuffer(CodePageBuffer);
 
             CodePage.Offset = 0;
-            TempString.Offset = 0;
+            TempString->Offset = 0;
         }
 
     }

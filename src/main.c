@@ -4,14 +4,13 @@
 #include "types.h"
 #include "platform.h"
 #include "core.c"
-#include "preprocess.c"
 #include "code_pages.c"
+#include "preprocess.c"
 
 typedef enum
 {
     command_line_arg_type_Undefined,
     command_line_arg_type_Preprocess,
-    command_line_arg_type_CreateCodePages,
     command_line_arg_type_Count,
 } command_line_arg_type;
 
@@ -25,6 +24,7 @@ typedef struct
 internal command_line_args ParseCommandLineArgs(s32 ArgCount, char **Args)
 {
     command_line_args CommandLineArgs = {0};
+    u8 *PreProcessName = (u8 *)"preprocess";
 
     if (ArgCount < 2 || ArgCount > 2)
     {
@@ -32,15 +32,11 @@ internal command_line_args ParseCommandLineArgs(s32 ArgCount, char **Args)
     }
     else
     {
-        char *FirstArg = Args[1];
+        u8 *FirstArg = (u8 *)Args[1];
 
-        if (StringsEqual(FirstArg, "preprocess"))
+        if (StringsEqual(FirstArg, PreProcessName))
         {
             CommandLineArgs.Type = command_line_arg_type_Preprocess;
-        }
-        else if (StringsEqual(FirstArg, "code"))
-        {
-            CommandLineArgs.Type = command_line_arg_type_CreateCodePages;
         }
         else
         {
@@ -62,9 +58,6 @@ int main(s32 ArgCount, char **Args)
     {
     case command_line_arg_type_Preprocess:
         TestPreprocessor();
-        break;
-    case command_line_arg_type_CreateCodePages:
-        GenerateCodePages();
         break;
     default:
         printf("Un-handled command line arg type: %d\n", CommandLineArgs.Type);

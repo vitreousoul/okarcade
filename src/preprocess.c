@@ -152,17 +152,19 @@ internal buffer GetCommandToken(pre_processor *PreProcessor, buffer *Buffer, s32
     return TokenBuffer;
 }
 
-internal void HandlePreProcessCommand(pre_processor *PreProcessor, buffer *Buffer, s32 Offset, s32 CommandSize)
+internal b32 HandlePreProcessCommand(pre_processor *PreProcessor, buffer *Buffer, s32 Offset, s32 CommandSize)
 {
     s32 Index = Offset;
     s32 MaxIndex = Offset + CommandSize;
     u8 *IncludeName = (u8 *)"include";
     linear_allocator *OutputAllocator = &PreProcessor->OutputAllocator;
+    b32 CommandWasHandled = 0;
 
     SkipSpace(Buffer, &Index);
 
     if (Index < MaxIndex && CheckIfStringIsPrefix(IncludeName, Buffer, Index))
     {
+        CommandWasHandled = 1;
         Index += GetStringLength(IncludeName);
         SkipSpace(Buffer, &Index);
 
@@ -187,10 +189,8 @@ internal void HandlePreProcessCommand(pre_processor *PreProcessor, buffer *Buffe
             LogError("include file not found");
         }
     }
-    else
-    {
-        LogError("Unknown command");
-    }
+
+    return CommandWasHandled;
 }
 
 b32 PreprocessFile(pre_processor *PreProcessor, u8 *FilePath, u8 *OutputFilePath)
@@ -226,6 +226,9 @@ b32 PreprocessFile(pre_processor *PreProcessor, u8 *FilePath, u8 *OutputFilePath
                     s32 JustPastKet = J + PreProcessor->KetCount;
                     s32 Size = I - WriteIndex;
 
+                    s32 OldI = I;
+                    s32 OldWriteIndex = WriteIndex;
+
                     u8 *WhereToWrite = PushLinearAllocator(OutputAllocator, Size);
 
                     if (WhereToWrite)
@@ -241,7 +244,16 @@ b32 PreprocessFile(pre_processor *PreProcessor, u8 *FilePath, u8 *OutputFilePath
                     WriteIndex = JustPastKet;
                     I = JustPastKet;
 
-                    HandlePreProcessCommand(PreProcessor, Buffer, CommandStart, J);
+                    b32 CommandWasHandled = HandlePreProcessCommand(PreProcessor, Buffer, CommandStart, J);
+
+                    if (!CommandWasHandled)
+                    {
+                        /* We saw preprocessor brackets, but did not parse. Assume it's not a pre-processer and
+                           just output the text as usual.
+                        */
+                        I = OldI;
+                        WriteIndex = OldWriteIndex;
+                    }
                     break;
                 }
             }
@@ -274,6 +286,7 @@ b32 PreprocessFile(pre_processor *PreProcessor, u8 *FilePath, u8 *OutputFilePath
 void TestPreprocessor(void)
 {
     u8 *GenDirectory = (u8 *)"../gen";
+    u8 *CodePagesDirectory = (u8 *)"../gen/code_pages";
     u8 *SiteDirectory = (u8 *)"../site";
 
     u8 *IndexIn = (u8 *)"../src/layout/index.html";
@@ -288,14 +301,34 @@ void TestPreprocessor(void)
     u8 *Bra = (u8 *)"{|";
     u8 *Ket = (u8 *)"|}";
 
+    linear_allocator TempString = CreateLinearAllocator(Gigabytes(1));
+
+    GenerateCodePages(&TempString);
+
+    EnsureDirectoryExists(GenDirectory);
+    EnsureDirectoryExists(CodePagesDirectory);
+    EnsureDirectoryExists(SiteDirectory);
+
     pre_processor PreProcessor = CreatePreProcessor(Bra, Ket);
     AddPreProcessorCommand(&PreProcessor, pre_processor_command_Include, (u8 *)"include");
     AddPreProcessorCommand(&PreProcessor, pre_processor_command_Docgen, (u8 *)"docgen");
 
-    EnsureDirectoryExists(GenDirectory);
-    EnsureDirectoryExists(SiteDirectory);
+    linear_allocator FileAllocator = WalkDirectory(CodePagesDirectory);
+    file_list *FileList = (file_list *)FileAllocator.Data;
+    file_list *SortedFileList = SortFileList(FileList);
+
+    for (file_list *CurrentFile = SortedFileList; CurrentFile; CurrentFile = CurrentFile->Next)
+    {
+        buffer Buffer = GetOutputHtmlPath(&TempString, CodePagesDirectory, SiteDirectory, CurrentFile->Name, 0);
+        EnsurePathDirectoriesExist(Buffer.Data);
+        PreprocessFile(&PreProcessor, CurrentFile->Name, Buffer.Data);
+    }
+
+    TempString.Offset = 0;
 
     PreprocessFile(&PreProcessor, IndexIn, IndexOut);
     PreprocessFile(&PreProcessor, CodeIn, CodeOut);
     PreprocessFile(&PreProcessor, LSystemIn, LSystemOut);
+
+    FreeLinearAllocator(FileAllocator);
 }
