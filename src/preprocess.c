@@ -211,13 +211,16 @@ b32 PreprocessFile(pre_processor *PreProcessor, u8 *FilePath, u8 *OutputFilePath
 
     for (s32 I = 0; I < Buffer->Size; I++)
     {
-        /* TODO Checking if the previous character was a quote is a hack to prevent the preprocessor,
-           from processing brackets inside C string literals. If we plan on preprocessing the preprocessor
-           file, we may need to obfuscate the brackets or something?
-        */
         /* TODO Fix bug in the l_system.html code page! Currently it does _not_ display the preprocessor command,
            instead the page shows the already preprocessed file. We need some way to selectively disable handling
            preprocessor commands...
+
+           Or maybe we should _add_ a preprocessor command that says to ignore its contents. So when generating
+           code pages, we can wrap the source text in the "ignore" preprocessor command.
+        */
+        /* TODO Checking if the previous character was a quote is a hack to prevent the preprocessor,
+           from processing brackets inside C string literals. If we plan on preprocessing the preprocessor
+           file, we may need to obfuscate the brackets or something?
         */
         b32 LastCharWasNotQuote = LastChar != '"';
         b32 FoundBra = LastCharWasNotQuote && CheckIfStringIsPrefix(PreProcessor->Bra, Buffer, I);
