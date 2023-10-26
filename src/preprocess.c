@@ -215,6 +215,10 @@ b32 PreprocessFile(pre_processor *PreProcessor, u8 *FilePath, u8 *OutputFilePath
            from processing brackets inside C string literals. If we plan on preprocessing the preprocessor
            file, we may need to obfuscate the brackets or something?
         */
+        /* TODO Fix bug in the l_system.html code page! Currently it does _not_ display the preprocessor command,
+           instead the page shows the already preprocessed file. We need some way to selectively disable handling
+           preprocessor commands...
+        */
         b32 LastCharWasNotQuote = LastChar != '"';
         b32 FoundBra = LastCharWasNotQuote && CheckIfStringIsPrefix(PreProcessor->Bra, Buffer, I);
         LastChar = Buffer->Data[I];
