@@ -46,7 +46,7 @@ typedef struct
 
 } command_result;
 
-b32 PreprocessFile(pre_processor *PreProcessor, u8 *FilePath, u8 *OutputFilePath);
+b32 PreprocessFile(pre_processor *PreProcessor, linear_allocator TempString, u8 *FilePath, u8 *OutputFilePath);
 void TestPreprocessor(void);
 
 internal pre_processor CreatePreProcessor(u8 *Bra, u8 *Ket)
@@ -193,7 +193,7 @@ internal b32 HandlePreProcessCommand(pre_processor *PreProcessor, buffer *Buffer
     return CommandWasHandled;
 }
 
-b32 PreprocessFile(pre_processor *PreProcessor, u8 *FilePath, u8 *OutputFilePath)
+b32 PreprocessFile(pre_processor *PreProcessor, linear_allocator TempString, u8 *FilePath, u8 *OutputFilePath)
 {
     linear_allocator *OutputAllocator = &PreProcessor->OutputAllocator;
     buffer *Buffer = ReadFileIntoBuffer(FilePath);
@@ -207,26 +207,53 @@ b32 PreprocessFile(pre_processor *PreProcessor, u8 *FilePath, u8 *OutputFilePath
         Error = 1;
     }
 
-    u8 LastChar = 0;
-
     for (s32 I = 0; I < Buffer->Size; I++)
     {
-        /* TODO Fix bug in the l_system.html code page! Currently it does _not_ display the preprocessor command,
-           instead the page shows the already preprocessed file. We need some way to selectively disable handling
-           preprocessor commands...
+        b32 FoundBra = CheckIfStringIsPrefix(PreProcessor->Bra, Buffer, I);
+        s32 HereDocCharOffset = I + PreProcessor->BraCount;
+        b32 IsHereDoc = HereDocCharOffset < Buffer->Size && Buffer->Data[HereDocCharOffset] == '#';
 
-           Or maybe we should _add_ a preprocessor command that says to ignore its contents. So when generating
-           code pages, we can wrap the source text in the "ignore" preprocessor command.
-        */
-        /* TODO Checking if the previous character was a quote is a hack to prevent the preprocessor,
-           from processing brackets inside C string literals. If we plan on preprocessing the preprocessor
-           file, we may need to obfuscate the brackets or something?
-        */
-        b32 LastCharWasNotQuote = LastChar != '"';
-        b32 FoundBra = LastCharWasNotQuote && CheckIfStringIsPrefix(PreProcessor->Bra, Buffer, I);
-        LastChar = Buffer->Data[I];
+        if (FoundBra && IsHereDoc)
+        {
+            I = HereDocCharOffset + 1; /* NOTE one past the here-doc character */
+            s32 Begin = I;
+            /* skip to the next space */
+            while (!IS_SPACE(Buffer->Data[I]))
+            {
+                I += 1;
+            }
 
-        if (FoundBra)
+            s32 HereDocLabelSize = I - Begin + 1;
+            u8 *HereDocLabel = TempString.Data + TempString.Offset;
+
+            PushLinearAllocator(&TempString, HereDocLabelSize);
+            CopyMemory(Buffer->Data + Begin, HereDocLabel, HereDocLabelSize);
+            TempString.Data[TempString.Offset - 1] = 0;
+
+            for (s32 J = I; J < Buffer->Size; J++)
+            {
+                if (CheckIfStringIsPrefix(HereDocLabel, Buffer, J))
+                {
+                    s32 Size = HereDocCharOffset - PreProcessor->BraCount - WriteIndex;
+                    u8 *WhereToWrite = PushLinearAllocator(OutputAllocator, Size);
+
+                    if (WhereToWrite)
+                    {
+                        u8 *BufferStart = Buffer->Data + WriteIndex;
+                        CopyMemory(BufferStart, WhereToWrite, Size);
+                    }
+                    else
+                    {
+                        LogError("failed to write to output");
+                    }
+
+                    I = J + HereDocLabelSize;
+                    WriteIndex = I;
+                    break;
+                }
+            }
+        }
+        else if (FoundBra)
         {
             s32 CommandStart = I + PreProcessor->BraCount;
 
@@ -237,7 +264,6 @@ b32 PreprocessFile(pre_processor *PreProcessor, u8 *FilePath, u8 *OutputFilePath
                 if (FoundKet)
                 {
                     u8 *BufferStart = Buffer->Data + WriteIndex;
-                    u8 *OutputAllocatorStart = OutputAllocator->Data + OutputAllocator->Offset;
                     s32 JustPastKet = J + PreProcessor->KetCount;
                     s32 Size = I - WriteIndex;
 
@@ -248,7 +274,7 @@ b32 PreprocessFile(pre_processor *PreProcessor, u8 *FilePath, u8 *OutputFilePath
 
                     if (WhereToWrite)
                     {
-                        CopyMemory(BufferStart, OutputAllocatorStart, Size);
+                        CopyMemory(BufferStart, WhereToWrite, Size);
                     }
                     else
                     {
@@ -277,6 +303,9 @@ b32 PreprocessFile(pre_processor *PreProcessor, u8 *FilePath, u8 *OutputFilePath
 
     if (WriteIndex < Buffer->Size)
     {
+        /* NOTE This branch handles any text after the last preprocessor command, or if
+           there were not preprocessor commands.
+        */
         u8 *OutputAllocatorStart = OutputAllocator->Data + OutputAllocator->Offset;
         s32 Size = Buffer->Size - WriteIndex;
         u8 *WhereToWrite = PushLinearAllocator(OutputAllocator, Size);
@@ -336,14 +365,14 @@ void TestPreprocessor(void)
     {
         buffer Buffer = GetOutputHtmlPath(&TempString, CodePagesDirectory, SiteDirectory, CurrentFile->Name, 0);
         EnsurePathDirectoriesExist(Buffer.Data);
-        PreprocessFile(&PreProcessor, CurrentFile->Name, Buffer.Data);
+        PreprocessFile(&PreProcessor, TempString, CurrentFile->Name, Buffer.Data);
     }
 
     TempString.Offset = 0;
 
-    PreprocessFile(&PreProcessor, IndexIn, IndexOut);
-    PreprocessFile(&PreProcessor, CodeIn, CodeOut);
-    PreprocessFile(&PreProcessor, LSystemIn, LSystemOut);
+    PreprocessFile(&PreProcessor, TempString, IndexIn, IndexOut);
+    PreprocessFile(&PreProcessor, TempString, CodeIn, CodeOut);
+    PreprocessFile(&PreProcessor, TempString, LSystemIn, LSystemOut);
 
     FreeLinearAllocator(FileAllocator);
 }

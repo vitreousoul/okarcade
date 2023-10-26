@@ -1,12 +1,8 @@
 #!/usr/bin/env sh
 
-if [ -z "$EMSDK_PATH" ]; then
-        echo "EMSDK_PATH is undefined"
-        exit 1
-fi
+# This is just a way to rememeber some of the emscripten compilation setup.
+# These must be run insize the emsdk directory.
 
-cd $EMSDK_PATH
-# TODO add option to install/activate latest
-# ./emsdk install latest
-# ./emsdk activate latest
-source ./emsdk_env.sh
+# echo ./emsdk install latest
+echo ./emsdk activate latest
+echo source ./emsdk_env.sh
