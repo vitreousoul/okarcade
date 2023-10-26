@@ -86,24 +86,6 @@ internal file_list *SortFileList(file_list *Files)
     return SortedFiles;
 }
 
-internal s32 GetLengthOfPathWithoutExtension(u8 *Path)
-{
-    s32 LastDotIndex = 0;
-    s32 I = 0;
-
-    while (Path[I])
-    {
-        if (Path[I] == '.')
-        {
-            LastDotIndex = I;
-        }
-
-        I += 1;
-    }
-
-    return LastDotIndex + 1;
-}
-
 internal u8 *CodePageBegin(void)
 {
     return (u8 *)(
@@ -125,15 +107,6 @@ internal void PushNullTerminator(linear_allocator *Allocator)
 {
     Allocator->Data[Allocator->Offset] = 0;
     Allocator->Offset += 1;
-}
-
-internal b32 PathHasExtension(u8 *Path, u8 *Extension)
-{
-    s32 PathLength = GetStringLength(Path);
-    u8 *OffsetPath = Path + PathLength;
-    b32 AreEqual = StringsEqual(OffsetPath, Extension);
-
-    return AreEqual;
 }
 
 internal buffer GetOutputHtmlPath(linear_allocator *TempString, u8 *OldRootPath, u8 *NewRootPath, u8 *CodePagePath, b32 AddHtmlExtension)
@@ -165,14 +138,21 @@ internal buffer GetOutputHtmlPath(linear_allocator *TempString, u8 *OldRootPath,
 
     s32 CodePagePathOffset = I;
 
-    PushString(TempString, NewRootPath);
+    if (NewRootPath)
+    {
+        PushString(TempString, NewRootPath);
+    }
+
     PushString(TempString, CodePagePath + CodePagePathOffset);
+
     if (AddHtmlExtension)
     {
         PushString(TempString, Extension);
     }
 
     PushNullTerminator(TempString);
+
+    /* printf("html path: \"%s\"\n", TempString->Data + BeginOffset); */
 
     Buffer.Size = TempString->Offset - BeginOffset;
     CopyMemory(TempString->Data + BeginOffset, Buffer.Data, Buffer.Size);
@@ -229,7 +209,7 @@ internal buffer EscapeHtmlString(linear_allocator *TempString, u8 *HtmlString, s
 void GenerateCodePages(linear_allocator *TempString)
 {
     u8 *SourceCodePath = (u8 *)"../src";
-    u8 *GenPath = (u8 *)"../gen/code_pages";
+    u8 *GenCodePagesPath = (u8 *)"../gen/code_pages";
 
     linear_allocator FileAllocator = WalkDirectory(SourceCodePath);
     linear_allocator CodePage = CreateLinearAllocator(Gigabytes(1));
@@ -241,11 +221,10 @@ void GenerateCodePages(linear_allocator *TempString)
         u8 *CodePageListingPath = (u8 *)"../gen/code_page_links.html";
         for (file_list *CurrentFile = SortedFileList; CurrentFile; CurrentFile = CurrentFile->Next)
         {
-            s32 PathLength = GetStringLength(CurrentFile->Name);
+            buffer FileOutputName = GetOutputHtmlPath(TempString, SourceCodePath, 0, CurrentFile->Name, 0);
 
             PushString(&CodePage, (u8 *)"<p><a href=\"");
-            /* TODO remove the "../src" prefix on the file name, and that should help fix the broken links! */
-            PushString_(&CodePage, CurrentFile->Name, PathLength);
+            PushString(&CodePage, FileOutputName.Data);
             PushString(&CodePage, (u8 *)".html\">");
             PushString(&CodePage, CurrentFile->Name);
             PushString(&CodePage, (u8 *)"</a></p>");
@@ -258,7 +237,7 @@ void GenerateCodePages(linear_allocator *TempString)
     { /* inidividual code page docs */
         for (file_list *CurrentFile = SortedFileList; CurrentFile; CurrentFile = CurrentFile->Next)
         {
-            buffer Buffer = GetOutputHtmlPath(TempString, SourceCodePath, GenPath, CurrentFile->Name, 1);
+            buffer Buffer = GetOutputHtmlPath(TempString, SourceCodePath, GenCodePagesPath, CurrentFile->Name, 1);
             EnsurePathDirectoriesExist(Buffer.Data);
 
             PushString(&CodePage, CodePageBegin());

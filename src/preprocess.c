@@ -207,9 +207,17 @@ b32 PreprocessFile(pre_processor *PreProcessor, u8 *FilePath, u8 *OutputFilePath
         Error = 1;
     }
 
+    u8 LastChar = 0;
+
     for (s32 I = 0; I < Buffer->Size; I++)
     {
-        b32 FoundBra = CheckIfStringIsPrefix(PreProcessor->Bra, Buffer, I);
+        /* TODO Checking if the previous character was a quote is a hack to prevent the preprocessor,
+           from processing brackets inside C string literals. If we plan on preprocessing the preprocessor
+           file, we may need to obfuscate the brackets or something?
+        */
+        b32 LastCharWasNotQuote = LastChar != '"';
+        b32 FoundBra = LastCharWasNotQuote && CheckIfStringIsPrefix(PreProcessor->Bra, Buffer, I);
+        LastChar = Buffer->Data[I];
 
         if (FoundBra)
         {
