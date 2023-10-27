@@ -94,13 +94,17 @@ internal u8 *CodePageBegin(void)
        using code to introspect its own source code.
     */
     return (u8 *)(
-        "<!doctype html>"                                             \
-        "<html lang=\"en-us\">"                                       \
-            "<head>"                                                  \
-                "{" "| include ../src/layout/head_common.html |" "}"  \
-            "</head>"                                                 \
-            "<body>"                                                  \
-                "<pre>"                                               \
+        "<!doctype html>"                                                          \
+        "<html lang=\"en-us\">"                                                    \
+            "<head>"                                                               \
+                "{" "| include ../src/layout/head_common.html |" "}"               \
+                "<style>"                                                          \
+                    "{" "| include ../src/layout/code_page_style.css |" "}"        \
+                "</style>"                                                         \
+            "</head>"                                                              \
+            "<body>"                                                               \
+                "{" "| include ../src/layout/code_page_header.html |" "}"          \
+                "<pre>"                                                            \
                     "{" "|" "#HERE" "DOC \n");
 }
 
