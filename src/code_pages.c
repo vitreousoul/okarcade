@@ -88,6 +88,11 @@ internal file_list *SortFileList(file_list *Files)
 
 internal u8 *CodePageBegin(void)
 {
+    /* NOTE we split up the here-doc tag into HERE and DOC, because otherwise it breaks
+       the preprocessor. even in this comment we have to separate the tag by "and". I don't
+       know if this should be considered a bug, but it is at least an interesting aspect of
+       using code to introspect its own source code.
+    */
     return (u8 *)(
         "<!doctype html>"                                             \
         "<html lang=\"en-us\">"                                       \
