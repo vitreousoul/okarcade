@@ -89,18 +89,19 @@ internal file_list *SortFileList(file_list *Files)
 internal u8 *CodePageBegin(void)
 {
     return (u8 *)(
-        "<!doctype html>"                                       \
-        "<html lang=\"en-us\">"                                 \
-            "<head>"                                            \
-                "{| include ../src/layout/head_common.html |}"  \
-            "</head>"                                           \
-            "<body>"                                            \
-                "<pre>");
+        "<!doctype html>"                                             \
+        "<html lang=\"en-us\">"                                       \
+            "<head>"                                                  \
+                "{" "| include ../src/layout/head_common.html |" "}"  \
+            "</head>"                                                 \
+            "<body>"                                                  \
+                "<pre>"                                               \
+                    "{" "|" "#HERE" "DOC \n");
 }
 
 internal u8 *CodePageEnd(void)
 {
-    return (u8 *)"</pre></body></html>";
+    return (u8 *)"HERE" "DOC</pre></body></html>";
 }
 
 internal void PushNullTerminator(linear_allocator *Allocator)

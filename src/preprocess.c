@@ -217,37 +217,53 @@ b32 PreprocessFile(pre_processor *PreProcessor, linear_allocator TempString, u8 
         {
             I = HereDocCharOffset + 1; /* NOTE one past the here-doc character */
             s32 Begin = I;
-            /* skip to the next space */
+            /* Skip to the next space, which is the end of the heredoc label */
             while (!IS_SPACE(Buffer->Data[I]))
             {
                 I += 1;
             }
 
+            /* Set up the heredoc label, which is used to scan for the end of the heredoc. */
             s32 HereDocLabelSize = I - Begin + 1;
             u8 *HereDocLabel = TempString.Data + TempString.Offset;
-
             PushLinearAllocator(&TempString, HereDocLabelSize);
             CopyMemory(Buffer->Data + Begin, HereDocLabel, HereDocLabelSize);
             TempString.Data[TempString.Offset - 1] = 0;
+
+            SkipSpace(Buffer, &I);
 
             for (s32 J = I; J < Buffer->Size; J++)
             {
                 if (CheckIfStringIsPrefix(HereDocLabel, Buffer, J))
                 {
-                    s32 Size = HereDocCharOffset - PreProcessor->BraCount - WriteIndex;
-                    u8 *WhereToWrite = PushLinearAllocator(OutputAllocator, Size);
+                    s32 PreDataSize = HereDocCharOffset - PreProcessor->BraCount - WriteIndex;
+                    u8 *DataPrecedingHereDoc = PushLinearAllocator(OutputAllocator, PreDataSize);
 
-                    if (WhereToWrite)
+                    if (DataPrecedingHereDoc)
                     {
                         u8 *BufferStart = Buffer->Data + WriteIndex;
-                        CopyMemory(BufferStart, WhereToWrite, Size);
+                        CopyMemory(BufferStart, DataPrecedingHereDoc, PreDataSize);
                     }
                     else
                     {
-                        LogError("failed to write to output");
+                        LogError("failed to write heredoc pre-data to output");
                     }
 
-                    I = J + HereDocLabelSize;
+                    s32 HereDocDataBegin = Begin + HereDocLabelSize - 1;
+                    s32 HereDocDataSize = J - HereDocDataBegin;
+                    u8 *HereDocData = PushLinearAllocator(OutputAllocator, HereDocDataSize);
+
+                    if (HereDocData)
+                    {
+                        u8 *BufferStart = Buffer->Data + HereDocDataBegin;
+                        CopyMemory(BufferStart, HereDocData, HereDocDataSize);
+                    }
+                    else
+                    {
+                        LogError("failed to write heredoc data to output");
+                    }
+
+                    I = J + HereDocLabelSize - 1; /* NOTE minus one to ignore the null terminator in the heredoc label */
                     WriteIndex = I;
                     break;
                 }
