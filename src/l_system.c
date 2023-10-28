@@ -1,8 +1,3 @@
-/*|
-  * TITLE
-  This is something
-|*/
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
@@ -327,49 +322,6 @@ internal void DrawLSystem(Image *Canvas, turtle *InitialTurtle, symbol Rules[sym
     }
 }
 
-internal void DrawRuleSet(app_state *AppState)
-{
-    Color FontColor = (Color){0, 0, 0, 255};
-    s32 ItemWidth = 24;
-    s32 Padding = 8;
-    s32 Height = (2 * AppState->UI.FontSize) + (3 * Padding);
-    s32 Y = SCREEN_HEIGHT - (Height + Padding);
-    s32 X = Padding;
-    s32 RowIndex = 0;
-
-    /* DrawRectangle(X, Y, Width, Height, BackgroundColor); */
-
-    for (s32 I = symbol_A; I <= symbol_B; I++)
-    {
-        u8 *LabelText = GetSymbolText(I);
-        s32 LabelX = X + Padding;
-        s32 YOffset = RowIndex * (AppState->UI.FontSize + Padding);
-        RowIndex += 1;
-        s32 LabelY = Y + YOffset + Padding;
-
-        ui_id RuleButtonId = button_kind_Count + 1 + I;
-        Vector2 ButtonPosition = CreateVector2(LabelX, LabelY);
-        button RuleButton = CreateButton(ButtonPosition, LabelText, RuleButtonId);
-
-        DoButton(&AppState->UI, RuleButton, AppState->UI.FontSize);
-
-        for (s32 J = 0; J < RULE_SIZE_MAX; J++)
-        {
-            u8 *ItemText = GetSymbolText(AppState->Rules[I][J]);
-
-            if (ItemText)
-            {
-                s32 XOffset = (J + 1) * (ItemWidth + 0);//Padding);
-                DrawText((char *)ItemText, LabelX + XOffset, LabelY, AppState->UI.FontSize, FontColor);
-            }
-            else
-            {
-                break;
-            }
-        }
-    }
-}
-
 internal void UpdateUI(app_state *AppState)
 {
     AppState->UI.Hot = -1;
@@ -405,8 +357,6 @@ internal void UpdateAndRender(void *VoidAppState)
                 ImageClearBackground(&AppState->Canvas, BackgroundColor);
             }
         }
-
-        DrawRuleSet(AppState);
     }
 
     EndDrawing();
@@ -424,7 +374,9 @@ internal void InitRules(symbol Rules[symbol_Count][RULE_SIZE_MAX])
         [symbol_Root] = {A,End},
         [symbol_A] = {B,Push,A,Pop,A,End},
         [symbol_B] = {B,B,End},
-        /* NOTE: For now we must define constant symbols as rules that expand to themselves. We could _maybe_ change the expansion algorithm to treat symbols without a rule as constant, but that might cause confusion. Maybe we should just error if we find a symbol without a rule... */
+        /* NOTE: For now we must define constant symbols as rules that expand to themselves.
+           We could _maybe_ change the expansion algorithm to treat symbols without a rule as constant,
+           but that might cause confusion. Maybe we should just error if we find a symbol without a rule... */
         [symbol_Push] = {symbol_Push,End},
         [symbol_Pop] = {symbol_Pop,End},
     };
