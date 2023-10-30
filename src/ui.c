@@ -2,11 +2,20 @@
 
 typedef struct
 {
-    Vector2 Position;
-    b32 Active;
-    u8 *Text;
     s32 Id;
+
+    Vector2 Position;
+    u8 *Text;
 } button;
+
+typedef struct
+{
+    s32 Id;
+
+    Vector2 Position;
+    Vector2 Size;
+    f32 Value;
+} slider;
 
 typedef s32 ui_id;
 
@@ -23,7 +32,8 @@ typedef struct
 } ui;
 
 button CreateButton(Vector2 Position, u8 *Text, ui_id Id);
-b32 DoButton(ui *UI, button Button, s32 FontSize);
+b32 DoButton(ui *UI, button *Button, s32 FontSize);
+f32 DoSlider(ui *UI, slider *Slider);
 
 button CreateButton(Vector2 Position, u8 *Text, ui_id Id)
 {
@@ -36,12 +46,12 @@ button CreateButton(Vector2 Position, u8 *Text, ui_id Id)
     return Button;
 }
 
-internal b32 PositionIsInsideButton(Vector2 Position, button Button, Vector2 ButtonSize)
+internal b32 PositionIsInsideButton(Vector2 Position, button *Button, Vector2 ButtonSize)
 {
-    f32 X0 = Button.Position.x;
-    f32 Y0 = Button.Position.y;
-    f32 X1 = Button.Position.x + ButtonSize.x;
-    f32 Y1 = Button.Position.y + ButtonSize.y;
+    f32 X0 = Button->Position.x;
+    f32 Y0 = Button->Position.y;
+    f32 X1 = Button->Position.x + ButtonSize.x;
+    f32 Y1 = Button->Position.y + ButtonSize.y;
 
     return ((Position.x >= X0) &&
             (Position.x <= X1) &&
@@ -49,7 +59,7 @@ internal b32 PositionIsInsideButton(Vector2 Position, button Button, Vector2 But
             (Position.y <= Y1));
 }
 
-b32 DoButton(ui *UI, button Button, s32 FontSize)
+b32 DoButton(ui *UI, button *Button, s32 FontSize)
 {
     b32 ButtonPressed = 0;
     Color UnderColor = (Color){20,20,20,225};
@@ -58,19 +68,19 @@ b32 DoButton(ui *UI, button Button, s32 FontSize)
     Color ActiveColor = (Color){40,120,120,255};
     Color TextColor = (Color){0,0,0,255};
 
-    s32 TextWidth = MeasureText((char *)Button.Text, FontSize);
+    s32 TextWidth = MeasureText((char *)Button->Text, FontSize);
     f32 TwicePadding = 2 * BUTTON_PADDING;
     Vector2 ButtonSize = CreateVector2(TextWidth + TwicePadding, FontSize + TwicePadding);
 
     b32 IsInside = PositionIsInsideButton(UI->MousePosition, Button, ButtonSize);
-    b32 IsActive = UI->Active == Button.Id;
+    b32 IsActive = UI->Active == Button->Id;
 
     if (IsInside)
     {
-        UI->Hot = Button.Id;
+        UI->Hot = Button->Id;
     }
 
-    b32 IsHot = UI->Hot == Button.Id;
+    b32 IsHot = UI->Hot == Button->Id;
 
     if (UI->MouseButtonPressed)
     {
@@ -78,7 +88,7 @@ b32 DoButton(ui *UI, button Button, s32 FontSize)
         {
             if (!UI->Active)
             {
-                UI->Active = Button.Id;
+                UI->Active = Button->Id;
             }
         }
     }
@@ -95,9 +105,9 @@ b32 DoButton(ui *UI, button Button, s32 FontSize)
         }
     }
 
-    Rectangle Rect = (Rectangle){Button.Position.x, Button.Position.y,
+    Rectangle Rect = (Rectangle){Button->Position.x, Button->Position.y,
                                  ButtonSize.x, ButtonSize.y};
-    Rectangle UnderRect = (Rectangle){Button.Position.x + 2.0f, Button.Position.y + 2.0f,
+    Rectangle UnderRect = (Rectangle){Button->Position.x + 2.0f, Button->Position.y + 2.0f,
                                       ButtonSize.x, ButtonSize.y};
 
     Color ButtonColor = IsActive ? ActiveColor : InactiveColor;
@@ -110,9 +120,28 @@ b32 DoButton(ui *UI, button Button, s32 FontSize)
         DrawRectangleLinesEx(Rect, 2.0f, HotColor);
     }
 
-    DrawText((char *)Button.Text,
-             Button.Position.x + BUTTON_PADDING, Button.Position.y + BUTTON_PADDING,
+    DrawText((char *)Button->Text,
+             Button->Position.x + BUTTON_PADDING, Button->Position.y + BUTTON_PADDING,
              UI->FontSize, TextColor);
 
     return ButtonPressed;
+}
+
+f32 DoSlider(ui *UI, slider *Slider)
+{
+    Vector2 Position = Slider->Position;
+    Vector2 Size = Slider->Size;
+
+    Color SliderColor = (Color){50,50,50,255};
+
+    f32 SliderValue = 0.0f;
+    f32 TrackWidthPercent = 0.1f;
+    f32 TrackHeight = Size.y * TrackWidthPercent;
+    f32 TrackOffset = TrackHeight / 2.0f;
+
+    f32 CenterY = Position.y + (Size.y / 2.0f);
+
+    DrawRectangle(Position.x, CenterY - TrackOffset, Size.x, TrackHeight, SliderColor);
+
+    return SliderValue;
 }

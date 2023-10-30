@@ -75,8 +75,11 @@ typedef struct
     Texture2D FrameBuffer;
     s32 LineDrawsPerFrame;
     symbol Rules[symbol_Count][RULE_SIZE_MAX];
-    button Buttons[button_kind_Count];
+
     ui UI;
+    button Buttons[button_kind_Count];
+    slider Slider;
+
 } app_state;
 
 
@@ -222,6 +225,7 @@ internal void DrawLSystem(Image *Canvas, turtle *InitialTurtle, symbol Rules[sym
         s32 MaxDepthMinusOne = EXPANSION_MAX_DEPTH - 1;
         printf("Max depth for DrawLSystem is %d but was passed a depth of %d\n", MaxDepthMinusOne, Depth);
         LogError("DepthError\n");
+        return;
     }
 
     expansion Expansion = {0};
@@ -332,7 +336,9 @@ internal void UpdateUI(app_state *AppState)
 
 internal void UpdateAndRender(void *VoidAppState)
 {
-    /* we have to pass our data in as a void-star because of emscripten, so we just cast it to app_state and pray */
+    /* We have to pass our data in as a void-star because of emscripten:
+       https://github.com/raysan5/raylib/blob/master/examples/core/core_basic_window_web.c
+    */
     app_state *AppState = (app_state *)VoidAppState;
     UpdateUI(AppState);
 
@@ -348,15 +354,18 @@ internal void UpdateAndRender(void *VoidAppState)
 
     { /* draw ui */
         ui *UI = &AppState->UI;
+
         for (s32 I = 1; I < button_kind_Count; I++)
         {
             button Button = AppState->Buttons[I];
 
-            if (DoButton(UI, Button, AppState->UI.FontSize))
+            if (DoButton(UI, &Button, AppState->UI.FontSize))
             {
                 ImageClearBackground(&AppState->Canvas, BackgroundColor);
             }
         }
+
+        DoSlider(UI, &AppState->Slider);
     }
 
     EndDrawing();
@@ -393,20 +402,30 @@ internal void InitRules(symbol Rules[symbol_Count][RULE_SIZE_MAX])
 internal void InitUi(app_state *AppState)
 {
     s32 Y = 10.0f;
+    s32 I = 1;
     s32 TwicePadding = 2 * BUTTON_PADDING;
 
     AppState->UI.Active = 0;
 
-    for (s32 I = 1; I < button_kind_Count; I++)
+    for (; I < button_kind_Count; I++)
     {
         u8 *Text = ButtonText[I];
 
         AppState->Buttons[I].Id = I;
         AppState->Buttons[I].Text = Text;
         AppState->Buttons[I].Position = (Vector2){10.0f, Y};
-        AppState->Buttons[I].Active = 0;
 
         Y += TwicePadding + AppState->UI.FontSize + 10;
+    }
+
+    { /* init slider */
+        AppState->Slider.Id = I;
+
+        AppState->Slider.Position.x = 10.0f;
+        AppState->Slider.Position.y = Y;
+
+        AppState->Slider.Size.x = 240.0f;
+        AppState->Slider.Size.y = 40.0f;
     }
 }
 
@@ -449,7 +468,7 @@ int main(void)
 
     app_state AppState = InitAppState();
 
-    DrawLSystem(&AppState.Canvas, &AppState.Turtle, AppState.Rules, 10);
+    DrawLSystem(&AppState.Canvas, &AppState.Turtle, AppState.Rules, 9);
 
 #if defined(PLATFORM_WEB)
     emscripten_set_main_loop_arg(UpdateAndRender, &AppState, 0, 1);
