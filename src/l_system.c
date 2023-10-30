@@ -426,6 +426,8 @@ internal void InitUi(app_state *AppState)
 
         AppState->Slider.Size.x = 240.0f;
         AppState->Slider.Size.y = 40.0f;
+
+        AppState->Slider.Value = 0.3f;
     }
 }
 

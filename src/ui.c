@@ -33,7 +33,7 @@ typedef struct
 
 button CreateButton(Vector2 Position, u8 *Text, ui_id Id);
 b32 DoButton(ui *UI, button *Button, s32 FontSize);
-f32 DoSlider(ui *UI, slider *Slider);
+b32 DoSlider(ui *UI, slider *Slider);
 
 button CreateButton(Vector2 Position, u8 *Text, ui_id Id)
 {
@@ -127,21 +127,29 @@ b32 DoButton(ui *UI, button *Button, s32 FontSize)
     return ButtonPressed;
 }
 
-f32 DoSlider(ui *UI, slider *Slider)
+b32 DoSlider(ui *UI, slider *Slider)
 {
+    b32 Changed = 0;
+
     Vector2 Position = Slider->Position;
     Vector2 Size = Slider->Size;
 
-    Color SliderColor = (Color){50,50,50,255};
+    f32 HandleWidth = 32.0f;
 
-    f32 SliderValue = 0.0f;
+    Color SliderColor = (Color){50,50,50,255};
+    Color HandleColor = (Color){250,250,50,255};
+
     f32 TrackWidthPercent = 0.1f;
     f32 TrackHeight = Size.y * TrackWidthPercent;
     f32 TrackOffset = TrackHeight / 2.0f;
 
     f32 CenterY = Position.y + (Size.y / 2.0f);
 
-    DrawRectangle(Position.x, CenterY - TrackOffset, Size.x, TrackHeight, SliderColor);
+    f32 ValueWidth = Slider->Value * Size.x;
+    f32 HandleX = Position.x + ValueWidth - (HandleWidth / 2.0f);
 
-    return SliderValue;
+    DrawRectangle(Position.x, CenterY - TrackOffset, Size.x, TrackHeight, SliderColor);
+    DrawRectangle(HandleX, Position.y, HandleWidth, Size.y, HandleColor);
+
+    return Changed;
 }
