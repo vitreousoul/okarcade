@@ -37,7 +37,6 @@ typedef struct
 
 void *AllocateMemory(u64 Size);
 void FreeMemory(void *Ref);
-void CopyMemory(u8 *Source, u8 *Destination, u64 Size);
 void *AllocateVirtualMemory(size Size);
 
 void GetResourceUsage(void);
@@ -82,14 +81,6 @@ void FreeMemory(void *Ref)
 {
     /* just use free for now... */
     free(Ref);
-}
-
-void CopyMemory(u8 *Source, u8 *Destination, u64 Size)
-{
-    for (u64 I = 0; I < Size; I++)
-    {
-        Destination[I] = Source[I];
-    }
 }
 
 void *AllocateVirtualMemory(size Size)

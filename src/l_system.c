@@ -83,6 +83,9 @@ typedef struct
     button Buttons[button_kind_Count];
     slider Slider;
 
+    expansion Expansion;
+    turtle TurtleStack[TURTLE_STACK_MAX];
+    s32 TurtleStackIndex;
 } app_state;
 
 
@@ -221,7 +224,7 @@ internal void CopyTurtle(turtle *SourceTurtle, turtle *DestinationTurtle)
     DestinationTurtle->Heading.y = SourceTurtle->Heading.y;
 }
 
-internal void DrawLSystem(Image *Canvas, app_state *AppState, s32 Depth)
+internal void DrawLSystem(app_state *AppState, s32 Depth)
 {
     if (Depth >= EXPANSION_MAX_DEPTH)
     {
@@ -231,21 +234,16 @@ internal void DrawLSystem(Image *Canvas, app_state *AppState, s32 Depth)
         return;
     }
 
-    expansion Expansion = {0};
-    turtle TurtleStack[TURTLE_STACK_MAX];
-    s32 TurtleStackIndex = 0;
-    CopyTurtle(&AppState->Turtle, &TurtleStack[TurtleStackIndex]);
+    expansion *Expansion = &AppState->Expansion;
+    turtle *TurtleStack = AppState->TurtleStack;
+    s32 *TurtleStackIndex = &AppState->TurtleStackIndex;
+    f32 TurtleSpeed = 0.05f;
 
-    f32 TurtleSpeed = 1.0f;
+    s32 LineDrawCount = 0;
 
+    while (Expansion->Index > 0 && LineDrawCount < AppState->LineDrawsPerFrame)
     {
-        expansion_item RootItem = CreateExpansionItem(symbol_Root, 0);
-        PushExpansionItem(&Expansion, RootItem);
-    }
-
-    while (Expansion.Index > 0)
-    {
-        expansion_item CurrentItem = PeekExpansionItem(&Expansion);
+        expansion_item CurrentItem = PeekExpansionItem(Expansion);
         b32 RuleIndexInBounds = CurrentItem.Index >= 0 && CurrentItem.Index < RULE_SIZE_MAX;
 
         if (!RuleIndexInBounds)
@@ -258,12 +256,12 @@ internal void DrawLSystem(Image *Canvas, app_state *AppState, s32 Depth)
 
         if (ChildSymbol == symbol_Undefined)
         {
-            PopAndIncrementParent(&Expansion);
+            PopAndIncrementParent(Expansion);
         }
-        else if (Expansion.Index <= Depth)
+        else if (Expansion->Index <= Depth)
         {
             expansion_item ChildItem = CreateExpansionItem(ChildSymbol, 0);
-            PushExpansionItem(&Expansion, ChildItem);
+            PushExpansionItem(Expansion, ChildItem);
         }
         else
         {
@@ -272,7 +270,7 @@ internal void DrawLSystem(Image *Canvas, app_state *AppState, s32 Depth)
 
             while (OutputSymbol != symbol_Undefined)
             {
-                turtle *Turtle = &TurtleStack[TurtleStackIndex];
+                turtle *Turtle = &TurtleStack[*TurtleStackIndex];
                 b32 ShouldDraw = 0;
 
                 switch(OutputSymbol)
@@ -287,23 +285,23 @@ internal void DrawLSystem(Image *Canvas, app_state *AppState, s32 Depth)
                 } break;
                 case symbol_Push:
                 {
-                    if (TurtleStackIndex < TURTLE_STACK_MAX - 1)
+                    if (*TurtleStackIndex < TURTLE_STACK_MAX - 1)
                     {
                         f32 RotationAmount = AppState->RotationAmount;
                         Vector2 NewHeading = RotateVector2(Turtle->Heading, RotationAmount);
-                        TurtleStackIndex += 1;
-                        CopyTurtle(Turtle, &TurtleStack[TurtleStackIndex]);
-                        TurtleStack[TurtleStackIndex].Heading = NewHeading;
+                        *TurtleStackIndex += 1;
+                        CopyTurtle(Turtle, &TurtleStack[*TurtleStackIndex]);
+                        TurtleStack[*TurtleStackIndex].Heading = NewHeading;
                     }
                 } break;
                 case symbol_Pop:
                 {
-                    if (TurtleStackIndex > 0)
+                    if (*TurtleStackIndex > 0)
                     {
                         f32 RotationAmount = -AppState->RotationAmount;
-                        TurtleStackIndex -= 1;
-                        Vector2 NewHeading = RotateVector2(TurtleStack[TurtleStackIndex].Heading, RotationAmount);
-                        TurtleStack[TurtleStackIndex].Heading = NewHeading;
+                        *TurtleStackIndex -= 1;
+                        Vector2 NewHeading = RotateVector2(TurtleStack[*TurtleStackIndex].Heading, RotationAmount);
+                        TurtleStack[*TurtleStackIndex].Heading = NewHeading;
                     }
                 } break;
                 default: break;
@@ -311,12 +309,13 @@ internal void DrawLSystem(Image *Canvas, app_state *AppState, s32 Depth)
 
                 if (ShouldDraw)
                 {
-                    turtle *Turtle = &TurtleStack[TurtleStackIndex];
+                    turtle *Turtle = &TurtleStack[*TurtleStackIndex];
                     f32 NewX = Turtle->Position.x + (TurtleSpeed * Turtle->Heading.x);
                     f32 NewY = Turtle->Position.y + (TurtleSpeed * Turtle->Heading.y);
                     Color LineColor = (Color){0,0,0,255};
 
-                    ImageDrawLine(Canvas, Turtle->Position.x, Turtle->Position.y, NewX, NewY, LineColor);
+                    ImageDrawLine(&AppState->Canvas, Turtle->Position.x, Turtle->Position.y, NewX, NewY, LineColor);
+                    LineDrawCount += 1;
 
                     Turtle->Position.x = NewX;
                     Turtle->Position.y = NewY;
@@ -326,7 +325,7 @@ internal void DrawLSystem(Image *Canvas, app_state *AppState, s32 Depth)
                 OutputSymbol = GetSymbolFromRules(AppState->Rules, CurrentItem);
             }
 
-            PopAndIncrementParent(&Expansion);
+            PopAndIncrementParent(Expansion);
         }
     }
 }
@@ -337,6 +336,19 @@ internal void UpdateUI(app_state *AppState)
     AppState->UI.MouseButtonPressed = IsMouseButtonPressed(0);
     AppState->UI.MouseButtonReleased = IsMouseButtonReleased(0);
     AppState->UI.MousePosition = GetMousePosition();
+}
+
+internal void InitTurtleState(app_state *AppState)
+{
+    SetMemory((u8 *)&AppState->Expansion, 0, sizeof(expansion));
+    SetMemory((u8 *)&AppState->TurtleStack, 0, sizeof(turtle) * TURTLE_STACK_MAX);
+
+    AppState->TurtleStackIndex = 0;
+
+    CopyTurtle(&AppState->Turtle, &AppState->TurtleStack[AppState->TurtleStackIndex]);
+
+    expansion_item RootItem = CreateExpansionItem(symbol_Root, 0);
+    PushExpansionItem(&AppState->Expansion, RootItem);
 }
 
 internal void UpdateAndRender(void *VoidAppState)
@@ -378,9 +390,11 @@ internal void UpdateAndRender(void *VoidAppState)
         {
             AppState->RotationAmount = AppState->Slider.Value;
             ImageClearBackground(&AppState->Canvas, BackgroundColor);
-            DrawLSystem(&AppState->Canvas, AppState, 4);
+            InitTurtleState(AppState);
         }
     }
+
+    DrawLSystem(AppState, 14);
 
     EndDrawing();
 }
@@ -455,11 +469,13 @@ internal app_state InitAppState(void)
     AppState.Turtle = (turtle){TurtlePosition, TurtleHeading};
 
     AppState.RotationAmount = 0.25f;
+    AppState.LineDrawsPerFrame = 10000;
 
-    AppState.LineDrawsPerFrame = 100;
     AppState.Canvas = GenImageColor(SCREEN_WIDTH, SCREEN_HEIGHT, BackgroundColor);
     AppState.FrameBuffer = LoadTextureFromImage(AppState.Canvas);
     AppState.UI.FontSize = 18;
+
+    InitTurtleState(&AppState);
 
     InitUi(&AppState);
 
@@ -486,8 +502,6 @@ int main(void)
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Look at the l-systems");
 
     app_state AppState = InitAppState();
-
-    DrawLSystem(&AppState.Canvas, &AppState, 9);
 
 #if defined(PLATFORM_WEB)
     emscripten_set_main_loop_arg(UpdateAndRender, &AppState, 0, 1);

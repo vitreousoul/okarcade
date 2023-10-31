@@ -2,8 +2,8 @@
 #include <stdio.h>
 
 #include "types.h"
-#include "platform.h"
 #include "core.c"
+#include "platform.h"
 #include "code_pages.c"
 #include "preprocess.c"
 
