@@ -59,6 +59,19 @@ internal b32 PositionIsInsideButton(Vector2 Position, button *Button, Vector2 Bu
             (Position.y <= Y1));
 }
 
+internal b32 PositionIsInsideSliderHandle(Vector2 Position, slider *Slider)
+{
+    f32 X0 = Slider->Position.x;
+    f32 Y0 = Slider->Position.y;
+    f32 X1 = Slider->Position.x + Slider->Size.x;
+    f32 Y1 = Slider->Position.y + Slider->Size.y;
+
+    return ((Position.x >= X0) &&
+            (Position.x <= X1) &&
+            (Position.y >= Y0) &&
+            (Position.y <= Y1));
+}
+
 b32 DoButton(ui *UI, button *Button, s32 FontSize)
 {
     b32 ButtonPressed = 0;
@@ -72,15 +85,13 @@ b32 DoButton(ui *UI, button *Button, s32 FontSize)
     f32 TwicePadding = 2 * BUTTON_PADDING;
     Vector2 ButtonSize = CreateVector2(TextWidth + TwicePadding, FontSize + TwicePadding);
 
-    b32 IsInside = PositionIsInsideButton(UI->MousePosition, Button, ButtonSize);
+    b32 IsHot = PositionIsInsideButton(UI->MousePosition, Button, ButtonSize);
     b32 IsActive = UI->Active == Button->Id;
 
-    if (IsInside)
+    if (IsHot)
     {
         UI->Hot = Button->Id;
     }
-
-    b32 IsHot = UI->Hot == Button->Id;
 
     if (UI->MouseButtonPressed)
     {
@@ -133,20 +144,46 @@ b32 DoSlider(ui *UI, slider *Slider)
 
     Vector2 Position = Slider->Position;
     Vector2 Size = Slider->Size;
-
-    f32 HandleWidth = 32.0f;
+    f32 CenterY = Position.y + (Size.y / 2.0f);
 
     Color SliderColor = (Color){50,50,50,255};
-    Color HandleColor = (Color){250,250,50,255};
+    Color HandleColor = (Color){230,210,150,255};
 
     f32 TrackWidthPercent = 0.1f;
     f32 TrackHeight = Size.y * TrackWidthPercent;
     f32 TrackOffset = TrackHeight / 2.0f;
 
-    f32 CenterY = Position.y + (Size.y / 2.0f);
+    f32 HandleWidth = 16.0f;
 
-    f32 ValueWidth = Slider->Value * Size.x;
-    f32 HandleX = Position.x + ValueWidth - (HandleWidth / 2.0f);
+    b32 IsHot = PositionIsInsideSliderHandle(UI->MousePosition, Slider);
+    b32 IsActive = UI->Active == Slider->Id;
+
+    if (UI->MouseButtonPressed)
+    {
+        if (IsHot)
+        {
+            if (!UI->Active)
+            {
+                UI->Active = Slider->Id;
+            }
+        }
+    }
+    else if (UI->MouseButtonReleased)
+    {
+        if (IsActive)
+        {
+            UI->Active = 0;
+        }
+    }
+
+    if (IsActive)
+    {
+        Slider->Value = (UI->MousePosition.x - Slider->Position.x) / Slider->Size.x;
+        Slider->Value = ClampF32(Slider->Value, 0.0f, 1.0f);
+        Changed = 1;
+    }
+
+    f32 HandleX = (Slider->Value * Slider->Size.x) + Slider->Position.x - (HandleWidth / 2.0f);
 
     DrawRectangle(Position.x, CenterY - TrackOffset, Size.x, TrackHeight, SliderColor);
     DrawRectangle(HandleX, Position.y, HandleWidth, Size.y, HandleColor);
