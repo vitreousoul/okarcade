@@ -72,9 +72,12 @@ typedef struct
 {
     turtle Turtle;
     Image Canvas;
-    Texture2D FrameBuffer;
+
+    f32 RotationAmount;
     s32 LineDrawsPerFrame;
+
     symbol Rules[symbol_Count][RULE_SIZE_MAX];
+    Texture2D FrameBuffer;
 
     ui UI;
     button Buttons[button_kind_Count];
@@ -218,7 +221,7 @@ internal void CopyTurtle(turtle *SourceTurtle, turtle *DestinationTurtle)
     DestinationTurtle->Heading.y = SourceTurtle->Heading.y;
 }
 
-internal void DrawLSystem(Image *Canvas, turtle *InitialTurtle, symbol Rules[symbol_Count][RULE_SIZE_MAX], s32 Depth)
+internal void DrawLSystem(Image *Canvas, app_state *AppState, s32 Depth)
 {
     if (Depth >= EXPANSION_MAX_DEPTH)
     {
@@ -231,7 +234,7 @@ internal void DrawLSystem(Image *Canvas, turtle *InitialTurtle, symbol Rules[sym
     expansion Expansion = {0};
     turtle TurtleStack[TURTLE_STACK_MAX];
     s32 TurtleStackIndex = 0;
-    CopyTurtle(InitialTurtle, &TurtleStack[TurtleStackIndex]);
+    CopyTurtle(&AppState->Turtle, &TurtleStack[TurtleStackIndex]);
 
     f32 TurtleSpeed = 1.0f;
 
@@ -251,7 +254,7 @@ internal void DrawLSystem(Image *Canvas, turtle *InitialTurtle, symbol Rules[sym
             break;
         }
 
-        symbol ChildSymbol = Rules[CurrentItem.Symbol][CurrentItem.Index];
+        symbol ChildSymbol = AppState->Rules[CurrentItem.Symbol][CurrentItem.Index];
 
         if (ChildSymbol == symbol_Undefined)
         {
@@ -265,7 +268,7 @@ internal void DrawLSystem(Image *Canvas, turtle *InitialTurtle, symbol Rules[sym
         else
         {
             /* output symbols */
-            symbol OutputSymbol = GetSymbolFromRules(Rules, CurrentItem);
+            symbol OutputSymbol = GetSymbolFromRules(AppState->Rules, CurrentItem);
 
             while (OutputSymbol != symbol_Undefined)
             {
@@ -286,7 +289,8 @@ internal void DrawLSystem(Image *Canvas, turtle *InitialTurtle, symbol Rules[sym
                 {
                     if (TurtleStackIndex < TURTLE_STACK_MAX - 1)
                     {
-                        Vector2 NewHeading = RotateVector2(Turtle->Heading, 0.75f);
+                        f32 RotationAmount = AppState->RotationAmount;
+                        Vector2 NewHeading = RotateVector2(Turtle->Heading, RotationAmount);
                         TurtleStackIndex += 1;
                         CopyTurtle(Turtle, &TurtleStack[TurtleStackIndex]);
                         TurtleStack[TurtleStackIndex].Heading = NewHeading;
@@ -296,8 +300,9 @@ internal void DrawLSystem(Image *Canvas, turtle *InitialTurtle, symbol Rules[sym
                 {
                     if (TurtleStackIndex > 0)
                     {
+                        f32 RotationAmount = -AppState->RotationAmount;
                         TurtleStackIndex -= 1;
-                        Vector2 NewHeading = RotateVector2(TurtleStack[TurtleStackIndex].Heading, -0.75f);
+                        Vector2 NewHeading = RotateVector2(TurtleStack[TurtleStackIndex].Heading, RotationAmount);
                         TurtleStack[TurtleStackIndex].Heading = NewHeading;
                     }
                 } break;
@@ -318,7 +323,7 @@ internal void DrawLSystem(Image *Canvas, turtle *InitialTurtle, symbol Rules[sym
                 }
 
                 CurrentItem.Index += 1;
-                OutputSymbol = GetSymbolFromRules(Rules, CurrentItem);
+                OutputSymbol = GetSymbolFromRules(AppState->Rules, CurrentItem);
             }
 
             PopAndIncrementParent(&Expansion);
@@ -355,6 +360,7 @@ internal void UpdateAndRender(void *VoidAppState)
     { /* draw ui */
         ui *UI = &AppState->UI;
 
+#if 0
         for (s32 I = 1; I < button_kind_Count; I++)
         {
             button Button = AppState->Buttons[I];
@@ -364,8 +370,16 @@ internal void UpdateAndRender(void *VoidAppState)
                 ImageClearBackground(&AppState->Canvas, BackgroundColor);
             }
         }
+#endif
 
-        DoSlider(UI, &AppState->Slider);
+        b32 SliderUpdated = DoSlider(UI, &AppState->Slider);
+
+        if (SliderUpdated)
+        {
+            AppState->RotationAmount = AppState->Slider.Value;
+            ImageClearBackground(&AppState->Canvas, BackgroundColor);
+            DrawLSystem(&AppState->Canvas, AppState, 4);
+        }
     }
 
     EndDrawing();
@@ -439,6 +453,9 @@ internal app_state InitAppState(void)
     Vector2 TurtleHeading = CreateVector2(1.0f, 0.0f);
 
     AppState.Turtle = (turtle){TurtlePosition, TurtleHeading};
+
+    AppState.RotationAmount = 0.25f;
+
     AppState.LineDrawsPerFrame = 100;
     AppState.Canvas = GenImageColor(SCREEN_WIDTH, SCREEN_HEIGHT, BackgroundColor);
     AppState.FrameBuffer = LoadTextureFromImage(AppState.Canvas);
@@ -470,7 +487,7 @@ int main(void)
 
     app_state AppState = InitAppState();
 
-    DrawLSystem(&AppState.Canvas, &AppState.Turtle, AppState.Rules, 9);
+    DrawLSystem(&AppState.Canvas, &AppState, 9);
 
 #if defined(PLATFORM_WEB)
     emscripten_set_main_loop_arg(UpdateAndRender, &AppState, 0, 1);
