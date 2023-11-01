@@ -3,9 +3,19 @@
 
 #include "types.h"
 #include "core.c"
+
+#include "ryn_prof.h"
+
 #include "platform.h"
 #include "code_pages.c"
 #include "preprocess.c"
+
+typedef enum
+{
+    timed_block_UNDEFINED,
+    timed_block_Main,
+    timed_block_Count,
+} timed_block;
 
 typedef enum
 {
@@ -51,6 +61,9 @@ int main(s32 ArgCount, char **Args)
 {
     GetResourceUsage();
 
+    ryn_BeginProfile();
+    ryn_BEGIN_TIMED_BLOCK(timed_block_Main);
+
     int Result = 0;
     command_line_args CommandLineArgs = ParseCommandLineArgs(ArgCount, Args);
 
@@ -63,6 +76,9 @@ int main(s32 ArgCount, char **Args)
         printf("Un-handled command line arg type: %d\n", CommandLineArgs.Type);
         break;
     }
+
+    ryn_END_TIMED_BLOCK(timed_block_Main);
+    ryn_EndAndPrintProfile();
 
     GetResourceUsage();
 
