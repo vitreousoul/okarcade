@@ -237,7 +237,7 @@ internal void DrawLSystem(app_state *AppState, s32 Depth)
     expansion *Expansion = &AppState->Expansion;
     turtle *TurtleStack = AppState->TurtleStack;
     s32 *TurtleStackIndex = &AppState->TurtleStackIndex;
-    f32 TurtleSpeed = 0.05f;
+    f32 TurtleSpeed = 2.0f;
 
     s32 LineDrawCount = 0;
 
@@ -394,7 +394,7 @@ internal void UpdateAndRender(void *VoidAppState)
         }
     }
 
-    DrawLSystem(AppState, 14);
+    DrawLSystem(AppState, 7);
 
     EndDrawing();
 }
@@ -409,7 +409,8 @@ internal void InitRules(symbol Rules[symbol_Count][RULE_SIZE_MAX])
 
     symbol InitialRules[symbol_Count][RULE_SIZE_MAX] = {
         [symbol_Root] = {A,End},
-        [symbol_A] = {B,Push,A,Pop,A,End},
+        /* [symbol_A] = {B,Push,A,Pop,A,End}, */
+        [symbol_A] = {B, Push, Push, A, Pop, A, Pop, B, Push, B, A, Pop, A, End},
         [symbol_B] = {B,B,End},
         /* NOTE: For now we must define constant symbols as rules that expand to themselves.
            We could _maybe_ change the expansion algorithm to treat symbols without a rule as constant,
