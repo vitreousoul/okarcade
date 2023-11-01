@@ -47,7 +47,7 @@ typedef struct
 } command_result;
 
 b32 PreprocessFile(pre_processor *PreProcessor, linear_allocator TempString, u8 *FilePath, u8 *OutputFilePath);
-void TestPreprocessor(void);
+void GenerateSite(void);
 
 internal pre_processor CreatePreProcessor(u8 *Bra, u8 *Ket)
 {
@@ -343,7 +343,7 @@ b32 PreprocessFile(pre_processor *PreProcessor, linear_allocator TempString, u8 
     return Error;
 }
 
-void TestPreprocessor(void)
+void GenerateSite(void)
 {
     u8 *GenDirectory = (u8 *)"../gen";
     u8 *CodePagesDirectory = (u8 *)"../gen/code_pages";
