@@ -82,10 +82,12 @@ typedef struct
     ui UI;
     button Buttons[button_kind_Count];
     slider Slider;
+    ui_element Tablet;
 
     expansion Expansion;
     turtle TurtleStack[TURTLE_STACK_MAX];
     s32 TurtleStackIndex;
+
 } app_state;
 
 
@@ -121,18 +123,6 @@ EM_JS(s32, GetCanvasHeight, (), {
     }
 });
 #endif
-
-internal u8 *GetSymbolText(symbol Symbol)
-{
-    switch (Symbol)
-    {
-    case symbol_A: return (u8 *)"A";
-    case symbol_B: return (u8 *)"B";
-    case symbol_Push: return (u8 *)"+";
-    case symbol_Pop: return (u8 *)"-";
-    default: return 0;
-    }
-}
 
 internal expansion_item CreateExpansionItem(symbol Symbol, s32 Index)
 {
@@ -338,7 +328,7 @@ internal void UpdateUI(app_state *AppState)
     AppState->UI.MousePosition = GetMousePosition();
 }
 
-internal void InitTurtleState(app_state *AppState)
+internal void InitTurtleState(app_state *AppState, f32 OffsetX, f32 OffsetY)
 {
     SetMemory((u8 *)&AppState->Expansion, 0, sizeof(expansion));
     SetMemory((u8 *)&AppState->TurtleStack, 0, sizeof(turtle) * TURTLE_STACK_MAX);
@@ -346,6 +336,9 @@ internal void InitTurtleState(app_state *AppState)
     AppState->TurtleStackIndex = 0;
 
     CopyTurtle(&AppState->Turtle, &AppState->TurtleStack[AppState->TurtleStackIndex]);
+
+    AppState->TurtleStack[AppState->TurtleStackIndex].Position.x += OffsetX;
+    AppState->TurtleStack[AppState->TurtleStackIndex].Position.y += OffsetY;
 
     expansion_item RootItem = CreateExpansionItem(symbol_Root, 0);
     PushExpansionItem(&AppState->Expansion, RootItem);
@@ -358,6 +351,7 @@ internal void UpdateAndRender(void *VoidAppState)
     */
     app_state *AppState = (app_state *)VoidAppState;
     UpdateUI(AppState);
+    b32 UiInteractionOccured = 0;
 
     BeginDrawing();
     ClearBackground(BackgroundColor);
@@ -377,8 +371,9 @@ internal void UpdateAndRender(void *VoidAppState)
         {
             button Button = AppState->Buttons[I];
 
-            if (DoButton(UI, &Button, AppState->UI.FontSize))
+            if (DoButton(UI, &Button))
             {
+                UiInteractionOccured = 1;
                 ImageClearBackground(&AppState->Canvas, BackgroundColor);
             }
         }
@@ -388,9 +383,33 @@ internal void UpdateAndRender(void *VoidAppState)
 
         if (SliderUpdated)
         {
+            UiInteractionOccured = 1;
             AppState->RotationAmount = AppState->Slider.Value * 8.0f;
             ImageClearBackground(&AppState->Canvas, BackgroundColor);
-            InitTurtleState(AppState);
+            InitTurtleState(AppState, 0.0f, 0.0f);
+        }
+
+        if (!UiInteractionOccured)
+        {
+            b32 TabletChanged = DoUiElement(UI, &AppState->Tablet);
+            tablet *Tablet = &AppState->Tablet.Tablet;
+
+            if (TabletChanged)
+            {
+                ImageClearBackground(&AppState->Canvas, BackgroundColor);
+
+                if (Tablet->UpdateTurtlePosition)
+                {
+                    AppState->Turtle.Position.x += Tablet->Offset.x;
+                    AppState->Turtle.Position.y += Tablet->Offset.y;
+                    InitTurtleState(AppState, 0.0f, 0.0f);
+                }
+                else
+                {
+                    Vector2 Offset = Tablet->Offset;
+                    InitTurtleState(AppState, Offset.x, Offset.y);
+                }
+            }
         }
     }
 
@@ -442,6 +461,7 @@ internal void InitUi(app_state *AppState)
         u8 *Text = ButtonText[I];
 
         AppState->Buttons[I].Id = I;
+
         AppState->Buttons[I].Text = Text;
         AppState->Buttons[I].Position = (Vector2){10.0f, Y};
 
@@ -458,6 +478,24 @@ internal void InitUi(app_state *AppState)
         AppState->Slider.Size.y = 40.0f;
 
         AppState->Slider.Value = 0.3f;
+
+        I += 1;
+    }
+
+    { /* init tablet */
+        AppState->Tablet.Tablet.Id = I;
+        AppState->Tablet.Type = ui_element_type_Tablet;
+
+        AppState->Tablet.Tablet.Position.x = 0.0f;
+        AppState->Tablet.Tablet.Position.y = 0.0f;
+
+        AppState->Tablet.Tablet.Size.x = SCREEN_WIDTH;
+        AppState->Tablet.Tablet.Size.y = SCREEN_HEIGHT;
+
+        AppState->Tablet.Tablet.Offset.x = 0.0f;
+        AppState->Tablet.Tablet.Offset.y = 0.0f;
+
+        I += 1;
     }
 }
 
@@ -477,7 +515,7 @@ internal app_state InitAppState(void)
     AppState.FrameBuffer = LoadTextureFromImage(AppState.Canvas);
     AppState.UI.FontSize = 18;
 
-    InitTurtleState(&AppState);
+    InitTurtleState(&AppState, 0.0f, 0.0f);
 
     InitUi(&AppState);
 

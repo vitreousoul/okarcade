@@ -1,10 +1,20 @@
 #define BUTTON_PADDING 8
 
+typedef enum
+{
+    ui_element_type_UNDEFINED,
+    ui_element_type_Button,
+    ui_element_type_Slider,
+    ui_element_type_Tablet,
+    ui_element_type_Count,
+} ui_element_type;
+
 typedef struct
 {
     s32 Id;
 
     Vector2 Position;
+    Vector2 Size;
     u8 *Text;
 } button;
 
@@ -16,6 +26,28 @@ typedef struct
     Vector2 Size;
     f32 Value;
 } slider;
+
+typedef struct
+{
+    s32 Id;
+
+    Vector2 Position;
+    Vector2 Size;
+    Vector2 Offset;
+
+    b32 UpdateTurtlePosition;
+} tablet;
+
+typedef struct
+{
+    ui_element_type Type;
+    union
+    {
+        button Button;
+        slider Slider;
+        tablet Tablet;
+    };
+} ui_element;
 
 typedef s32 ui_id;
 
@@ -29,11 +61,15 @@ typedef struct
     b32 MouseButtonPressed;
     b32 MouseButtonReleased;
     Vector2 MousePosition;
+
+    Vector2 ActivationPosition;
 } ui;
 
 button CreateButton(Vector2 Position, u8 *Text, ui_id Id);
-b32 DoButton(ui *UI, button *Button, s32 FontSize);
+b32 DoButton(ui *UI, button *Button);
 b32 DoSlider(ui *UI, slider *Slider);
+b32 DoTablet(ui *UI, tablet *Tablet);
+b32 DoUiElement(ui *UI, ui_element *UiElement);
 
 button CreateButton(Vector2 Position, u8 *Text, ui_id Id)
 {
@@ -46,12 +82,12 @@ button CreateButton(Vector2 Position, u8 *Text, ui_id Id)
     return Button;
 }
 
-internal b32 PositionIsInsideButton(Vector2 Position, button *Button, Vector2 ButtonSize)
+internal b32 PositionIsInsideButton(Vector2 Position, button *Button)
 {
     f32 X0 = Button->Position.x;
     f32 Y0 = Button->Position.y;
-    f32 X1 = Button->Position.x + ButtonSize.x;
-    f32 Y1 = Button->Position.y + ButtonSize.y;
+    f32 X1 = Button->Position.x + Button->Size.x;
+    f32 Y1 = Button->Position.y + Button->Size.y;
 
     return ((Position.x >= X0) &&
             (Position.x <= X1) &&
@@ -72,7 +108,59 @@ internal b32 PositionIsInsideSliderHandle(Vector2 Position, slider *Slider)
             (Position.y <= Y1));
 }
 
-b32 DoButton(ui *UI, button *Button, s32 FontSize)
+internal b32 PositionIsInsideTablet(Vector2 Position, tablet *Tablet)
+{
+    f32 X0 = Tablet->Position.x;
+    f32 Y0 = Tablet->Position.y;
+    f32 X1 = Tablet->Position.x + Tablet->Size.x;
+    f32 Y1 = Tablet->Position.y + Tablet->Size.y;
+
+    return ((Position.x >= X0) &&
+            (Position.x <= X1) &&
+            (Position.y >= Y0) &&
+            (Position.y <= Y1));
+}
+
+/* TODO Delete PositionIsInsideUiElement if it is not used */
+internal b32 PositionIsInsideUiElement(ui_element *UiElement, Vector2 Position)
+{
+    f32 X0 = 0.0f;
+    f32 Y0 = 0.0f;
+    f32 X1 = 0.0f;
+    f32 Y1 = 0.0f;
+
+    switch (UiElement->Type)
+    {
+    case ui_element_type_Button:
+    {
+        button Button = UiElement->Button;
+
+        X0 = Button.Position.x;
+        Y0 = Button.Position.y;
+        X1 = Button.Position.x + Button.Size.x;
+        Y1 = Button.Position.y + Button.Size.y;
+    } break;
+    case ui_element_type_Slider:
+    {
+        slider Slider = UiElement->Slider;
+
+        X0 = Slider.Position.x;
+        Y0 = Slider.Position.y;
+        X1 = Slider.Position.x + Slider.Size.x;
+        Y1 = Slider.Position.y + Slider.Size.y;
+    } break;
+    case ui_element_type_Tablet:
+        break;
+    default: break;
+    }
+
+    return ((Position.x >= X0) &&
+            (Position.x <= X1) &&
+            (Position.y >= Y0) &&
+            (Position.y <= Y1));
+}
+
+b32 DoButton(ui *UI, button *Button)
 {
     b32 ButtonPressed = 0;
     Color UnderColor = (Color){20,20,20,225};
@@ -81,11 +169,11 @@ b32 DoButton(ui *UI, button *Button, s32 FontSize)
     Color ActiveColor = (Color){40,120,120,255};
     Color TextColor = (Color){0,0,0,255};
 
-    s32 TextWidth = MeasureText((char *)Button->Text, FontSize);
+    s32 TextWidth = MeasureText((char *)Button->Text, UI->FontSize);
     f32 TwicePadding = 2 * BUTTON_PADDING;
-    Vector2 ButtonSize = CreateVector2(TextWidth + TwicePadding, FontSize + TwicePadding);
+    Button->Size = CreateVector2(TextWidth + TwicePadding, UI->FontSize + TwicePadding);
 
-    b32 IsHot = PositionIsInsideButton(UI->MousePosition, Button, ButtonSize);
+    b32 IsHot = PositionIsInsideButton(UI->MousePosition, Button);
     b32 IsActive = UI->Active == Button->Id;
 
     if (IsHot)
@@ -117,9 +205,9 @@ b32 DoButton(ui *UI, button *Button, s32 FontSize)
     }
 
     Rectangle Rect = (Rectangle){Button->Position.x, Button->Position.y,
-                                 ButtonSize.x, ButtonSize.y};
+                                 Button->Size.x, Button->Size.y};
     Rectangle UnderRect = (Rectangle){Button->Position.x + 2.0f, Button->Position.y + 2.0f,
-                                      ButtonSize.x, ButtonSize.y};
+                                      Button->Size.x, Button->Size.y};
 
     Color ButtonColor = IsActive ? ActiveColor : InactiveColor;
 
@@ -187,6 +275,71 @@ b32 DoSlider(ui *UI, slider *Slider)
 
     DrawRectangle(Position.x, CenterY - TrackOffset, Size.x, TrackHeight, SliderColor);
     DrawRectangle(HandleX, Position.y, HandleWidth, Size.y, HandleColor);
+
+    return Changed;
+}
+
+b32 DoTablet(ui *UI, tablet *Tablet)
+{
+    b32 Changed = 0;
+
+    b32 IsHot = PositionIsInsideTablet(UI->MousePosition, Tablet);
+    b32 NoActive = !UI->Active;
+    b32 IsActive = UI->Active == Tablet->Id;
+
+    Tablet->UpdateTurtlePosition = 0;
+
+    if (IsHot)
+    {
+        if (UI->MouseButtonPressed && NoActive)
+        {
+            UI->Active = Tablet->Id;
+            UI->ActivationPosition = UI->MousePosition;
+        }
+
+        if (IsActive)
+        {
+            Changed = 1;
+
+            Tablet->Offset.x = UI->MousePosition.x - UI->ActivationPosition.x;
+            Tablet->Offset.y = UI->MousePosition.y - UI->ActivationPosition.y;
+        }
+    }
+
+    if (UI->MouseButtonReleased)
+    {
+        if (IsActive)
+        {
+            IsActive = 0;
+            UI->Active = 0;
+            Changed = 1;
+
+            Tablet->UpdateTurtlePosition = 1;
+            /* Tablet->Offset.x = UI->ActivationPosition.x + Tablet->Offset.x; */
+            /* Tablet->Offset.y = UI->ActivationPosition.y + Tablet->Offset.y; */
+        }
+    }
+
+    return Changed;
+}
+
+b32 DoUiElement(ui *UI, ui_element *UiElement)
+{
+    b32 Changed = 0;
+
+    switch (UiElement->Type)
+    {
+    case ui_element_type_Button:
+        Changed = DoButton(UI, &UiElement->Button);
+        break;
+    case ui_element_type_Slider:
+        Changed = DoSlider(UI, &UiElement->Slider);
+        break;
+    case ui_element_type_Tablet:
+        Changed = DoTablet(UI, &UiElement->Tablet);
+        break;
+    default: break;
+    }
 
     return Changed;
 }
