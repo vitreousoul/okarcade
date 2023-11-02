@@ -237,7 +237,7 @@ internal void DrawLSystem(app_state *AppState, s32 Depth)
     expansion *Expansion = &AppState->Expansion;
     turtle *TurtleStack = AppState->TurtleStack;
     s32 *TurtleStackIndex = &AppState->TurtleStackIndex;
-    f32 TurtleSpeed = 2.0f;
+    f32 TurtleSpeed = 1.0f;
 
     s32 LineDrawCount = 0;
 
@@ -388,13 +388,13 @@ internal void UpdateAndRender(void *VoidAppState)
 
         if (SliderUpdated)
         {
-            AppState->RotationAmount = AppState->Slider.Value;
+            AppState->RotationAmount = AppState->Slider.Value * 8.0f;
             ImageClearBackground(&AppState->Canvas, BackgroundColor);
             InitTurtleState(AppState);
         }
     }
 
-    DrawLSystem(AppState, 7);
+    DrawLSystem(AppState, 8);
 
     EndDrawing();
 }
@@ -410,7 +410,8 @@ internal void InitRules(symbol Rules[symbol_Count][RULE_SIZE_MAX])
     symbol InitialRules[symbol_Count][RULE_SIZE_MAX] = {
         [symbol_Root] = {A,End},
         /* [symbol_A] = {B,Push,A,Pop,A,End}, */
-        [symbol_A] = {B, Push, Push, A, Pop, A, Pop, B, Push, B, A, Pop, A, End},
+        [symbol_A] = {B, Push, B, Push, B, A, Pop, A, A, Pop, A, End},
+        /* [symbol_A] = {B, Push, Push, A, Pop, A, Pop, B, Push, B, A, Pop, A, End}, */
         [symbol_B] = {B,B,End},
         /* NOTE: For now we must define constant symbols as rules that expand to themselves.
            We could _maybe_ change the expansion algorithm to treat symbols without a rule as constant,
@@ -464,13 +465,13 @@ internal app_state InitAppState(void)
 {
     app_state AppState;
 
-    Vector2 TurtlePosition = CreateVector2(20.0f, SCREEN_HEIGHT / 2.0f);
+    Vector2 TurtlePosition = CreateVector2(120.0f, SCREEN_HEIGHT / 2.0f);
     Vector2 TurtleHeading = CreateVector2(1.0f, 0.0f);
 
     AppState.Turtle = (turtle){TurtlePosition, TurtleHeading};
 
     AppState.RotationAmount = 0.25f;
-    AppState.LineDrawsPerFrame = 10000;
+    AppState.LineDrawsPerFrame = 20000;
 
     AppState.Canvas = GenImageColor(SCREEN_WIDTH, SCREEN_HEIGHT, BackgroundColor);
     AppState.FrameBuffer = LoadTextureFromImage(AppState.Canvas);
