@@ -132,7 +132,7 @@ internal buffer GetOutputHtmlPath(linear_allocator *TempString, u8 *OldRootPath,
 
     /* We want to replace the source code path prefix "../src" with the "../gen" prefix.
        This loop increments an offset until the source/code paths don't match.
-     */
+    */
     for (;;)
     {
         b32 SomethingIsNull = !(OldRootPath[I] && CodePagePath[I]);
@@ -161,8 +161,6 @@ internal buffer GetOutputHtmlPath(linear_allocator *TempString, u8 *OldRootPath,
     }
 
     PushNullTerminator(TempString);
-
-    /* printf("html path: \"%s\"\n", TempString->Data + BeginOffset); */
 
     Buffer.Size = TempString->Offset - BeginOffset;
     CopyMemory(TempString->Data + BeginOffset, Buffer.Data, Buffer.Size);
@@ -216,6 +214,76 @@ internal buffer EscapeHtmlString(linear_allocator *TempString, u8 *HtmlString, s
     return Buffer;
 }
 
+#define FILE_TREE_DEPTH_MAX 16
+
+typedef struct
+{
+    u8 *Path[FILE_TREE_DEPTH_MAX];
+} file_tree;
+
+typedef struct
+{
+    u8 *Parts[FILE_TREE_DEPTH_MAX];
+    u8 *Name;
+} path_parts;
+
+internal path_parts GetPathParts(linear_allocator *TempString, u8 *Path)
+{
+    path_parts PathParts = {0};
+
+    u64 Begin = 0;
+    s32 PathPartIndex = 0;
+    u64 I = 0;
+
+    for (;;)
+    {
+        if (!Path[I])
+        {
+            u8 *WriteLocation = GetLinearAllocatorWriteLocation(TempString);
+            s32 WriteError = WriteLinearAllocator(TempString, Path + Begin, I - Begin);
+
+            if (WriteError)
+            {
+                LogError("writing name to temp-string");
+            }
+            else
+            {
+                PathParts.Name = WriteLocation;
+            }
+
+            break;
+        }
+        else if (Path[I] == PATH_SEPARATOR)
+        {
+            u64 Size = I - Begin + 1;
+
+            u8 *WriteLocation = GetLinearAllocatorWriteLocation(TempString);
+            s32 WriteError = WriteLinearAllocator(TempString, Path + Begin, Size);
+
+            if (WriteError)
+            {
+                LogError("writing to temp-string");
+                break;
+            }
+            else if (PathPartIndex >= FILE_TREE_DEPTH_MAX)
+            {
+                printf("PathPartIndex out of max (%d/%d)", PathPartIndex, FILE_TREE_DEPTH_MAX);
+                LogError("path part index max exceeded");
+            }
+
+            PathParts.Parts[PathPartIndex] = WriteLocation;
+            PathPartIndex += 1;
+            TempString->Data[TempString->Offset - 1] = 0;
+
+            Begin = I + 1;
+        }
+
+        I += 1;
+    }
+
+    return PathParts;
+}
+
 void GenerateCodePages(linear_allocator *TempString)
 {
     u8 *SourceCodePath = (u8 *)"../src";
@@ -227,17 +295,70 @@ void GenerateCodePages(linear_allocator *TempString)
     file_list *FileList = (file_list *)FileAllocator.Data;
     file_list *SortedFileList = SortFileList(FileList);
 
-    { /* code page links doc */
+    { /* Print out html for file-tree */
         u8 *CodePageListingPath = (u8 *)"../gen/code_page_links.html";
+        file_tree Tree = {0};
+
         for (file_list *CurrentFile = SortedFileList; CurrentFile; CurrentFile = CurrentFile->Next)
         {
             buffer FileOutputName = GetOutputHtmlPath(TempString, SourceCodePath, 0, CurrentFile->Name, 0);
+            path_parts PathParts = GetPathParts(TempString, CurrentFile->Name);
+            s32 LeadingSpaceCount = 0;
 
-            PushString(&CodePage, (u8 *)"<p><a href=\"");
+            PushString(&CodePage, (u8 *)"<div>");
+
+            for (s32 I = 0; I < FILE_TREE_DEPTH_MAX; ++I)
+            {
+                u8 *PathPart = PathParts.Parts[I];
+
+                if (PathPart)
+                {
+                    if (Tree.Path[I] && StringsEqual(PathPart, Tree.Path[I]))
+                    {
+                        LeadingSpaceCount += 1;
+                    }
+                    else
+                    {
+                        for (s32 J = 0; J < I - 1; ++J)
+                        {
+                            PushString(&CodePage, (u8 *)"<div class=\"spacer\"></div>");
+                        }
+
+                        if (I > 0)
+                        {
+                            PushString(&CodePage, (u8 *)"<div class=\"spacer\"></div>");
+                        }
+
+                        PushString(&CodePage, PathPart);
+                        PushString(&CodePage, (u8 *)"<br>");
+                        LeadingSpaceCount = I + 1;
+                        /* We found a new path-part, so we overwrite old path parts.
+                           We should keep any part of the path at the start where both Tree.Path
+                           and PathPart match.
+                        */
+                        Tree.Path[I] = PathPart;
+                    }
+                }
+                else
+                {
+                    break;
+                }
+            }
+
+            for (s32 J = 0; J < LeadingSpaceCount - 1; ++J)
+            {
+                PushString(&CodePage, (u8 *)"<div class=\"spacer\"></div>");
+            }
+
+            PushString(&CodePage, (u8 *)"<div class=\"spacer\"></div>");
+
+            PushString(&CodePage, (u8 *)"<a href=\"");
             PushString(&CodePage, FileOutputName.Data);
             PushString(&CodePage, (u8 *)".html\">");
-            PushString(&CodePage, CurrentFile->Name);
-            PushString(&CodePage, (u8 *)"</a></p>");
+            PushString(&CodePage, PathParts.Name);
+            PushString(&CodePage, (u8 *)"</a>");
+
+            PushString(&CodePage, (u8 *)"</div>");
         }
 
         WriteFile(CodePageListingPath, CodePage.Data, CodePage.Offset);

@@ -6,6 +6,8 @@
 #include <unistd.h>
 #include <fts.h>
 
+#define PATH_SEPARATOR '/'
+
 typedef struct
 {
     s32 Size;
@@ -44,6 +46,7 @@ void GetResourceUsage(void);
 linear_allocator CreateLinearAllocator(u64 Size);
 void *PushLinearAllocator(linear_allocator *LinearAllocator, u64 Size);
 s32 WriteLinearAllocator(linear_allocator *LinearAllocator, u8 *Data, u64 Size);
+u8 *GetLinearAllocatorWriteLocation(linear_allocator *LinearAllocator);
 void FreeLinearAllocator(linear_allocator LinearAllocator);
 
 void CopyString(u8 *Source, u8 *Destination, s32 DestinationSize);
@@ -185,6 +188,12 @@ s32 WriteLinearAllocator(linear_allocator *LinearAllocator, u8 *Data, u64 Size)
     return ErrorCode;
 }
 
+u8 *GetLinearAllocatorWriteLocation(linear_allocator *LinearAllocator)
+{
+    u8 *WriteLocation = LinearAllocator->Data + LinearAllocator->Offset;
+    return WriteLocation;
+}
+
 void FreeLinearAllocator(linear_allocator LinearAllocator)
 {
     munmap(LinearAllocator.Data, LinearAllocator.Capacity);
@@ -224,10 +233,11 @@ s32 GetStringLength(u8 *String)
 }
 
 #define PushString(a, s) PushString_((a), (s), GetStringLength(s))
-internal void PushString_(linear_allocator *LinearAllocator, u8 *String, s32 StringLength)
+internal u8 *PushString_(linear_allocator *LinearAllocator, u8 *String, s32 StringLength)
 {
     u8 *WhereToWrite = PushLinearAllocator(LinearAllocator, StringLength);
     CopyMemory(String, WhereToWrite, StringLength);
+    return WhereToWrite;
 }
 
 buffer *ReadFileIntoBuffer(u8 *FilePath)
