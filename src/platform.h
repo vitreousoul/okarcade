@@ -43,6 +43,7 @@ void GetResourceUsage(void);
 
 linear_allocator CreateLinearAllocator(u64 Size);
 void *PushLinearAllocator(linear_allocator *LinearAllocator, u64 Size);
+s32 WriteLinearAllocator(linear_allocator *LinearAllocator, u8 *Data, u64 Size);
 void FreeLinearAllocator(linear_allocator LinearAllocator);
 
 void CopyString(u8 *Source, u8 *Destination, s32 DestinationSize);
@@ -163,6 +164,25 @@ void *PushLinearAllocator(linear_allocator *LinearAllocator, u64 Size)
     }
 
     return Result;
+}
+
+
+s32 WriteLinearAllocator(linear_allocator *LinearAllocator, u8 *Data, u64 Size)
+{
+    s32 ErrorCode = 0;
+
+    u8 *WhereToWrite = PushLinearAllocator(LinearAllocator, Size);
+
+    if (WhereToWrite)
+    {
+        CopyMemory(Data, WhereToWrite, Size);
+    }
+    else
+    {
+        ErrorCode = 1;
+    }
+
+    return ErrorCode;
 }
 
 void FreeLinearAllocator(linear_allocator LinearAllocator)
@@ -355,11 +375,6 @@ linear_allocator WalkDirectory(u8 *Path)
             {
             case FTS_F:
             {
-                struct file_list
-                {
-                    struct file_list *Next;
-                    u8 Name[];
-                };
                 b32 IsFirstAllocation = Allocator.Offset == 0;
                 s32 FilePathLength = strlen(p->fts_path);
                 size FileItemSize = sizeof(file_list) + FilePathLength + 1;

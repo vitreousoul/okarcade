@@ -142,9 +142,15 @@ internal buffer GetCommandToken(pre_processor *PreProcessor, buffer *Buffer, s32
 
         if (IsKet || IsSpace)
         {
-            TokenBuffer.Data = PushLinearAllocator(&PreProcessor->StringAllocator, TokenBuffer.Size + 1);
-            TokenBuffer.Data[TokenBuffer.Size] = 0;
-            CopyMemory(Buffer->Data + Offset, TokenBuffer.Data, TokenBuffer.Size);
+            linear_allocator *StringAllocator = &PreProcessor->StringAllocator;
+            TokenBuffer.Data = StringAllocator->Data + StringAllocator->Offset;
+
+            b32 WriteError = WriteLinearAllocator(StringAllocator, Buffer->Data + Offset, TokenBuffer.Size + 1);
+
+            if (!WriteError)
+            {
+                TokenBuffer.Data[TokenBuffer.Size] = 0;
+            }
             break;
         }
     }
@@ -173,13 +179,10 @@ internal b32 HandlePreProcessCommand(pre_processor *PreProcessor, buffer *Buffer
 
         if (Buffer)
         {
-            u8 *WhereToWrite = PushLinearAllocator(OutputAllocator, Buffer->Size);
-            if (WhereToWrite)
-            {
-                CopyMemory(Buffer->Data, WhereToWrite, Buffer->Size);
-                FreeBuffer(Buffer);
-            }
-            else
+            b32 WriteError = WriteLinearAllocator(OutputAllocator, Buffer->Data, Buffer->Size);
+            FreeBuffer(Buffer);
+
+            if (WriteError)
             {
                 LogError("failed to write to output\n");
             }
@@ -226,9 +229,16 @@ b32 PreprocessFile(pre_processor *PreProcessor, linear_allocator TempString, u8 
             /* Set up the heredoc label, which is used to scan for the end of the heredoc. */
             s32 HereDocLabelSize = I - Begin + 1;
             u8 *HereDocLabel = TempString.Data + TempString.Offset;
-            PushLinearAllocator(&TempString, HereDocLabelSize);
-            CopyMemory(Buffer->Data + Begin, HereDocLabel, HereDocLabelSize);
-            TempString.Data[TempString.Offset - 1] = 0;
+            s32 WriteError = WriteLinearAllocator(&TempString, Buffer->Data + Begin, HereDocLabelSize);
+
+            if (WriteError)
+            {
+                LogError("failed to write heredoc label to allocator");
+            }
+            else
+            {
+                TempString.Data[TempString.Offset - 1] = 0;
+            }
 
             SkipSpace(Buffer, &I);
 
@@ -237,28 +247,20 @@ b32 PreprocessFile(pre_processor *PreProcessor, linear_allocator TempString, u8 
                 if (CheckIfStringIsPrefix(HereDocLabel, Buffer, J))
                 {
                     s32 PreDataSize = HereDocCharOffset - PreProcessor->BraCount - WriteIndex;
-                    u8 *DataPrecedingHereDoc = PushLinearAllocator(OutputAllocator, PreDataSize);
+                    b32 WriteError = WriteLinearAllocator(OutputAllocator, Buffer->Data + WriteIndex, PreDataSize);
 
-                    if (DataPrecedingHereDoc)
-                    {
-                        u8 *BufferStart = Buffer->Data + WriteIndex;
-                        CopyMemory(BufferStart, DataPrecedingHereDoc, PreDataSize);
-                    }
-                    else
+                    if (WriteError)
                     {
                         LogError("failed to write heredoc pre-data to output");
                     }
 
                     s32 HereDocDataBegin = Begin + HereDocLabelSize - 1;
                     s32 HereDocDataSize = J - HereDocDataBegin;
-                    u8 *HereDocData = PushLinearAllocator(OutputAllocator, HereDocDataSize);
+                    u8 *DataBegin = Buffer->Data + HereDocDataBegin;
 
-                    if (HereDocData)
-                    {
-                        u8 *BufferStart = Buffer->Data + HereDocDataBegin;
-                        CopyMemory(BufferStart, HereDocData, HereDocDataSize);
-                    }
-                    else
+                    WriteError = WriteLinearAllocator(OutputAllocator, DataBegin, HereDocDataSize);
+
+                    if (WriteError)
                     {
                         LogError("failed to write heredoc data to output");
                     }
@@ -286,13 +288,9 @@ b32 PreprocessFile(pre_processor *PreProcessor, linear_allocator TempString, u8 
                     s32 OldI = I;
                     s32 OldWriteIndex = WriteIndex;
 
-                    u8 *WhereToWrite = PushLinearAllocator(OutputAllocator, Size);
+                    b32 WriteError = WriteLinearAllocator(OutputAllocator, BufferStart, Size);
 
-                    if (WhereToWrite)
-                    {
-                        CopyMemory(BufferStart, WhereToWrite, Size);
-                    }
-                    else
+                    if (WriteError)
                     {
                         LogError("failed to write to output");
                         break;
@@ -322,15 +320,11 @@ b32 PreprocessFile(pre_processor *PreProcessor, linear_allocator TempString, u8 
         /* NOTE This branch handles any text after the last preprocessor command, or if
            there were not preprocessor commands.
         */
-        u8 *OutputAllocatorStart = OutputAllocator->Data + OutputAllocator->Offset;
         s32 Size = Buffer->Size - WriteIndex;
-        u8 *WhereToWrite = PushLinearAllocator(OutputAllocator, Size);
+        u8 *DataBegin = Buffer->Data + WriteIndex;
+        b32 WriteError = WriteLinearAllocator(OutputAllocator, DataBegin, Size);
 
-        if (WhereToWrite)
-        {
-            CopyMemory(Buffer->Data + WriteIndex, OutputAllocatorStart, Size);
-        }
-        else
+        if (WriteError)
         {
             LogError("failed to write to output");
         }

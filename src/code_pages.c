@@ -197,6 +197,7 @@ internal buffer EscapeHtmlString(linear_allocator *TempString, u8 *HtmlString, s
             u8 *BeginData = HtmlString + HtmlStringBegin;
             s32 Size = I - HtmlStringBegin;
             u8 *Data = PushLinearAllocator(TempString, Size);
+
             CopyMemory(BeginData, Data, Size);
             PushString(TempString, EscapeString);
             HtmlStringBegin = I + 1;
@@ -207,8 +208,7 @@ internal buffer EscapeHtmlString(linear_allocator *TempString, u8 *HtmlString, s
 
     if (RemainingLength)
     {
-        u8 *Data = PushLinearAllocator(TempString, RemainingLength);
-        CopyMemory(HtmlString + HtmlStringBegin, Data, RemainingLength);
+        WriteLinearAllocator(TempString, HtmlString + HtmlStringBegin, RemainingLength);
     }
 
     Buffer.Size = TempString->Offset - InitialOffset;
