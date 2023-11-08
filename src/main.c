@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <time.h>
 
 #include "types.h"
 #include "core.c"
@@ -9,6 +10,7 @@
 #include "platform.h"
 #include "code_pages.c"
 #include "preprocess.c"
+#include "blog.h"
 
 typedef enum
 {
@@ -85,8 +87,11 @@ int main(s32 ArgCount, char **Args)
     switch(CommandLineArgType)
     {
     case command_line_arg_type_Preprocess:
-        GenerateSite();
-        break;
+    {
+        linear_allocator TempString = CreateLinearAllocator(Gigabytes(1));
+        GenerateSite(&TempString);
+        GenerateBlogPages(&TempString);
+    } break;
     default:
         printf("Un-handled command line arg type: %d\n", CommandLineArgType);
         break;

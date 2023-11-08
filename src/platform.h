@@ -37,6 +37,13 @@ typedef struct
     u8 *Data;
 } linear_allocator;
 
+typedef struct
+{
+    s32 Year;
+    s32 Month;
+    s32 Day;
+} date;
+
 void *AllocateMemory(u64 Size);
 void FreeMemory(void *Ref);
 void *AllocateVirtualMemory(size Size);
@@ -47,10 +54,13 @@ linear_allocator CreateLinearAllocator(u64 Size);
 void *PushLinearAllocator(linear_allocator *LinearAllocator, u64 Size);
 s32 WriteLinearAllocator(linear_allocator *LinearAllocator, u8 *Data, u64 Size);
 u8 *GetLinearAllocatorWriteLocation(linear_allocator *LinearAllocator);
+u64 GetLinearAllocatorFreeSpace(linear_allocator *LinearAllocator);
 void FreeLinearAllocator(linear_allocator LinearAllocator);
 
 void CopyString(u8 *Source, u8 *Destination, s32 DestinationSize);
 s32 GetStringLength(u8 *String);
+
+date GetDate(void);
 
 buffer *ReadFileIntoBuffer(u8 *FilePath);
 u64 GetFileSize(u8 *FilePath);
@@ -194,6 +204,13 @@ u8 *GetLinearAllocatorWriteLocation(linear_allocator *LinearAllocator)
     return WriteLocation;
 }
 
+u64 GetLinearAllocatorFreeSpace(linear_allocator *LinearAllocator)
+{
+    Assert(LinearAllocator->Capacity > LinearAllocator->Offset);
+    u64 FreeSpace = LinearAllocator->Capacity - LinearAllocator->Offset;
+    return FreeSpace;
+}
+
 void FreeLinearAllocator(linear_allocator LinearAllocator)
 {
     munmap(LinearAllocator.Data, LinearAllocator.Capacity);
@@ -230,6 +247,21 @@ s32 GetStringLength(u8 *String)
     s32 StringLength = -1;
     while (String[++StringLength]);
     return StringLength;
+}
+
+date GetDate(void)
+{
+    date Date;
+
+    time_t Time;
+    time(&Time);
+    struct tm *LocalTime = localtime(&Time);
+
+    Date.Year = LocalTime->tm_year + 1900;
+    Date.Month = LocalTime->tm_mon + 1;
+    Date.Day = LocalTime->tm_mday;
+
+    return Date;
 }
 
 #define PushString(a, s) PushString_((a), (s), GetStringLength(s))

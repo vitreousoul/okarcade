@@ -47,7 +47,7 @@ typedef struct
 } command_result;
 
 b32 PreprocessFile(pre_processor *PreProcessor, linear_allocator TempString, u8 *FilePath, u8 *OutputFilePath);
-void GenerateSite(void);
+void GenerateSite(linear_allocator *TempString);
 
 internal pre_processor CreatePreProcessor(u8 *Bra, u8 *Ket)
 {
@@ -337,7 +337,7 @@ b32 PreprocessFile(pre_processor *PreProcessor, linear_allocator TempString, u8 
     return Error;
 }
 
-void GenerateSite(void)
+void GenerateSite(linear_allocator *TempString)
 {
     u8 *GenDirectory = (u8 *)"../gen";
     u8 *CodePagesDirectory = (u8 *)"../gen/code_pages";
@@ -355,9 +355,7 @@ void GenerateSite(void)
     u8 *Bra = (u8 *)"{|";
     u8 *Ket = (u8 *)"|}";
 
-    linear_allocator TempString = CreateLinearAllocator(Gigabytes(1));
-
-    GenerateCodePages(&TempString);
+    GenerateCodePages(TempString);
 
     EnsureDirectoryExists(GenDirectory);
     EnsureDirectoryExists(CodePagesDirectory);
@@ -373,16 +371,16 @@ void GenerateSite(void)
 
     for (file_list *CurrentFile = SortedFileList; CurrentFile; CurrentFile = CurrentFile->Next)
     {
-        buffer Buffer = GetOutputHtmlPath(&TempString, CodePagesDirectory, SiteDirectory, CurrentFile->Name, 0);
+        buffer Buffer = GetOutputHtmlPath(TempString, CodePagesDirectory, SiteDirectory, CurrentFile->Name, 0);
         EnsurePathDirectoriesExist(Buffer.Data);
-        PreprocessFile(&PreProcessor, TempString, CurrentFile->Name, Buffer.Data);
+        PreprocessFile(&PreProcessor, *TempString, CurrentFile->Name, Buffer.Data);
     }
 
-    TempString.Offset = 0;
+    TempString->Offset = 0;
 
-    PreprocessFile(&PreProcessor, TempString, IndexIn, IndexOut);
-    PreprocessFile(&PreProcessor, TempString, CodeIn, CodeOut);
-    PreprocessFile(&PreProcessor, TempString, LSystemIn, LSystemOut);
+    PreprocessFile(&PreProcessor, *TempString, IndexIn, IndexOut);
+    PreprocessFile(&PreProcessor, *TempString, CodeIn, CodeOut);
+    PreprocessFile(&PreProcessor, *TempString, LSystemIn, LSystemOut);
 
     FreeLinearAllocator(FileAllocator);
 }
