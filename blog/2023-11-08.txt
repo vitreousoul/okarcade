@@ -1,10 +1,8 @@
-DATE: 2023-11-08
-
 === This is a title ===
 --- This is smaller title ---
 
 This is a paragraph.
 
-image(../assets/some_image.png)
+#image ../assets/some_image.png
 
 This is another paragraph.
