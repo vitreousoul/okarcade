@@ -119,7 +119,7 @@ internal void PushNullTerminator(linear_allocator *Allocator)
     Allocator->Offset += 1;
 }
 
-internal buffer GetOutputHtmlPath(linear_allocator *TempString, u8 *OldRootPath, u8 *NewRootPath, u8 *CodePagePath, b32 AddHtmlExtension)
+internal buffer GetOutputHtmlPath(linear_allocator *TempString, u8 *OldRootPath, u8 *NewRootPath, u8 *CodePagePath, b32 ExcludePathExtension, b32 AddHtmlExtension)
 {
     u8 *Extension = (u8 *)".html";
 
@@ -153,7 +153,27 @@ internal buffer GetOutputHtmlPath(linear_allocator *TempString, u8 *OldRootPath,
         PushString(TempString, NewRootPath);
     }
 
-    PushString(TempString, CodePagePath + CodePagePathOffset);
+    if (ExcludePathExtension)
+    {
+        s32 End = CodePagePathOffset;
+
+        while (CodePagePath[End])
+        {
+            if (CodePagePath[End] == '.')
+            {
+                break;
+            }
+
+            End += 1;
+        }
+
+        s32 Size = End - CodePagePathOffset;
+        WriteLinearAllocator(TempString, CodePagePath + CodePagePathOffset, Size);
+    }
+    else
+    {
+        PushString(TempString, CodePagePath + CodePagePathOffset);
+    }
 
     if (AddHtmlExtension)
     {
@@ -301,7 +321,7 @@ void GenerateCodePages(linear_allocator *TempString)
 
         for (file_list *CurrentFile = SortedFileList; CurrentFile; CurrentFile = CurrentFile->Next)
         {
-            buffer FileOutputName = GetOutputHtmlPath(TempString, SourceCodePath, 0, CurrentFile->Name, 0);
+            buffer FileOutputName = GetOutputHtmlPath(TempString, SourceCodePath, 0, CurrentFile->Name, 0, 0);
             path_parts PathParts = GetPathParts(TempString, CurrentFile->Name);
             s32 LeadingSpaceCount = 0;
 
@@ -368,7 +388,7 @@ void GenerateCodePages(linear_allocator *TempString)
     { /* inidividual code page docs */
         for (file_list *CurrentFile = SortedFileList; CurrentFile; CurrentFile = CurrentFile->Next)
         {
-            buffer Buffer = GetOutputHtmlPath(TempString, SourceCodePath, GenCodePagesPath, CurrentFile->Name, 1);
+            buffer Buffer = GetOutputHtmlPath(TempString, SourceCodePath, GenCodePagesPath, CurrentFile->Name, 0, 1);
             EnsurePathDirectoriesExist(Buffer.Data);
 
             PushString(&CodePage, CodePageBegin());

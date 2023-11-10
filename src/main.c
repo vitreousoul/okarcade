@@ -9,7 +9,6 @@
 
 #include "platform.h"
 #include "code_pages.c"
-#include "blog.h"
 #include "preprocess.c"
 
 typedef enum
