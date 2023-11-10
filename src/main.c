@@ -9,8 +9,8 @@
 
 #include "platform.h"
 #include "code_pages.c"
-#include "preprocess.c"
 #include "blog.h"
+#include "preprocess.c"
 
 typedef enum
 {
@@ -90,7 +90,6 @@ int main(s32 ArgCount, char **Args)
     {
         linear_allocator TempString = CreateLinearAllocator(Gigabytes(1));
         GenerateSite(&TempString);
-        GenerateBlogPages(&TempString);
     } break;
     default:
         printf("Un-handled command line arg type: %d\n", CommandLineArgType);

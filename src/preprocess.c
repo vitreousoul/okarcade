@@ -4,8 +4,6 @@
   - documentation generation
 */
 
-#define IS_SPACE(c) ((c) == ' ' || (c) == '\t' || (c) == '\n' || (c) == '\r')
-
 typedef enum
 {
     pre_processor_command_Undefined,
@@ -69,6 +67,9 @@ internal pre_processor CreatePreProcessor(u8 *Bra, u8 *Ket)
         PreProcessor.StringAllocator = CreateLinearAllocator(TotalVirtualSize);
         PreProcessor.StringAllocator.Capacity = StringAllocatorVirtualSize;
 
+        /* TODO Do _not_ call CreateLinearAllocator twice here, just set one of the
+           allocator's data to the first allocator's data plus an offset.
+        */
         PreProcessor.OutputAllocator = CreateLinearAllocator(Gigabytes(1));
         PreProcessor.OutputAllocator.Capacity = OutputBufferVirtualSize;
     }
@@ -86,21 +87,6 @@ internal void AddPreProcessorCommand(pre_processor *PreProcessor, pre_processor_
     PreProcessor->Commands[I].Name = Name;
 
     PreProcessor->CommandCount += 1;
-}
-
-internal void SkipSpace(buffer *Buffer, s32 *Index)
-{
-    while (*Index < Buffer->Size)
-    {
-        if (!IS_SPACE(Buffer->Data[*Index]))
-        {
-            break;
-        }
-        else
-        {
-            *Index += 1;
-        }
-    }
 }
 
 internal b32 CheckIfStringIsPrefix(u8 *String, buffer *Buffer, s32 BufferOffset)
@@ -170,27 +156,54 @@ internal b32 HandlePreProcessCommand(pre_processor *PreProcessor, buffer *Buffer
 
     if (Index < MaxIndex && CheckIfStringIsPrefix(IncludeName, Buffer, Index))
     {
-        CommandWasHandled = 1;
-        Index += GetStringLength(IncludeName);
-        SkipSpace(Buffer, &Index);
+        { /* skip the include keyword */
+            CommandWasHandled = 1;
+            Index += GetStringLength(IncludeName);
+            SkipSpace(Buffer, &Index);
+        }
 
         buffer Token = GetCommandToken(PreProcessor, Buffer, Index);
-        buffer *Buffer = ReadFileIntoBuffer(Token.Data);
+        u8 *IncludePath = 0;
 
-        if (Buffer)
+        if (Token.Data[0] == '$')
         {
-            b32 WriteError = WriteLinearAllocator(OutputAllocator, Buffer->Data, Buffer->Size);
-            FreeBuffer(Buffer);
+            /* we have a variable argument */
+            Assert(0);
+        }
+        else
+        {
+            /* assume we are dealing with a path argument */
+            IncludePath = Buffer->Data;
+        }
 
-            if (WriteError)
+        if (IncludePath)
+        {
+            buffer *Buffer = ReadFileIntoBuffer(Token.Data);
+
+            if (Buffer)
             {
-                LogError("failed to write to output\n");
+                b32 WriteError = WriteLinearAllocator(OutputAllocator, Buffer->Data, Buffer->Size);
+                FreeBuffer(Buffer);
+
+                if (WriteError)
+                {
+                    LogError("failed to write to output");
+                }
+            }
+            else
+            {
+                LogError("include file not found");
             }
         }
         else
         {
-            LogError("include file not found");
+            LogError("no include path");
         }
+    }
+    else
+    {
+        printf("Preprocessor command: \"%s\"\n", Buffer->Data);
+        LogError("unknown preprocessor command");
     }
 
     return CommandWasHandled;
@@ -378,9 +391,12 @@ void GenerateSite(linear_allocator *TempString)
 
     TempString->Offset = 0;
 
+    GenerateBlogPages(TempString, GenDirectory);
+
     PreprocessFile(&PreProcessor, *TempString, IndexIn, IndexOut);
     PreprocessFile(&PreProcessor, *TempString, CodeIn, CodeOut);
     PreprocessFile(&PreProcessor, *TempString, LSystemIn, LSystemOut);
+
 
     FreeLinearAllocator(FileAllocator);
 }

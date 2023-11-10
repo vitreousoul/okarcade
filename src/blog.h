@@ -1,8 +1,7 @@
-/* #define IsLowerCase(c) ((c) >= 'a' && (c) <= 'z') */
-/* #define IsUpperCase(c) ((c) >= 'A' && (c) <= 'Z') */
-/* #define IsAlpha(c) (IsLowerCase(c) && IsUpperCase(c)) */
+#define IS_SPACE(c) ((c) == ' ' || (c) == '\t' || (c) == '\n' || (c) == '\r')
 
-void GenerateBlogPages(linear_allocator *TempString);
+void SkipSpace(buffer *Buffer, s32 *Index);
+void GenerateBlogPages(linear_allocator *TempString, u8 *GenDirectory);
 
 typedef enum
 {
@@ -13,9 +12,23 @@ typedef enum
     blog_line_type_Count,
 } blog_line_type;
 
-internal s32 StringMatchLength(u8 *StringA, u8 *StringB, u64 MaxBytes)
+void SkipSpace(buffer *Buffer, s32 *Index)
 {
-    u32 I = 0;
+    while (*Index < Buffer->Size)
+    {
+        if (!IS_SPACE(Buffer->Data[*Index]))
+        {
+            break;
+        }
+        else
+        {
+            *Index += 1;
+        }
+    }
+}
+
+internal s32 StringMatchLength(u8 *StringA, u8 *StringB, u64 MaxBytes)
+{    u32 I = 0;
 
     if (StringA && StringB)
     {
@@ -36,15 +49,16 @@ internal s32 StringMatchLength(u8 *StringA, u8 *StringB, u64 MaxBytes)
 }
 
 global_variable buffer BlogLineTypes[blog_line_type_Count] = {
-    [blog_line_type_Paragraph] = (buffer){0,(u8 *)""},
-    [blog_line_type_Header] = (buffer){3,(u8 *)"==="},
-    [blog_line_type_SubHeader] = (buffer){3,(u8 *)"---"},
-    [blog_line_type_Image] = (buffer){6,(u8 *)"#image"},
+    [blog_line_type_Paragraph]   = (buffer){0,(u8 *)""},
+    [blog_line_type_Header]      = (buffer){3,(u8 *)"==="},
+    [blog_line_type_SubHeader]   = (buffer){3,(u8 *)"---"},
+    [blog_line_type_Image]       = (buffer){6,(u8 *)"#image"},
 };
 
 internal blog_line_type GetBlogLineType(u8 *BlogData, u64 MaxBytes)
 {
     blog_line_type Type = blog_line_type_Paragraph;
+
     buffer Header = BlogLineTypes[blog_line_type_Header];
     buffer SubHeader = BlogLineTypes[blog_line_type_SubHeader];
     buffer Image = BlogLineTypes[blog_line_type_Image];
@@ -84,98 +98,63 @@ internal s32 GetBytesUntilNewline(u8 *Bytes, s32 MaxBytes)
 internal b32 HandleBlogLine(linear_allocator *HtmlOutput, buffer *BlogBuffer, s32 *I)
 {
     b32 ShouldContinue = 0;
-    b32 IsStartOfLine = 1;
-    s32 BlogBufferOffset = 0;
 
     while (*I < BlogBuffer->Size)
     {
+        SkipSpace(BlogBuffer, I);
         u8 *BlogOffsetData = BlogBuffer->Data + *I;
 
-        if (IsStartOfLine)
+        blog_line_type BlogLineType = GetBlogLineType(BlogOffsetData, BlogBuffer->Size);
+        b32 ShouldHandleTextTag = 0;
+        u8 *OpenTagName = (u8 *)"<div>";
+        u8 *CloseTagName = (u8 *)"</div>";
+
+        switch (BlogLineType)
         {
-            blog_line_type BlogLineType = GetBlogLineType(BlogOffsetData, BlogBuffer->Size);
-            b32 ShouldHandleTextTag = 0;
-            u8 *OpenTagName = (u8 *)"<div>";
-            u8 *CloseTagName = (u8 *)"</div>";
-
-            switch (BlogLineType)
-            {
-            case blog_line_type_Header:
-            {
-                ShouldHandleTextTag = 1;
-                OpenTagName = (u8 *)"<h1>";
-                CloseTagName = (u8 *)"</h1>";
-            } break;
-            case blog_line_type_SubHeader: {
-                ShouldHandleTextTag = 1;
-                OpenTagName = (u8 *)"<h2>";
-                CloseTagName = (u8 *)"</h2>";
-            } break;
-            case blog_line_type_Paragraph: {
-                ShouldHandleTextTag = 1;
-                OpenTagName = (u8 *)"<p>";
-                CloseTagName = (u8 *)"</p>";
-            } break;
-            case blog_line_type_Image: {} break;
-            default: break;
-            }
-
-            if (ShouldHandleTextTag)
-            {
-                BlogBufferOffset += BlogLineTypes[blog_line_type_Header].Size;
-                SkipSpace(BlogBuffer, &BlogBufferOffset);
-                u8 *StartOfText = BlogBuffer->Data + BlogBufferOffset;
-                s32 BytesUntilNewline = GetBytesUntilNewline(StartOfText, BlogBuffer->Size);
-
-                PushString(HtmlOutput, OpenTagName);
-                WriteLinearAllocator(HtmlOutput, StartOfText, BytesUntilNewline);
-                PushString(HtmlOutput, CloseTagName);
-            }
-
-            while (BlogBuffer->Data[(*I)++] != '\n');
+        case blog_line_type_Header:
+        {
+            ShouldHandleTextTag = 1;
+            OpenTagName = (u8 *)"<h1>";
+            CloseTagName = (u8 *)"</h1>";
+        } break;
+        case blog_line_type_SubHeader: {
+            ShouldHandleTextTag = 1;
+            OpenTagName = (u8 *)"<h2>";
+            CloseTagName = (u8 *)"</h2>";
+        } break;
+        case blog_line_type_Paragraph: {
+            ShouldHandleTextTag = 1;
+            OpenTagName = (u8 *)"<p>";
+            CloseTagName = (u8 *)"</p>";
+        } break;
+        case blog_line_type_Image: {
+            ShouldHandleTextTag = 1;
+            OpenTagName = (u8 *)"<img src=\"";
+            CloseTagName = (u8 *)"\" />";
+        } break;
+        default: break;
         }
-        else if (BlogBuffer->Data[*I] == '\n')
+
+        if (ShouldHandleTextTag)
         {
-            IsStartOfLine = 1;
-            *I += 1;
-        }
-        else
-        {
-            IsStartOfLine = 0;
-            *I += 1;
+            *I += BlogLineTypes[BlogLineType].Size;
+            SkipSpace(BlogBuffer, I);
+            u8 *StartOfText = BlogBuffer->Data + *I;
+            s32 BytesUntilNewline = GetBytesUntilNewline(StartOfText, BlogBuffer->Size);
+
+            PushString(HtmlOutput, OpenTagName);
+            WriteLinearAllocator(HtmlOutput, StartOfText, BytesUntilNewline);
+            PushString(HtmlOutput, CloseTagName);
+            PushString(HtmlOutput, (u8 *)"\n");
+
+            *I = *I + BytesUntilNewline + 1;
         }
     }
 
     return ShouldContinue;
 }
 
-internal void GenerateBlogPage(linear_allocator *TempString, u8 *FileName)
-{
-    buffer File;
-    File.Size = GetFileSize(FileName);
-    File.Data = PushLinearAllocator(TempString, File.Size + 1);
-
-    if (File.Data)
-    {
-        ReadFileIntoData(FileName, File.Data, File.Size);
-        File.Data[File.Size] = 0;
-
-        u8 *HtmlPageData = GetLinearAllocatorWriteLocation(TempString);
-
-        s32 BlogFileDataOffset = 0;
-        while (HandleBlogLine(TempString, &File, &BlogFileDataOffset));
-        WriteLinearAllocator(TempString, (u8 *)"\0", 1);
-
-        printf("\n\nblog file:\n%s\n", File.Data);
-        printf("\n\nhtml file:\n%s\n", HtmlPageData);
-    }
-    else
-    {
-        LogError("writing blog file to temp-string");
-    }
-}
-
-void GenerateBlogPages(linear_allocator *TempString)
+void GenerateBlogPages(linear_allocator *TempString, u8 *GenDirectory)
 {
     u8 *BlogDirectory = (u8 *)"../blog";
 
@@ -183,9 +162,32 @@ void GenerateBlogPages(linear_allocator *TempString)
     file_list *FileList = (file_list *)FileAllocator.Data;
     file_list *SortedFileList = SortFileList(FileList);
 
+    buffer File;
+
     for (file_list *CurrentFile = SortedFileList; CurrentFile; CurrentFile = CurrentFile->Next)
     {
-        GenerateBlogPage(TempString, CurrentFile->Name);
+        File.Size = GetFileSize(CurrentFile->Name);
+        File.Data = PushLinearAllocator(TempString, File.Size + 1);
+
+        if (File.Data)
+        {
+            ReadFileIntoData(CurrentFile->Name, File.Data, File.Size);
+            File.Data[File.Size] = 0;
+
+            u8 *HtmlPageData = GetLinearAllocatorWriteLocation(TempString);
+
+            s32 BlogFileDataOffset = 0;
+            while (HandleBlogLine(TempString, &File, &BlogFileDataOffset));
+            WriteLinearAllocator(TempString, (u8 *)"\0", 1);
+
+            printf("\n\nblog file:\n%s\n", File.Data);
+            printf("\n\nhtml file:\n%s\n", HtmlPageData);
+        }
+        else
+        {
+            LogError("writing blog file to temp-string");
+        }
+
         TempString->Offset = 0;
     }
 
