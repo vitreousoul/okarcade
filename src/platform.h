@@ -304,7 +304,7 @@ u64 GetFileSize(u8 *FilePath)
 
     if (StatError)
     {
-        printf("GetFileSize stat error\n");
+        printf("GetFileSize stat error %d\n", StatError);
         return 0;
     }
 
@@ -317,9 +317,14 @@ u64 ReadFileIntoData(u8 *FilePath, u8 *Bytes, u64 MaxBytes)
 {
     u64 FileSize = GetFileSize(FilePath);
 
-    if (FileSize > MaxBytes)
+    if (!FileSize)
     {
-        printf("Errof in ReadFileIntoData: file size exceeds max-bytes\n");
+        printf("Error in ReadFileIntoData getting file size\n");
+        return 0;
+    }
+    else if (!FileSize || FileSize > MaxBytes)
+    {
+        printf("Error in ReadFileIntoData: file size exceeds max-bytes\n");
         return 0;
     }
 
@@ -393,7 +398,7 @@ void EnsurePathDirectoriesExist(u8 *Path)
     }
 }
 
-/* NOTE copypasta from a post about fts... */
+/* TODO: pass in allocator, to give caller more control */
 linear_allocator WalkDirectory(u8 *Path)
 {
     linear_allocator Allocator = CreateLinearAllocator(Gigabytes(1));

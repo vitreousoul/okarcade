@@ -589,11 +589,11 @@ internal b32 HandleBlogLine(linear_allocator *HtmlOutput, buffer *BlogBuffer, s3
 internal void GenerateBlogPages(linear_allocator *TempString, pre_processor *Preprocessor, u8 *SiteBlogDirectory)
 {
     u8 *BlogDirectory = (u8 *)"../blog";
-    u8 *BlogPageTemplateFilePath = (u8 *)"../src/layout/blog_page.html";
+    u8 *BlogPageTemplateFilePath = (u8 *)"../src/layout/blog.html";
+    u8 *BlogListingFilePath = (u8 *)"../gen/blog_listing.html";
 
     linear_allocator FileAllocator = WalkDirectory(BlogDirectory);
-    file_list *FileList = (file_list *)FileAllocator.Data;
-    file_list *SortedFileList = SortFileList(FileList);
+    file_list *SortedFileList = SortFileList((file_list *)FileAllocator.Data);
 
     buffer File;
     buffer BlogPageTemplate;
@@ -612,6 +612,9 @@ internal void GenerateBlogPages(linear_allocator *TempString, pre_processor *Pre
 
     u64 TempStringOffset = TempString->Offset;
 
+    u64 BlogListingOffset = Preprocessor->OutputAllocator.Offset;
+
+    /* write each blog page */
     for (file_list *CurrentFile = SortedFileList; CurrentFile; CurrentFile = CurrentFile->Next)
     {
         File.Size = GetFileSize(CurrentFile->Name);
@@ -648,23 +651,46 @@ internal void GenerateBlogPages(linear_allocator *TempString, pre_processor *Pre
         TempString->Offset = TempStringOffset;
     }
 
+    { /* write blog listing page */
+        linear_allocator *OutputAllocator = &Preprocessor->OutputAllocator;
+        u64 OutputOffset = Preprocessor->OutputAllocator.Offset;
+
+        for (file_list *CurrentFile = SortedFileList; CurrentFile; CurrentFile = CurrentFile->Next)
+        {
+            PushString(OutputAllocator, (u8 *)"<li><a href=\"");
+            PushString(OutputAllocator, (u8 *)"#");
+            PushString(OutputAllocator, (u8 *)"\">");
+            PushString(OutputAllocator, CurrentFile->Name);
+            PushString(OutputAllocator, (u8 *)"</a></li>\n");
+        }
+
+        u8 *BlogListingData = OutputAllocator->Data + OutputOffset;
+        u64 Size = OutputAllocator->Offset - BlogListingOffset;
+        WriteFile(BlogListingFilePath, BlogListingData, Size);
+        OutputAllocator->Offset = OutputOffset;
+    }
+
     FreeLinearAllocator(FileAllocator);
 }
 
 void GenerateSite(linear_allocator *TempString)
 {
-    u8 *GenDirectory = (u8 *)"../gen";
+    u8 *GenDirectory =       (u8 *)"../gen";
     u8 *CodePagesDirectory = (u8 *)"../gen/code_pages";
-    u8 *SiteDirectory = (u8 *)"../site";
+
+    u8 *SiteDirectory =     (u8 *)"../site";
     u8 *SiteBlogDirectory = (u8 *)"../site/blog";
 
-    u8 *IndexIn = (u8 *)"../src/layout/index.html";
+    u8 *IndexIn =  (u8 *)"../src/layout/index.html";
     u8 *IndexOut = (u8 *)"../site/index.html";
 
-    u8 *CodeIn = (u8 *)"../src/layout/code.html";
+    u8 *CodeIn =  (u8 *)"../src/layout/code.html";
     u8 *CodeOut = (u8 *)"../site/code.html";
 
-    u8 *LSystemIn = (u8 *)"../src/layout/l_system.html";
+    u8 *BlogIn =  (u8 *)"../src/layout/blog.html";
+    u8 *BlogOut = (u8 *)"../site/blog/index.html";
+
+    u8 *LSystemIn =  (u8 *)"../src/layout/l_system.html";
     u8 *LSystemOut = (u8 *)"../gen/l_system.html";
 
     u8 *Bra = (u8 *)"{|";
@@ -698,6 +724,7 @@ void GenerateSite(linear_allocator *TempString)
 
     PreprocessFile(&PreProcessor, *TempString, IndexIn, IndexOut);
     PreprocessFile(&PreProcessor, *TempString, CodeIn, CodeOut);
+    PreprocessFile(&PreProcessor, *TempString, BlogIn, BlogOut);
     PreprocessFile(&PreProcessor, *TempString, LSystemIn, LSystemOut);
 
 
