@@ -696,12 +696,12 @@ void GenerateSite(linear_allocator *TempString)
     u8 *Bra = (u8 *)"{|";
     u8 *Ket = (u8 *)"|}";
 
-    GenerateCodePages(TempString);
-
     EnsureDirectoryExists(GenDirectory);
     EnsureDirectoryExists(CodePagesDirectory);
     EnsureDirectoryExists(SiteDirectory);
     EnsureDirectoryExists(SiteBlogDirectory);
+
+    GenerateCodePages(TempString);
 
     pre_processor PreProcessor = CreatePreProcessor(Bra, Ket);
     AddPreProcessorCommand(&PreProcessor, pre_processor_command_Include, (u8 *)"include");
