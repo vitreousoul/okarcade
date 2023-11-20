@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en-us">
+
+  <head>
+    {| include ../src/layout/head_common.html |}
+    <title>SCUBA</title>
+    <style>
+      {| include ../src/layout/raylib_app.css |}
+    </style>
+  </head>
+
+  <body>
+    <header>
+      <a href="/">&lt; Back</a>
+    </header>
+
+    <canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex=-1></canvas>
+
+    <script type='text/javascript'>
+      {| include ../src/layout/raylib_app.js |}
+    </script>
+
+    {{{ SCRIPT }}}
+  </body>
+
+</html>

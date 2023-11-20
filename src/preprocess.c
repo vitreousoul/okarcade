@@ -693,6 +693,9 @@ void GenerateSite(linear_allocator *TempString)
     u8 *LSystemIn =  (u8 *)"../src/layout/l_system.html";
     u8 *LSystemOut = (u8 *)"../gen/l_system.html";
 
+    u8 *ScubaIn =  (u8 *)"../src/layout/scuba.html";
+    u8 *ScubaOut = (u8 *)"../gen/scuba.html";
+
     u8 *Bra = (u8 *)"{|";
     u8 *Ket = (u8 *)"|}";
 
@@ -726,7 +729,7 @@ void GenerateSite(linear_allocator *TempString)
     PreprocessFile(&PreProcessor, *TempString, CodeIn, CodeOut);
     PreprocessFile(&PreProcessor, *TempString, BlogIn, BlogOut);
     PreprocessFile(&PreProcessor, *TempString, LSystemIn, LSystemOut);
-
+    PreprocessFile(&PreProcessor, *TempString, ScubaIn, ScubaOut);
 
     FreeLinearAllocator(FileAllocator);
 }
