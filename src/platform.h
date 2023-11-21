@@ -398,6 +398,36 @@ void EnsurePathDirectoriesExist(u8 *Path)
     }
 }
 
+internal b32 IsWalkableFile(u8 *FileName)
+{
+    b32 IsWalkable = 1;
+    char *IgnoredNames[] = {".DS_Store"};
+
+    u32 I = 0;
+    u32 NameOffset = 0;
+    while (FileName[I])
+    {
+        if (FileName[I] == PATH_SEPARATOR)
+        {
+            NameOffset = I + 1;
+        }
+
+        I += 1;
+    }
+
+    for (I = 0; I < ArrayCount(IgnoredNames); ++I)
+    {
+        u8 *OffsetFileName = FileName + NameOffset;
+        if (StringsEqual((u8 *)IgnoredNames[I], OffsetFileName))
+        {
+            IsWalkable = 0;
+            break;
+        }
+    }
+
+    return IsWalkable;
+}
+
 /* TODO: pass in allocator, to give caller more control */
 linear_allocator WalkDirectory(u8 *Path)
 {
@@ -422,24 +452,29 @@ linear_allocator WalkDirectory(u8 *Path)
             {
             case FTS_F:
             {
-                b32 IsFirstAllocation = Allocator.Offset == 0;
-                s32 FilePathLength = strlen(p->fts_path);
-                size FileItemSize = sizeof(file_list) + FilePathLength + 1;
-                file_list *FileItem = PushLinearAllocator(&Allocator, FileItemSize);
+                u8 *FilePath = (u8 *)p->fts_path;
 
-                CopyMemory((u8 *)p->fts_path, FileItem->Name, FilePathLength);
-                FileItem->Name[FileItemSize] = 0;
-
-                if (IsFirstAllocation)
+                if (IsWalkableFile(FilePath))
                 {
-                    FileItem->Next = 0;
-                }
-                else
-                {
-                    PreviousFileItem->Next = FileItem;
-                }
+                    b32 IsFirstAllocation = Allocator.Offset == 0;
+                    s32 FilePathLength = strlen((char *)FilePath);
+                    size FileItemSize = sizeof(file_list) + FilePathLength + 1;
+                    file_list *FileItem = PushLinearAllocator(&Allocator, FileItemSize);
 
-                PreviousFileItem = FileItem;
+                    CopyMemory(FilePath, FileItem->Name, FilePathLength);
+                    FileItem->Name[FileItemSize] = 0;
+
+                    if (IsFirstAllocation)
+                    {
+                        FileItem->Next = 0;
+                    }
+                    else
+                    {
+                        PreviousFileItem->Next = FileItem;
+                    }
+
+                    PreviousFileItem = FileItem;
+                }
             } break;
             case FTS_DP:
             {

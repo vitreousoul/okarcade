@@ -531,7 +531,7 @@ internal b32 HandleBlogLine(linear_allocator *HtmlOutput, buffer *BlogBuffer, s3
 {
     b32 ShouldContinue = 0;
 
-    while (*I < BlogBuffer->Size)
+    while (*I < BlogBuffer->Size && BlogBuffer->Data[*I])
     {
         SkipSpace(BlogBuffer, I);
         u8 *BlogOffsetData = BlogBuffer->Data + *I;
@@ -574,12 +574,15 @@ internal b32 HandleBlogLine(linear_allocator *HtmlOutput, buffer *BlogBuffer, s3
             u8 *StartOfText = BlogBuffer->Data + *I;
             s32 BytesUntilNewline = GetBytesUntilNewline(StartOfText, BlogBuffer->Size);
 
-            PushString(HtmlOutput, OpenTagName);
-            WriteLinearAllocator(HtmlOutput, StartOfText, BytesUntilNewline);
-            PushString(HtmlOutput, CloseTagName);
-            PushString(HtmlOutput, (u8 *)"\n");
+            if (BytesUntilNewline > 0)
+            {
+                PushString(HtmlOutput, OpenTagName);
+                WriteLinearAllocator(HtmlOutput, StartOfText, BytesUntilNewline);
+                PushString(HtmlOutput, CloseTagName);
+                PushString(HtmlOutput, (u8 *)"\n");
 
-            *I = *I + BytesUntilNewline + 1;
+                *I = *I + BytesUntilNewline + 1;
+            }
         }
     }
 

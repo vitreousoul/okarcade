@@ -9,6 +9,7 @@
 #endif
 
 #include "types.h"
+#include "../gen/pigeon.h"
 #include "core.c"
 #include "raylib_helpers.h"
 #include "math.c"
@@ -16,11 +17,12 @@
 
 int SCREEN_WIDTH = 1200;
 int SCREEN_HEIGHT = 700;
-#define TARGET_FPS 30
 
-global_variable Color BackgroundColor = (Color){58, 141, 230, 255};
+global_variable Color BackgroundColor = (Color){58, 121, 120, 255};
+
 typedef struct
 {
+    Texture2D PigeonTexture;
 } app_state;
 
 
@@ -63,12 +65,15 @@ internal void UpdateAndRender(void *VoidAppState)
 
     BeginDrawing();
     ClearBackground(BackgroundColor);
+    DrawTexture(AppState->PigeonTexture, 20, 30, (Color){255,255,255,255});
     EndDrawing();
 }
 
-internal app_state InitAppState(void)
+internal app_state InitAppState(Texture2D PigeonTexture)
 {
     app_state AppState;
+
+    AppState.PigeonTexture = PigeonTexture;
 
     return AppState;
 }
@@ -89,7 +94,10 @@ int main(void)
 
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "SCUBA");
 
-    app_state AppState = InitAppState();
+    Image PigeonImage = LoadImageFromMemory(".png", PigeonAssetData, sizeof(PigeonAssetData));
+    Texture2D PigeonTexture = LoadTextureFromImage(PigeonImage);
+
+    app_state AppState = InitAppState(PigeonTexture);
 
 #if defined(PLATFORM_WEB)
     emscripten_set_main_loop_arg(UpdateAndRender, &AppState, 0, 1);
