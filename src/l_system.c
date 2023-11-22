@@ -9,14 +9,19 @@
 #endif
 
 #include "types.h"
-#include "core.c"
-#include "raylib_helpers.h"
-#include "math.c"
-#include "ui.c"
 
 int SCREEN_WIDTH = 1200;
 int SCREEN_HEIGHT = 700;
 #define TARGET_FPS 30
+
+#if defined(PLATFORM_WEB)
+#include "raylib_defines.c"
+#endif
+
+#include "core.c"
+#include "raylib_helpers.h"
+#include "math.c"
+#include "ui.c"
 
 #define EXPANSION_BUFFER_SIZE (1 << 12)
 #define EXPANSION_MAX_DEPTH 16
@@ -90,39 +95,6 @@ typedef struct
 
 } app_state;
 
-
-#if defined(PLATFORM_WEB)
-EM_JS(void, UpdateCanvasDimensions, (), {
-    var canvas = document.getElementById("canvas");
-    var body = document.querySelector("body");
-
-    if (canvas && body) {
-        var rect = body.getBoundingClientRect();
-        canvas.width = rect.width;
-        canvas.height = rect.height;
-    }
-});
-
-EM_JS(s32, GetCanvasWidth, (), {
-    var canvas = document.getElementById("canvas");
-    if (canvas) {
-        var rect = canvas.getBoundingClientRect();
-        return canvas.width;
-    } else {
-        return -1.0;
-    }
-});
-
-EM_JS(s32, GetCanvasHeight, (), {
-    var canvas = document.getElementById("canvas");
-    if (canvas) {
-        var rect = canvas.getBoundingClientRect();
-        return canvas.height;
-    } else {
-        return -1.0;
-    }
-});
-#endif
 
 internal expansion_item CreateExpansionItem(symbol Symbol, s32 Index)
 {
@@ -527,15 +499,7 @@ internal app_state InitAppState(void)
 int main(void)
 {
 #if defined(PLATFORM_WEB)
-    UpdateCanvasDimensions();
-
-    s32 CanvasWidth = GetCanvasWidth();
-    s32 CanvasHeight = GetCanvasHeight();
-    if (CanvasWidth > 0.0f && CanvasHeight > 0.0f)
-    {
-        SCREEN_WIDTH = CanvasWidth;
-        SCREEN_HEIGHT = CanvasHeight;
-    }
+    InitRaylibCanvas();
 #endif
 
     printf("InitWindow %d %d\n", SCREEN_WIDTH, SCREEN_HEIGHT);
