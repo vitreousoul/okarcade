@@ -27,27 +27,42 @@ global_variable Color BackgroundColor = (Color){58, 121, 120, 255};
 
 typedef struct
 {
+    /* TODO: replace pigeon with scuba art, and then change "pigeon"->"scuba" or something like that. */
     Texture2D PigeonTexture;
-} app_state;
 
+    Vector2 PigeonPosition;
+    Vector2 PigeonAcceleration;
+} game_state;
 
-internal void UpdateAndRender(void *VoidAppState)
+internal void HandleUserInput(game_state *GameState)
 {
-    app_state *AppState = (app_state *)VoidAppState;
+}
+
+internal void UpdateAndRender(void *VoidGameState)
+{
+    game_state *GameState = (game_state *)VoidGameState;
+
+    HandleUserInput(GameState);
 
     BeginDrawing();
     ClearBackground(BackgroundColor);
-    DrawTexture(AppState->PigeonTexture, 20, 30, (Color){255,255,255,255});
+    DrawTexture(GameState->PigeonTexture, 20, 30, (Color){255,255,255,255});
     EndDrawing();
 }
 
-internal app_state InitAppState(Texture2D PigeonTexture)
+internal game_state InitGameState(Texture2D PigeonTexture)
 {
-    app_state AppState;
+    game_state GameState;
 
-    AppState.PigeonTexture = PigeonTexture;
+    GameState.PigeonTexture = PigeonTexture;
 
-    return AppState;
+    GameState.PigeonAcceleration.x = 0.0f;
+    GameState.PigeonAcceleration.y = 0.0f;
+
+    GameState.PigeonPosition.x = 0.0f;
+    GameState.PigeonPosition.y = 0.0f;
+
+    return GameState;
 }
 
 int main(void)
@@ -61,15 +76,15 @@ int main(void)
     Image PigeonImage = LoadImageFromMemory(".png", PigeonAssetData, sizeof(PigeonAssetData));
     Texture2D PigeonTexture = LoadTextureFromImage(PigeonImage);
 
-    app_state AppState = InitAppState(PigeonTexture);
+    game_state GameState = InitGameState(PigeonTexture);
 
 #if defined(PLATFORM_WEB)
-    emscripten_set_main_loop_arg(UpdateAndRender, &AppState, 0, 1);
+    emscripten_set_main_loop_arg(UpdateAndRender, &GameState, 0, 1);
 #else
     SetTargetFPS(60);
     while (!WindowShouldClose())
     {
-        UpdateAndRender(&AppState);
+        UpdateAndRender(&GameState);
     }
 #endif
 
