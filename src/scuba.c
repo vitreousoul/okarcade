@@ -17,21 +17,20 @@ int SCREEN_HEIGHT = 700;
 #include "raylib_defines.c"
 #endif
 
-#include "../gen/pigeon.h"
+#include "../gen/scuba.h"
 #include "core.c"
 #include "raylib_helpers.h"
 #include "math.c"
 #include "ui.c"
 
-global_variable Color BackgroundColor = (Color){58, 121, 120, 255};
+global_variable Color BackgroundColor = (Color){176, 176, 168, 255};
 
 typedef struct
 {
-    /* TODO: replace pigeon with scuba art, and then change "pigeon"->"scuba" or something like that. */
-    Texture2D PigeonTexture;
+    Texture2D ScubaTexture;
 
-    Vector2 PigeonPosition;
-    Vector2 PigeonAcceleration;
+    Vector2 PlayerPosition;
+    Vector2 PlayerAcceleration;
 } game_state;
 
 internal void HandleUserInput(game_state *GameState)
@@ -46,21 +45,32 @@ internal void UpdateAndRender(void *VoidGameState)
 
     BeginDrawing();
     ClearBackground(BackgroundColor);
-    DrawTexture(GameState->PigeonTexture, 20, 30, (Color){255,255,255,255});
+
+    { /* draw player */
+        Vector2 SourceSize = (Vector2){12,9};
+        Rectangle SourceRectangle = (Rectangle){5,3,SourceSize.x,SourceSize.y};
+        Vector2 Position = (Vector2){20,30};
+        f32 Scale = 8.0f;
+        Rectangle DestRectangle = (Rectangle){Position.x,Position.y,Scale*SourceSize.x,Scale*SourceSize.y};
+        Color Tint = (Color){255,255,255,255};
+        Vector2 Origin = (Vector2){0,0};
+
+        DrawTexturePro(GameState->ScubaTexture, SourceRectangle, DestRectangle, Origin, 0.0f, Tint);
+    }
+
     EndDrawing();
 }
 
-internal game_state InitGameState(Texture2D PigeonTexture)
+internal game_state InitGameState(Texture2D ScubaTexture)
 {
     game_state GameState;
 
-    GameState.PigeonTexture = PigeonTexture;
+    GameState.ScubaTexture = ScubaTexture;
 
-    GameState.PigeonAcceleration.x = 0.0f;
-    GameState.PigeonAcceleration.y = 0.0f;
-
-    GameState.PigeonPosition.x = 0.0f;
-    GameState.PigeonPosition.y = 0.0f;
+    GameState.PlayerAcceleration.x = 0.0f;
+    GameState.PlayerAcceleration.y = 0.0f;
+    GameState.PlayerPosition.x = 0.0f;
+    GameState.PlayerPosition.y = 0.0f;
 
     return GameState;
 }
@@ -73,10 +83,10 @@ int main(void)
 
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "SCUBA");
 
-    Image PigeonImage = LoadImageFromMemory(".png", PigeonAssetData, sizeof(PigeonAssetData));
-    Texture2D PigeonTexture = LoadTextureFromImage(PigeonImage);
+    Image ScubaImage = LoadImageFromMemory(".png", ScubaAssetData, sizeof(ScubaAssetData));
+    Texture2D ScubaTexture = LoadTextureFromImage(ScubaImage);
 
-    game_state GameState = InitGameState(PigeonTexture);
+    game_state GameState = InitGameState(ScubaTexture);
 
 #if defined(PLATFORM_WEB)
     emscripten_set_main_loop_arg(UpdateAndRender, &GameState, 0, 1);

@@ -77,20 +77,20 @@ internal command_line_arg_type ParseCommandLineArgs(s32 ArgCount, char **Args)
 
 internal void GenerateGameAssets(linear_allocator TempString)
 {
-    u8 *PigeonAssetPath = (u8 *)"../assets/pigeon.png";
-    u8 *PigeonDataPath = (u8 *)"../gen/pigeon.h";
+    u8 *ScubaAssetPath = (u8 *)"../assets/scuba.png";
+    u8 *ScubaDataPath = (u8 *)"../gen/scuba.h";
 
-    u64 FileSize = GetFileSize(PigeonAssetPath);
-    u8 *PigeonData = PushLinearAllocator(&TempString, FileSize);
+    u64 FileSize = GetFileSize(ScubaAssetPath);
+    u8 *ScubaData = PushLinearAllocator(&TempString, FileSize);
 
-    if (PigeonData)
+    if (ScubaData)
     {
-        ReadFileIntoData(PigeonAssetPath, PigeonData, FileSize);
-        u8 *PigeonOutput = GetLinearAllocatorWriteLocation(&TempString);
+        ReadFileIntoData(ScubaAssetPath, ScubaData, FileSize);
+        u8 *ScubaOutput = GetLinearAllocatorWriteLocation(&TempString);
         u64 BeginningOffset = TempString.Offset;
         u8 HexData[16] = {};
 
-        PushString(&TempString, (u8 *)"u8 PigeonAssetData[] = {");
+        PushString(&TempString, (u8 *)"u8 ScubaAssetData[] = {");
 
         for (u64 I = 0; I < FileSize; ++I)
         {
@@ -98,14 +98,14 @@ internal void GenerateGameAssets(linear_allocator TempString)
             {
                 PushString(&TempString, (u8 *)"\n    ");
             }
-            sprintf((char *)HexData, "0x%02x,", PigeonData[I]);
+            sprintf((char *)HexData, "0x%02x,", ScubaData[I]);
             WriteLinearAllocator(&TempString, HexData, 5);
         }
 
         PushString(&TempString, (u8 *)"\n};\0");
 
         u64 FileSize = TempString.Offset - BeginningOffset;
-        WriteFile(PigeonDataPath, PigeonOutput, FileSize);
+        WriteFile(ScubaDataPath, ScubaOutput, FileSize);
     }
     else
     {
