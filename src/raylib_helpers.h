@@ -1,11 +1,60 @@
+f32 Min(f32 ValueA, f32 ValueB);
+f32 Max(f32 ValueA, f32 ValueB);
+
 Vector2 V2(f32 X, f32 Y);
+Vector2 AddV2(Vector2 VectorA, Vector2 VectorB);
+Vector2 MultiplyV2(Vector2 VectorA, Vector2 VectorB);
+Vector2 MultiplyV2S(Vector2 VectorA, f32 Scalar);
+Vector2 ClampV2(Vector2 VectorA, f32 Min, f32 Max);
+
+
 Rectangle R2(f32 X, f32 Y, f32 Width, f32 Height);
 
+inline f32 Min(f32 ValueA, f32 ValueB)
+{
+    f32 Result = ValueA < ValueB ? ValueA : ValueB;
+    return Result;
+}
+
+inline f32 Max(f32 ValueA, f32 ValueB)
+{
+    f32 Result = ValueA > ValueB ? ValueA : ValueB;
+    return Result;
+}
 
 inline Vector2 V2(f32 X, f32 Y)
 {
     return (Vector2){X,Y};
 }
+
+inline Vector2 AddV2(Vector2 VectorA, Vector2 VectorB)
+{
+    Vector2 Result = (Vector2){VectorA.x + VectorB.x, VectorA.y + VectorB.y};
+    return Result;
+}
+
+inline Vector2 MultiplyV2(Vector2 VectorA, Vector2 VectorB)
+{
+    Vector2 Result = (Vector2){VectorA.x * VectorB.x, VectorA.y * VectorB.y};
+    return Result;
+}
+
+inline Vector2 MultiplyV2S(Vector2 VectorA, f32 Scalar)
+{
+    Vector2 Result = (Vector2){VectorA.x * Scalar, VectorA.y * Scalar};
+    return Result;
+}
+
+inline Vector2 ClampV2(Vector2 V, f32 Min, f32 Max)
+{
+    Vector2 Result;
+
+    Result.x = ClampF32(V.x, Min, Max);
+    Result.y = ClampF32(V.y, Min, Max);
+
+    return Result;
+}
+
 
 inline Rectangle R2(f32 X, f32 Y, f32 Width, f32 Height)
 {

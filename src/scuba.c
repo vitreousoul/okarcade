@@ -19,8 +19,8 @@ int SCREEN_HEIGHT = 700;
 
 #include "../gen/scuba.h"
 #include "core.c"
-#include "raylib_helpers.h"
 #include "math.c"
+#include "raylib_helpers.h"
 #include "ui.c"
 
 #define TEXTURE_MAP_SCALE 8
@@ -40,6 +40,9 @@ typedef struct
 
 typedef struct
 {
+    f32 DeltaTime;
+    f32 LastTime;
+
     s32 EntityCount;
     entity Entities[MAX_ENTITY_COUNT];
 
@@ -81,13 +84,35 @@ internal entity *AddEntity(game_state *GameState)
 
 internal void HandleUserInput(game_state *GameState)
 {
+    GameState->PlayerEntity->Acceleration.x = 0;
+    GameState->PlayerEntity->Acceleration.y = 0;
+
+    if (IsKeyDown(KEY_D))
+    {
+        GameState->PlayerEntity->Acceleration.x += 1.0f;
+    }
+
+    if (IsKeyDown(KEY_S))
+    {
+        GameState->PlayerEntity->Acceleration.y += 1.0f;
+    }
+
+    if (IsKeyDown(KEY_A))
+    {
+        GameState->PlayerEntity->Acceleration.x -= 1.0f;
+    }
+
+    if (IsKeyDown(KEY_W))
+    {
+        GameState->PlayerEntity->Acceleration.y -= 1.0f;
+    }
 }
 
-internal void DrawSprite(game_state *GameState, sprite_type Type, Vector2 Position)
+internal void DrawSprite(game_state *GameState, sprite_type Type, entity *Entity)
 {
     Rectangle SourceRectangle = Sprites[Type].SourceRectangle;
-    Rectangle DestRectangle = R2(Position.x,
-                                 Position.y,
+    Rectangle DestRectangle = R2(Entity->Position.x,
+                                 Entity->Position.y,
                                  TEXTURE_MAP_SCALE*SourceRectangle.width,
                                  TEXTURE_MAP_SCALE*SourceRectangle.height);
     Color Tint = (Color){255,255,255,255};
@@ -96,9 +121,34 @@ internal void DrawSprite(game_state *GameState, sprite_type Type, Vector2 Positi
     DrawTexturePro(GameState->ScubaTexture, SourceRectangle, DestRectangle, Origin, 0.0f, Tint);
 }
 
+internal void UpdateEntity(game_state *GameState, entity *Entity)
+{
+    f32 Scale = 800.0f;
+    f32 DT = GameState->DeltaTime;
+
+    Vector2 P = Entity->Position;
+    Vector2 V = Entity->Velocity;
+    Vector2 A = MultiplyV2S(Entity->Acceleration, Scale);
+    A = AddV2(A, MultiplyV2S(V, -2.0f)); /* friction */
+
+    Vector2 NewVelocity = AddV2(MultiplyV2S(A, DT), V);
+    Vector2 NewPosition = AddV2(AddV2(MultiplyV2S(A, 0.5f * DT * DT),
+                                      MultiplyV2S(V, DT)),
+                                P);
+
+    Entity->Velocity = NewVelocity;
+    Entity->Position = NewPosition;
+}
+
 internal void UpdateAndRender(void *VoidGameState)
 {
     game_state *GameState = (game_state *)VoidGameState;
+
+    { /* update timer */
+        f32 Time = GetTime();
+        GameState->DeltaTime = Time - GameState->LastTime;
+        GameState->LastTime = Time;
+    }
 
     HandleUserInput(GameState);
 
@@ -106,7 +156,8 @@ internal void UpdateAndRender(void *VoidGameState)
     ClearBackground(BackgroundColor);
 
     { /* draw player */
-        DrawSprite(GameState, sprite_type_Fish, GameState->PlayerEntity->Position);
+        UpdateEntity(GameState, GameState->PlayerEntity);
+        DrawSprite(GameState, sprite_type_Fish, GameState->PlayerEntity);
     }
 
     EndDrawing();
@@ -121,6 +172,8 @@ internal game_state InitGameState(Texture2D ScubaTexture)
     Sprites[sprite_type_Fish].SourceRectangle = R2(5,3,12,9);
 
     GameState.PlayerEntity = AddEntity(&GameState);
+
+    GameState.LastTime = GetTime();
 
     return GameState;
 }
