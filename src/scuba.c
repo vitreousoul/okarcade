@@ -23,18 +23,77 @@ int SCREEN_HEIGHT = 700;
 #include "math.c"
 #include "ui.c"
 
+#define TEXTURE_MAP_SCALE 8
+
 global_variable Color BackgroundColor = (Color){176, 176, 168, 255};
+
+#define MAX_ENTITY_COUNT 256
+
+typedef s32 error_code;
 
 typedef struct
 {
-    Texture2D ScubaTexture;
+    Vector2 Position;
+    Vector2 Velocity;
+    Vector2 Acceleration;
+} entity;
 
-    Vector2 PlayerPosition;
-    Vector2 PlayerAcceleration;
+typedef struct
+{
+    s32 EntityCount;
+    entity Entities[MAX_ENTITY_COUNT];
+
+    entity *PlayerEntity;
+
+    Texture2D ScubaTexture;
 } game_state;
+
+typedef enum
+{
+    sprite_type_NONE,
+    sprite_type_Fish,
+    sprite_type_Count,
+} sprite_type;
+
+typedef struct
+{
+    Rectangle SourceRectangle;
+} sprite;
+
+static sprite Sprites[sprite_type_Count] = {0};
+
+internal entity *AddEntity(game_state *GameState)
+{
+    entity *Entity = 0;
+
+    if (GameState->EntityCount < MAX_ENTITY_COUNT)
+    {
+        Entity = GameState->Entities + GameState->EntityCount;
+        GameState->EntityCount += 1;
+    }
+    else
+    {
+        LogError("adding entity");
+    }
+
+    return Entity;
+}
 
 internal void HandleUserInput(game_state *GameState)
 {
+}
+
+internal void DrawSprite(game_state *GameState, sprite_type Type, Vector2 Position)
+{
+    Rectangle SourceRectangle = Sprites[Type].SourceRectangle;
+    Rectangle DestRectangle = R2(Position.x,
+                                 Position.y,
+                                 TEXTURE_MAP_SCALE*SourceRectangle.width,
+                                 TEXTURE_MAP_SCALE*SourceRectangle.height);
+    Color Tint = (Color){255,255,255,255};
+    Vector2 Origin = (Vector2){0,0};
+
+    DrawTexturePro(GameState->ScubaTexture, SourceRectangle, DestRectangle, Origin, 0.0f, Tint);
 }
 
 internal void UpdateAndRender(void *VoidGameState)
@@ -47,15 +106,7 @@ internal void UpdateAndRender(void *VoidGameState)
     ClearBackground(BackgroundColor);
 
     { /* draw player */
-        Vector2 SourceSize = (Vector2){12,9};
-        Rectangle SourceRectangle = (Rectangle){5,3,SourceSize.x,SourceSize.y};
-        Vector2 Position = (Vector2){20,30};
-        f32 Scale = 8.0f;
-        Rectangle DestRectangle = (Rectangle){Position.x,Position.y,Scale*SourceSize.x,Scale*SourceSize.y};
-        Color Tint = (Color){255,255,255,255};
-        Vector2 Origin = (Vector2){0,0};
-
-        DrawTexturePro(GameState->ScubaTexture, SourceRectangle, DestRectangle, Origin, 0.0f, Tint);
+        DrawSprite(GameState, sprite_type_Fish, GameState->PlayerEntity->Position);
     }
 
     EndDrawing();
@@ -63,14 +114,13 @@ internal void UpdateAndRender(void *VoidGameState)
 
 internal game_state InitGameState(Texture2D ScubaTexture)
 {
-    game_state GameState;
+    game_state GameState = {0};
 
     GameState.ScubaTexture = ScubaTexture;
 
-    GameState.PlayerAcceleration.x = 0.0f;
-    GameState.PlayerAcceleration.y = 0.0f;
-    GameState.PlayerPosition.x = 0.0f;
-    GameState.PlayerPosition.y = 0.0f;
+    Sprites[sprite_type_Fish].SourceRectangle = R2(5,3,12,9);
+
+    GameState.PlayerEntity = AddEntity(&GameState);
 
     return GameState;
 }

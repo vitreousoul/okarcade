@@ -1,9 +1,15 @@
-Vector2 CreateVector2(f32 X, f32 Y);
+Vector2 V2(f32 X, f32 Y);
+Rectangle R2(f32 X, f32 Y, f32 Width, f32 Height);
 
 
-Vector2 CreateVector2(f32 X, f32 Y)
+inline Vector2 V2(f32 X, f32 Y)
 {
     return (Vector2){X,Y};
+}
+
+inline Rectangle R2(f32 X, f32 Y, f32 Width, f32 Height)
+{
+    return (Rectangle){X, Y, Width, Height};
 }
 
 /*

@@ -171,7 +171,7 @@ b32 DoButton(ui *UI, button *Button)
 
     s32 TextWidth = MeasureText((char *)Button->Text, UI->FontSize);
     f32 TwicePadding = 2 * BUTTON_PADDING;
-    Button->Size = CreateVector2(TextWidth + TwicePadding, UI->FontSize + TwicePadding);
+    Button->Size = V2(TextWidth + TwicePadding, UI->FontSize + TwicePadding);
 
     b32 IsHot = PositionIsInsideButton(UI->MousePosition, Button);
     b32 IsActive = UI->Active == Button->Id;

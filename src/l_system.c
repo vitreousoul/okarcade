@@ -475,8 +475,8 @@ internal app_state InitAppState(void)
 {
     app_state AppState;
 
-    Vector2 TurtlePosition = CreateVector2(120.0f, SCREEN_HEIGHT / 2.0f);
-    Vector2 TurtleHeading = CreateVector2(1.0f, 0.0f);
+    Vector2 TurtlePosition = V2(120.0f, SCREEN_HEIGHT / 2.0f);
+    Vector2 TurtleHeading = V2(1.0f, 0.0f);
 
     AppState.Turtle = (turtle){TurtlePosition, TurtleHeading};
 
