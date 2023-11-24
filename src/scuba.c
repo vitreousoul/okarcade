@@ -29,8 +29,6 @@ global_variable Color BackgroundColor = (Color){176, 176, 168, 255};
 
 #define MAX_ENTITY_COUNT 256
 
-typedef s32 error_code;
-
 typedef struct
 {
     Vector2 Position;
