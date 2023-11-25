@@ -24,10 +24,11 @@ int SCREEN_HEIGHT = 700;
 #include "ui.c"
 
 #define TEXTURE_MAP_SCALE 8
+#define MAX_ENTITY_COUNT 256
+#define MAX_DELTA_TIME (1.0f/50.0f)
 
 global_variable Color BackgroundColor = (Color){176, 176, 168, 255};
 
-#define MAX_ENTITY_COUNT 256
 
 typedef struct
 {
@@ -144,7 +145,8 @@ internal void UpdateAndRender(void *VoidGameState)
 
     { /* update timer */
         f32 Time = GetTime();
-        GameState->DeltaTime = Time - GameState->LastTime;
+        f32 DeltaTime = Time - GameState->LastTime;
+        GameState->DeltaTime = MinF32(MAX_DELTA_TIME, DeltaTime);
         GameState->LastTime = Time;
     }
 
