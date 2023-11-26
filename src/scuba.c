@@ -27,7 +27,7 @@ int SCREEN_HEIGHT = 700;
 #define MAX_ENTITY_COUNT 256
 #define MAX_DELTA_TIME (1.0f/50.0f)
 
-global_variable Color BackgroundColor = (Color){176, 176, 168, 255};
+global_variable Color BackgroundColor = (Color){20, 116, 92, 255};
 
 
 typedef struct
@@ -46,6 +46,7 @@ typedef struct
     entity Entities[MAX_ENTITY_COUNT];
 
     entity *PlayerEntity;
+    entity *EelEntity;
 
     Texture2D ScubaTexture;
 } game_state;
@@ -54,6 +55,7 @@ typedef enum
 {
     sprite_type_NONE,
     sprite_type_Fish,
+    sprite_type_Eel,
     sprite_type_Count,
 } sprite_type;
 
@@ -155,6 +157,11 @@ internal void UpdateAndRender(void *VoidGameState)
     BeginDrawing();
     ClearBackground(BackgroundColor);
 
+    { /* draw eel */
+        UpdateEntity(GameState, GameState->EelEntity);
+        DrawSprite(GameState, sprite_type_Eel, GameState->EelEntity);
+    }
+
     { /* draw player */
         UpdateEntity(GameState, GameState->PlayerEntity);
         DrawSprite(GameState, sprite_type_Fish, GameState->PlayerEntity);
@@ -170,8 +177,12 @@ internal game_state InitGameState(Texture2D ScubaTexture)
     GameState.ScubaTexture = ScubaTexture;
 
     Sprites[sprite_type_Fish].SourceRectangle = R2(5,3,12,9);
+    Sprites[sprite_type_Eel].SourceRectangle = R2(1,27,34,20);
 
     GameState.PlayerEntity = AddEntity(&GameState);
+    GameState.EelEntity = AddEntity(&GameState);
+    GameState.EelEntity->Position.x = 0.0f;
+    GameState.EelEntity->Position.y = 200.0f;
 
     GameState.LastTime = GetTime();
 
