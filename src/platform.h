@@ -73,18 +73,6 @@ void EnsurePathDirectoriesExist(u8 *Path);
 
 linear_allocator WalkDirectory(u8 *Path);
 
-#define Assert(p) Assert_(p, __FILE__, __LINE__)
-internal void Assert_(b32 Proposition, char *FilePath, s32 LineNumber)
-{
-    if (!Proposition)
-    {
-        b32 *NullPtr = 0;
-        printf("Assertion failed on line %d in %s\n", LineNumber, FilePath);
-        /* this should break the program... */
-        Proposition = *NullPtr;
-    }
-}
-
 void *AllocateMemory(u64 Size)
 {
     /* just use malloc for now... */

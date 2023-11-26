@@ -10,6 +10,18 @@ internal void LogError_(u8 *Message, s32 Line, char *File)
     printf("Error at line %d in %s: %s\n", Line, File, Message);
 }
 
+#define Assert(p) Assert_(p, __FILE__, __LINE__)
+internal void Assert_(b32 Proposition, char *FilePath, s32 LineNumber)
+{
+    if (!Proposition)
+    {
+        b32 *NullPtr = 0;
+        printf("Assertion failed on line %d in %s\n", LineNumber, FilePath);
+        /* this should break the program... */
+        Proposition = *NullPtr;
+    }
+}
+
 b32 StringsEqual(u8 *StringA, u8 *StringB)
 {
     s32 AreEqual = 1;
