@@ -25,6 +25,7 @@ int SCREEN_HEIGHT = 700;
 
 #define TEXTURE_MAP_SCALE 7
 #define MAX_ENTITY_COUNT 256
+#define MAX_COLLISION_AREA_COUNT 256
 #define MAX_DELTA_TIME (1.0f/50.0f)
 
 global_variable Color BackgroundColor = (Color){20, 116, 92, 255};
@@ -39,12 +40,22 @@ typedef enum
     sprite_type_Count,
 } sprite_type;
 
+struct collision_area
+{
+    Rectangle Area;
+    struct collision_area *Next;
+};
+typedef struct collision_area collision_area;
+
 typedef struct
 {
     Vector2 Position;
     Vector2 Velocity;
     Vector2 Acceleration;
+
     sprite_type SpriteType;
+
+    collision_area *CollisionArea;
 } entity;
 
 typedef struct
@@ -54,6 +65,9 @@ typedef struct
 
     s32 EntityCount;
     entity Entities[MAX_ENTITY_COUNT];
+
+    s32 CollisionAreaCount;
+    collision_area CollisionAreas[MAX_COLLISION_AREA_COUNT];
 
     entity *PlayerEntity;
     entity *EelEntity;
@@ -67,7 +81,7 @@ typedef struct
     Rectangle SourceRectangle;
 } sprite;
 
-static sprite Sprites[sprite_type_Count] = {0};
+global_variable sprite Sprites[sprite_type_Count] = {0};
 
 internal entity *AddEntity(game_state *GameState)
 {
@@ -170,19 +184,36 @@ internal b32 CollideRanges(f32 ValueA, f32 LengthA, f32 ValueB, f32 LengthB)
     return Collides;
 }
 
-internal b32 CollideRectangles(entity *EntityA, entity *EntityB)
+internal b32 CollideEntities(entity *EntityA, entity *EntityB)
 {
     if (EntityA->SpriteType == sprite_type_Coral || EntityB->SpriteType == sprite_type_Coral)
     {
         return 0;
     }
 
-    Rectangle A = GetSpriteRectangle(EntityA);
-    Rectangle B = GetSpriteRectangle(EntityB);
+    /* TODO: handle multiple collision areas by traversing the collision_area list */
+
+    Rectangle A = EntityA->CollisionArea->Area;
+    A.x += EntityA->Position.x;
+    A.y += EntityA->Position.y;
+
+    Rectangle B = EntityB->CollisionArea->Area;
+    B.x += EntityB->Position.x;
+    B.y += EntityB->Position.y;
 
     b32 XCollides = CollideRanges(A.x, A.width, B.x, B.width);
     b32 YCollides = CollideRanges(A.y, A.height, B.y, B.height);
+
     b32 Collides = XCollides && YCollides;
+
+#if 1
+    if (Collides)
+    {
+        DrawRectangleLinesEx(A, 2.0f, (Color){220,40,220,255});
+        DrawRectangleLinesEx(B, 2.0f, (Color){220,40,220,255});
+    }
+#endif
+
 
     return Collides;
 }
@@ -208,16 +239,7 @@ internal void DebugDrawCollisions(game_state *GameState)
                 break;
             }
 
-            b32 Collides = CollideRectangles(EntityA, EntityB);
-
-            if (Collides)
-            {
-                Rectangle SpriteA = GetSpriteRectangle(EntityA);
-                Rectangle SpriteB = GetSpriteRectangle(EntityB);
-
-                DrawRectangleLinesEx(SpriteA, 2.0f, (Color){220,40,220,255});
-                DrawRectangleLinesEx(SpriteB, 2.0f, (Color){220,40,220,255});
-            }
+            b32 Collides = CollideEntities(EntityA, EntityB);
         }
     }
 }
@@ -282,6 +304,21 @@ internal void UpdateAndRender(void *VoidGameState)
     EndDrawing();
 }
 
+internal collision_area *AddCollisionArea(game_state *GameState)
+{
+    collision_area *CollisionArea = 0;
+
+    if (GameState->CollisionAreaCount < MAX_COLLISION_AREA_COUNT)
+    {
+        CollisionArea = GameState->CollisionAreas + GameState->CollisionAreaCount;
+        CollisionArea->Area = (Rectangle){0};
+        CollisionArea->Next = 0;
+        GameState->CollisionAreaCount += 1;
+    }
+
+    return CollisionArea;
+}
+
 internal game_state InitGameState(Texture2D ScubaTexture)
 {
     game_state GameState = {0};
@@ -295,11 +332,22 @@ internal game_state InitGameState(Texture2D ScubaTexture)
     { /* init entities */
         GameState.PlayerEntity = AddEntity(&GameState);
         GameState.PlayerEntity->SpriteType = sprite_type_Fish;
+        GameState.PlayerEntity->CollisionArea = AddCollisionArea(&GameState);
+        GameState.PlayerEntity->CollisionArea->Area.x = 1 * TEXTURE_MAP_SCALE;
+        GameState.PlayerEntity->CollisionArea->Area.y = 1 * TEXTURE_MAP_SCALE;
+        GameState.PlayerEntity->CollisionArea->Area.width = 10 * TEXTURE_MAP_SCALE;
+        GameState.PlayerEntity->CollisionArea->Area.height = 6 * TEXTURE_MAP_SCALE;
 
         GameState.EelEntity = AddEntity(&GameState);
         GameState.EelEntity->SpriteType = sprite_type_Eel;
         GameState.EelEntity->Position.x = 0.0f;
         GameState.EelEntity->Position.y = 200.0f;
+        GameState.EelEntity->CollisionArea = AddCollisionArea(&GameState);
+        GameState.EelEntity->CollisionArea->Area.x = 12 * TEXTURE_MAP_SCALE;
+        GameState.EelEntity->CollisionArea->Area.y = 12 * TEXTURE_MAP_SCALE;
+        GameState.EelEntity->CollisionArea->Area.width = 22 * TEXTURE_MAP_SCALE;
+        GameState.EelEntity->CollisionArea->Area.height = 8 * TEXTURE_MAP_SCALE;
+
 
         GameState.CoralEntity = AddEntity(&GameState);
         GameState.CoralEntity->SpriteType = sprite_type_Coral;
@@ -314,6 +362,7 @@ internal game_state InitGameState(Texture2D ScubaTexture)
 
 int main(void)
 {
+    printf("entity size %lu\n", sizeof(entity));
 #if defined(PLATFORM_WEB)
     InitRaylibCanvas();
 #endif
