@@ -23,7 +23,7 @@ int SCREEN_HEIGHT = 700;
 #include "raylib_helpers.h"
 #include "ui.c"
 
-#define TEXTURE_MAP_SCALE 8
+#define TEXTURE_MAP_SCALE 7
 #define MAX_ENTITY_COUNT 256
 #define MAX_DELTA_TIME (1.0f/50.0f)
 
@@ -235,12 +235,28 @@ internal void UpdateAndRender(void *VoidGameState)
 
     HandleUserInput(GameState);
 
+    f32 StartTime = GetTime();
+
     BeginDrawing();
     ClearBackground(BackgroundColor);
 
-    { /* draw coral */
-        UpdateEntity(GameState, GameState->CoralEntity);
-        DrawSprite(GameState, GameState->CoralEntity);
+    { /* draw coral background */
+        entity *CoralEntity = GameState->CoralEntity;
+        Rectangle CoralSpriteRectangle = GetSpriteRectangle(CoralEntity);
+
+        s32 WallColumnCount = 2 + (SCREEN_WIDTH / CoralSpriteRectangle.width);
+        s32 WallRowCount = 2 + (SCREEN_HEIGHT / CoralSpriteRectangle.height);
+
+        for (s32 Y = 0; Y < WallRowCount; ++Y)
+        {
+            for (s32 X = 0; X < WallColumnCount; ++X)
+            {
+                CoralEntity->Position.x = (X - 1) * CoralSpriteRectangle.width;
+                CoralEntity->Position.y = (Y - 1) * CoralSpriteRectangle.height;
+
+                DrawSprite(GameState, CoralEntity);
+            }
+        }
     }
 
     { /* draw eel */
@@ -254,6 +270,14 @@ internal void UpdateAndRender(void *VoidGameState)
     }
 
     DebugDrawCollisions(GameState);
+
+    { /* debug draw time */
+        char DebugTextBuffer[128] = {};
+        f32 DeltaTime = GetTime() - StartTime;
+        sprintf(DebugTextBuffer, "dt %.4f", 1000 * DeltaTime);
+        DrawText(DebugTextBuffer, 11, 11, 12, (Color){0,0,0,255});
+        DrawText(DebugTextBuffer, 10, 10, 12, (Color){255,255,255,255});
+    }
 
     EndDrawing();
 }
