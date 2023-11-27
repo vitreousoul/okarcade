@@ -35,6 +35,7 @@ typedef enum
     sprite_type_NONE,
     sprite_type_Fish,
     sprite_type_Eel,
+    sprite_type_Coral,
     sprite_type_Count,
 } sprite_type;
 
@@ -56,6 +57,7 @@ typedef struct
 
     entity *PlayerEntity;
     entity *EelEntity;
+    entity *CoralEntity;
 
     Texture2D ScubaTexture;
 } game_state;
@@ -168,8 +170,16 @@ internal b32 CollideRanges(f32 ValueA, f32 LengthA, f32 ValueB, f32 LengthB)
     return Collides;
 }
 
-internal b32 CollideRectangles(Rectangle A, Rectangle B)
+internal b32 CollideRectangles(entity *EntityA, entity *EntityB)
 {
+    if (EntityA->SpriteType == sprite_type_Coral || EntityB->SpriteType == sprite_type_Coral)
+    {
+        return 0;
+    }
+
+    Rectangle A = GetSpriteRectangle(EntityA);
+    Rectangle B = GetSpriteRectangle(EntityB);
+
     b32 XCollides = CollideRanges(A.x, A.width, B.x, B.width);
     b32 YCollides = CollideRanges(A.y, A.height, B.y, B.height);
     b32 Collides = XCollides && YCollides;
@@ -198,13 +208,13 @@ internal void DebugDrawCollisions(game_state *GameState)
                 break;
             }
 
-            Rectangle SpriteA = GetSpriteRectangle(EntityA);
-            Rectangle SpriteB = GetSpriteRectangle(EntityB);
-
-            b32 Collides = CollideRectangles(SpriteA, SpriteB);
+            b32 Collides = CollideRectangles(EntityA, EntityB);
 
             if (Collides)
             {
+                Rectangle SpriteA = GetSpriteRectangle(EntityA);
+                Rectangle SpriteB = GetSpriteRectangle(EntityB);
+
                 DrawRectangleLinesEx(SpriteA, 2.0f, (Color){220,40,220,255});
                 DrawRectangleLinesEx(SpriteB, 2.0f, (Color){220,40,220,255});
             }
@@ -227,6 +237,11 @@ internal void UpdateAndRender(void *VoidGameState)
 
     BeginDrawing();
     ClearBackground(BackgroundColor);
+
+    { /* draw coral */
+        UpdateEntity(GameState, GameState->CoralEntity);
+        DrawSprite(GameState, GameState->CoralEntity);
+    }
 
     { /* draw eel */
         UpdateEntity(GameState, GameState->EelEntity);
@@ -251,6 +266,7 @@ internal game_state InitGameState(Texture2D ScubaTexture)
 
     Sprites[sprite_type_Fish].SourceRectangle = R2(5,3,12,9);
     Sprites[sprite_type_Eel].SourceRectangle = R2(1,27,34,20);
+    Sprites[sprite_type_Coral].SourceRectangle = R2(464,7,24,24);
 
     { /* init entities */
         GameState.PlayerEntity = AddEntity(&GameState);
@@ -260,6 +276,11 @@ internal game_state InitGameState(Texture2D ScubaTexture)
         GameState.EelEntity->SpriteType = sprite_type_Eel;
         GameState.EelEntity->Position.x = 0.0f;
         GameState.EelEntity->Position.y = 200.0f;
+
+        GameState.CoralEntity = AddEntity(&GameState);
+        GameState.CoralEntity->SpriteType = sprite_type_Coral;
+        GameState.CoralEntity->Position.x = 100.0f;
+        GameState.CoralEntity->Position.y = 200.0f;
     }
 
     GameState.LastTime = GetTime();
