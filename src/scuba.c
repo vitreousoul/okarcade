@@ -332,14 +332,16 @@ internal void UpdateAndRender(void *VoidGameState)
         DrawSprite(GameState, GameState->CageEntity, 1);
     }
 
-    DebugDrawCollisions(GameState);
+    { /* debug graphics */
+        DebugDrawCollisions(GameState);
 
-    { /* debug draw time */
-        char DebugTextBuffer[128] = {};
-        f32 DeltaTime = GetTime() - StartTime;
-        sprintf(DebugTextBuffer, "dt %.4f", 1000 * DeltaTime);
-        DrawText(DebugTextBuffer, 11, 11, 12, (Color){0,0,0,255});
-        DrawText(DebugTextBuffer, 10, 10, 12, (Color){255,255,255,255});
+        { /* draw time */
+            char DebugTextBuffer[128] = {};
+            f32 DeltaTime = GetTime() - StartTime;
+            sprintf(DebugTextBuffer, "dt %.4f", 1000 * DeltaTime);
+            DrawText(DebugTextBuffer, 11, 11, 12, (Color){0,0,0,255});
+            DrawText(DebugTextBuffer, 10, 10, 12, (Color){255,255,255,255});
+        }
     }
 
     EndDrawing();
