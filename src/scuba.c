@@ -37,8 +37,16 @@ typedef enum
     sprite_type_Fish,
     sprite_type_Eel,
     sprite_type_Coral,
+    sprite_type_Cage,
     sprite_type_Count,
 } sprite_type;
+
+typedef struct
+{
+    sprite_type Type;
+    Rectangle SourceRectangle;
+    s32 DepthZ;
+} sprite;
 
 struct collision_area
 {
@@ -47,13 +55,15 @@ struct collision_area
 };
 typedef struct collision_area collision_area;
 
+#define ENTITY_SPRITE_COUNT 3
+
 typedef struct
 {
     Vector2 Position;
     Vector2 Velocity;
     Vector2 Acceleration;
 
-    sprite_type SpriteType;
+    sprite Sprites[ENTITY_SPRITE_COUNT];
 
     collision_area *CollisionArea;
 } entity;
@@ -69,19 +79,16 @@ typedef struct
     s32 CollisionAreaCount;
     collision_area CollisionAreas[MAX_COLLISION_AREA_COUNT];
 
+    /* TODO: don't store these, and just loop through entities to update/render them */
     entity *PlayerEntity;
     entity *EelEntity;
     entity *CoralEntity;
+    entity *CageEntity;
 
     Texture2D ScubaTexture;
 } game_state;
 
-typedef struct
-{
-    Rectangle SourceRectangle;
-} sprite;
-
-global_variable sprite Sprites[sprite_type_Count] = {0};
+/* global_variable sprite Sprites[sprite_type_Count] = {0}; */
 
 internal entity *AddEntity(game_state *GameState)
 {
@@ -126,17 +133,35 @@ internal void HandleUserInput(game_state *GameState)
     }
 }
 
-internal void DrawSprite(game_state *GameState, entity *Entity)
+internal void DrawSprite(game_state *GameState, entity *Entity, s32 DepthZ)
 {
-    Rectangle SourceRectangle = Sprites[Entity->SpriteType].SourceRectangle;
-    Rectangle DestRectangle = R2(Entity->Position.x,
-                                 Entity->Position.y,
-                                 TEXTURE_MAP_SCALE*SourceRectangle.width,
-                                 TEXTURE_MAP_SCALE*SourceRectangle.height);
-    Color Tint = (Color){255,255,255,255};
-    Vector2 Origin = (Vector2){0,0};
+    /* Rectangle SourceRectangle = Sprites[Entity->SpriteType].SourceRectangle; */
 
-    DrawTexturePro(GameState->ScubaTexture, SourceRectangle, DestRectangle, Origin, 0.0f, Tint);
+    for (s32 I = 0; I < ENTITY_SPRITE_COUNT; ++I)
+    {
+        sprite Sprite = Entity->Sprites[I];
+
+        if (Sprite.Type)
+        {
+            if (Sprite.DepthZ == DepthZ)
+            {
+                Rectangle SourceRectangle = Sprite.SourceRectangle;
+                Rectangle DestRectangle = R2(Entity->Position.x,
+                                             Entity->Position.y,
+                                             TEXTURE_MAP_SCALE*SourceRectangle.width,
+                                             TEXTURE_MAP_SCALE*SourceRectangle.height);
+                Color Tint = (Color){255,255,255,255};
+                Vector2 Origin = (Vector2){0,0};
+
+                DrawTexturePro(GameState->ScubaTexture, SourceRectangle, DestRectangle, Origin, 0.0f, Tint);
+
+            }
+        }
+        else
+        {
+            break;
+        }
+    }
 }
 
 internal void UpdateEntity(game_state *GameState, entity *Entity)
@@ -160,7 +185,8 @@ internal void UpdateEntity(game_state *GameState, entity *Entity)
 
 internal Rectangle GetSpriteRectangle(entity *Entity)
 {
-    Rectangle SourceRectangle = Sprites[Entity->SpriteType].SourceRectangle;
+    Rectangle SourceRectangle = Entity->Sprites[0].SourceRectangle;
+
     Rectangle SpriteRectangle = (Rectangle){
         Entity->Position.x,
         Entity->Position.y,
@@ -186,7 +212,10 @@ internal b32 CollideRanges(f32 ValueA, f32 LengthA, f32 ValueB, f32 LengthB)
 
 internal b32 CollideEntities(entity *EntityA, entity *EntityB)
 {
-    if (EntityA->SpriteType == sprite_type_Coral || EntityB->SpriteType == sprite_type_Coral)
+    sprite SpriteA = EntityA->Sprites[0];
+    sprite SpriteB = EntityB->Sprites[0];
+
+    if (SpriteA.Type == sprite_type_Coral || SpriteB.Type == sprite_type_Coral)
     {
         return 0;
     }
@@ -224,8 +253,9 @@ internal void DebugDrawCollisions(game_state *GameState)
     for (s32 I = 0; I < MAX_ENTITY_COUNT; ++I)
     {
         entity *EntityA = GameState->Entities + I;
+        sprite SpriteA = EntityA->Sprites[0];
 
-        if (!EntityA->SpriteType)
+        if (!SpriteA.Type)
         {
             break;
         }
@@ -233,8 +263,9 @@ internal void DebugDrawCollisions(game_state *GameState)
         for (s32 J = I + 1; J < MAX_ENTITY_COUNT; ++J)
         {
             entity *EntityB = GameState->Entities + J;
+            sprite SpriteB = EntityB->Sprites[0];
 
-            if (!EntityB->SpriteType)
+            if (!SpriteB.Type)
             {
                 break;
             }
@@ -264,7 +295,8 @@ internal void UpdateAndRender(void *VoidGameState)
 
     { /* draw coral background */
         entity *CoralEntity = GameState->CoralEntity;
-        Rectangle CoralSpriteRectangle = GetSpriteRectangle(CoralEntity);
+        Rectangle CoralSpriteRectangle = CoralEntity->Sprites[0].SourceRectangle;
+        /* Rectangle CoralSpriteRectangle = GetSpriteRectangle(CoralEntity); */
 
         s32 WallColumnCount = 2 + (SCREEN_WIDTH / CoralSpriteRectangle.width);
         s32 WallRowCount = 2 + (SCREEN_HEIGHT / CoralSpriteRectangle.height);
@@ -276,19 +308,29 @@ internal void UpdateAndRender(void *VoidGameState)
                 CoralEntity->Position.x = (X - 1) * CoralSpriteRectangle.width;
                 CoralEntity->Position.y = (Y - 1) * CoralSpriteRectangle.height;
 
-                DrawSprite(GameState, CoralEntity);
+                DrawSprite(GameState, CoralEntity, -1);
             }
         }
     }
 
+    /* TODO: loop through entities to do update/render (have to do z-sorting) */
+
+    { /* draw back of cage */
+        DrawSprite(GameState, GameState->CageEntity, 0);
+    }
+
     { /* draw eel */
         UpdateEntity(GameState, GameState->EelEntity);
-        DrawSprite(GameState, GameState->EelEntity);
+        DrawSprite(GameState, GameState->EelEntity, 1);
     }
 
     { /* draw player */
         UpdateEntity(GameState, GameState->PlayerEntity);
-        DrawSprite(GameState, GameState->PlayerEntity);
+        DrawSprite(GameState, GameState->PlayerEntity, 1);
+    }
+
+    { /* draw front of cage */
+        DrawSprite(GameState, GameState->CageEntity, 1);
     }
 
     DebugDrawCollisions(GameState);
@@ -325,34 +367,53 @@ internal game_state InitGameState(Texture2D ScubaTexture)
 
     GameState.ScubaTexture = ScubaTexture;
 
+/*
     Sprites[sprite_type_Fish].SourceRectangle = R2(5,3,12,9);
     Sprites[sprite_type_Eel].SourceRectangle = R2(1,27,34,20);
     Sprites[sprite_type_Coral].SourceRectangle = R2(464,7,24,24);
+    Sprites[sprite_type_Cage].SourceRectangle = R2(90,6,100,70);
+ */
 
     { /* init entities */
         GameState.PlayerEntity = AddEntity(&GameState);
-        GameState.PlayerEntity->SpriteType = sprite_type_Fish;
+        GameState.PlayerEntity->Sprites[0].Type = sprite_type_Fish;
+        GameState.PlayerEntity->Sprites[0].SourceRectangle = R2(5,3,12,9);
+        GameState.PlayerEntity->Sprites[0].DepthZ = 1;
         GameState.PlayerEntity->CollisionArea = AddCollisionArea(&GameState);
-        GameState.PlayerEntity->CollisionArea->Area.x = 1 * TEXTURE_MAP_SCALE;
-        GameState.PlayerEntity->CollisionArea->Area.y = 1 * TEXTURE_MAP_SCALE;
-        GameState.PlayerEntity->CollisionArea->Area.width = 10 * TEXTURE_MAP_SCALE;
-        GameState.PlayerEntity->CollisionArea->Area.height = 6 * TEXTURE_MAP_SCALE;
+        GameState.PlayerEntity->CollisionArea->Area = R2(1 * TEXTURE_MAP_SCALE,
+                                                         1 * TEXTURE_MAP_SCALE,
+                                                         10 * TEXTURE_MAP_SCALE,
+                                                         6 * TEXTURE_MAP_SCALE);
 
         GameState.EelEntity = AddEntity(&GameState);
-        GameState.EelEntity->SpriteType = sprite_type_Eel;
-        GameState.EelEntity->Position.x = 0.0f;
-        GameState.EelEntity->Position.y = 200.0f;
+        GameState.EelEntity->Sprites[0].Type = sprite_type_Eel;
+        GameState.EelEntity->Sprites[0].SourceRectangle = R2(1,27,34,20);
+        GameState.EelEntity->Sprites[0].DepthZ = 1;
+        GameState.EelEntity->Position = V2(0.0f, 200.0f);
         GameState.EelEntity->CollisionArea = AddCollisionArea(&GameState);
-        GameState.EelEntity->CollisionArea->Area.x = 12 * TEXTURE_MAP_SCALE;
-        GameState.EelEntity->CollisionArea->Area.y = 12 * TEXTURE_MAP_SCALE;
-        GameState.EelEntity->CollisionArea->Area.width = 22 * TEXTURE_MAP_SCALE;
-        GameState.EelEntity->CollisionArea->Area.height = 8 * TEXTURE_MAP_SCALE;
-
+        GameState.EelEntity->CollisionArea->Area = R2(12 * TEXTURE_MAP_SCALE,
+                                                      12 * TEXTURE_MAP_SCALE,
+                                                      22 * TEXTURE_MAP_SCALE,
+                                                      8 * TEXTURE_MAP_SCALE);
 
         GameState.CoralEntity = AddEntity(&GameState);
-        GameState.CoralEntity->SpriteType = sprite_type_Coral;
-        GameState.CoralEntity->Position.x = 100.0f;
-        GameState.CoralEntity->Position.y = 200.0f;
+        GameState.CoralEntity->Sprites[0].Type = sprite_type_Coral;
+        GameState.CoralEntity->Sprites[0].SourceRectangle = R2(464,7,24,24);
+        GameState.CoralEntity->Sprites[0].DepthZ = 0;
+
+        GameState.CageEntity = AddEntity(&GameState);
+        GameState.CageEntity->Sprites[0].Type = sprite_type_Cage;
+        GameState.CageEntity->Sprites[0].SourceRectangle = R2(90,6,110,70);
+        GameState.CageEntity->Sprites[0].DepthZ = 0;
+        GameState.CageEntity->Sprites[1].Type = sprite_type_Cage;
+        GameState.CageEntity->Sprites[1].SourceRectangle = R2(90,101,110,70);
+        GameState.CageEntity->Sprites[0].DepthZ = 1;
+        GameState.CageEntity->Position = V2(250.0f, 130.0f);
+        GameState.CageEntity->CollisionArea = AddCollisionArea(&GameState);
+        GameState.CageEntity->CollisionArea->Area = R2(1 * TEXTURE_MAP_SCALE,
+                                                       1 * TEXTURE_MAP_SCALE,
+                                                       110 * TEXTURE_MAP_SCALE,
+                                                       70 * TEXTURE_MAP_SCALE);
     }
 
     GameState.LastTime = GetTime();
