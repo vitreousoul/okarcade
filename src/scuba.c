@@ -79,7 +79,7 @@ typedef struct
     s32 CollisionAreaCount;
     collision_area CollisionAreas[MAX_COLLISION_AREA_COUNT];
 
-    /* TODO: don't store these, and just loop through entities to update/render them */
+    /* TODO: don't store these entity pointers. Instead, loop through entities to update/render them */
     entity *PlayerEntity;
     entity *EelEntity;
     entity *CoralEntity;
@@ -87,8 +87,6 @@ typedef struct
 
     Texture2D ScubaTexture;
 } game_state;
-
-/* global_variable sprite Sprites[sprite_type_Count] = {0}; */
 
 internal entity *AddEntity(game_state *GameState)
 {
@@ -367,13 +365,6 @@ internal game_state InitGameState(Texture2D ScubaTexture)
     game_state GameState = {0};
 
     GameState.ScubaTexture = ScubaTexture;
-
-/*
-    Sprites[sprite_type_Fish].SourceRectangle = R2(5,3,12,9);
-    Sprites[sprite_type_Eel].SourceRectangle = R2(1,27,34,20);
-    Sprites[sprite_type_Coral].SourceRectangle = R2(464,7,24,24);
-    Sprites[sprite_type_Cage].SourceRectangle = R2(90,6,100,70);
- */
 
     { /* init entities */
         GameState.PlayerEntity = AddEntity(&GameState);
