@@ -295,8 +295,7 @@ internal void UpdateAndRender(void *VoidGameState)
 
     { /* draw coral background */
         entity *CoralEntity = GameState->CoralEntity;
-        Rectangle CoralSpriteRectangle = CoralEntity->Sprites[0].SourceRectangle;
-        /* Rectangle CoralSpriteRectangle = GetSpriteRectangle(CoralEntity); */
+        Rectangle CoralSpriteRectangle = GetSpriteRectangle(CoralEntity);
 
         s32 WallColumnCount = 2 + (SCREEN_WIDTH / CoralSpriteRectangle.width);
         s32 WallRowCount = 2 + (SCREEN_HEIGHT / CoralSpriteRectangle.height);
@@ -308,7 +307,7 @@ internal void UpdateAndRender(void *VoidGameState)
                 CoralEntity->Position.x = (X - 1) * CoralSpriteRectangle.width;
                 CoralEntity->Position.y = (Y - 1) * CoralSpriteRectangle.height;
 
-                DrawSprite(GameState, CoralEntity, -1);
+                DrawSprite(GameState, CoralEntity, 0);
             }
         }
     }
