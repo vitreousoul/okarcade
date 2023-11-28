@@ -4,16 +4,13 @@
 
 #include "../lib/raylib.h"
 
-#if defined(PLATFORM_WEB)
-    #include <emscripten/emscripten.h>
-#endif
-
 #include "types.h"
 
 int SCREEN_WIDTH = 1200;
 int SCREEN_HEIGHT = 700;
 
 #if defined(PLATFORM_WEB)
+#include <emscripten/emscripten.h>
 #include "raylib_defines.c"
 #endif
 
