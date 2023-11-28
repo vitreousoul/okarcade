@@ -35,6 +35,7 @@ typedef enum
     sprite_type_Eel,
     sprite_type_Coral,
     sprite_type_Cage,
+    sprite_type_Crab,
     sprite_type_Count,
 } sprite_type;
 
@@ -81,6 +82,7 @@ typedef struct
     entity *EelEntity;
     entity *CoralEntity;
     entity *CageEntity;
+    entity *CrabEntity;
 
     Texture2D ScubaTexture;
 } game_state;
@@ -318,6 +320,11 @@ internal void UpdateAndRender(void *VoidGameState)
         DrawSprite(GameState, GameState->EelEntity, 1);
     }
 
+    { /* draw crab */
+        UpdateEntity(GameState, GameState->CrabEntity);
+        DrawSprite(GameState, GameState->CrabEntity, 1);
+    }
+
     { /* draw player */
         UpdateEntity(GameState, GameState->PlayerEntity);
         DrawSprite(GameState, GameState->PlayerEntity, 1);
@@ -385,6 +392,17 @@ internal game_state InitGameState(Texture2D ScubaTexture)
                                                       22 * TEXTURE_MAP_SCALE,
                                                       8 * TEXTURE_MAP_SCALE);
 
+        GameState.CrabEntity = AddEntity(&GameState);
+        GameState.CrabEntity->Sprites[0].Type = sprite_type_Crab;
+        GameState.CrabEntity->Sprites[0].SourceRectangle = R2(14,69,39,20);
+        GameState.CrabEntity->Sprites[0].DepthZ = 1;
+        GameState.CrabEntity->Position = V2(340.0f, 280.0f);
+        GameState.CrabEntity->CollisionArea = AddCollisionArea(&GameState);
+        GameState.CrabEntity->CollisionArea->Area = R2(13 * TEXTURE_MAP_SCALE,
+                                                       3 * TEXTURE_MAP_SCALE,
+                                                       16 * TEXTURE_MAP_SCALE,
+                                                       9 * TEXTURE_MAP_SCALE);
+
         GameState.CoralEntity = AddEntity(&GameState);
         GameState.CoralEntity->Sprites[0].Type = sprite_type_Coral;
         GameState.CoralEntity->Sprites[0].SourceRectangle = R2(464,7,24,24);
@@ -396,7 +414,7 @@ internal game_state InitGameState(Texture2D ScubaTexture)
         GameState.CageEntity->Sprites[0].DepthZ = 0;
         GameState.CageEntity->Sprites[1].Type = sprite_type_Cage;
         GameState.CageEntity->Sprites[1].SourceRectangle = R2(90,101,110,70);
-        GameState.CageEntity->Sprites[0].DepthZ = 1;
+        GameState.CageEntity->Sprites[1].DepthZ = 1;
         GameState.CageEntity->Position = V2(250.0f, 130.0f);
         GameState.CageEntity->CollisionArea = AddCollisionArea(&GameState);
         GameState.CageEntity->CollisionArea->Area = R2(1 * TEXTURE_MAP_SCALE,
