@@ -472,12 +472,12 @@ internal game_state InitGameState(Texture2D ScubaTexture)
 
         GameState.CoralEntity = AddEntity(&GameState);
         GameState.CoralEntity->Sprites[0].Type = sprite_type_Coral;
-        GameState.CoralEntity->Sprites[0].SourceRectangle = R2(464,7,24,24);
+        GameState.CoralEntity->Sprites[0].SourceRectangle = R2(13,118,24,24);
         GameState.CoralEntity->Sprites[0].DepthZ = 0;
 
         GameState.WallEntity = AddEntity(&GameState);
         GameState.WallEntity->Sprites[0].Type = sprite_type_Wall;
-        GameState.WallEntity->Sprites[0].SourceRectangle = R2(464,36,24,24);
+        GameState.WallEntity->Sprites[0].SourceRectangle = R2(13,147,24,24);
         GameState.WallEntity->Sprites[0].DepthZ = 0;
         GameState.WallEntity->CollisionArea = AddCollisionArea(&GameState);
         GameState.WallEntity->CollisionArea->Area = R2(0 * TEXTURE_MAP_SCALE,

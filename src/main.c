@@ -98,8 +98,15 @@ internal void GenerateGameAssets(linear_allocator TempString)
             {
                 PushString(&TempString, (u8 *)"\n    ");
             }
-            sprintf((char *)HexData, "0x%02x,", ScubaData[I]);
-            WriteLinearAllocator(&TempString, HexData, 5);
+            if (I == FileSize - 1)
+            {
+                sprintf((char *)HexData, "0x%02x", ScubaData[I]);
+            }
+            else
+            {
+                sprintf((char *)HexData, "0x%02x,", ScubaData[I]);
+            }
+            PushString(&TempString, HexData);
         }
 
         PushString(&TempString, (u8 *)"\n};\0");
