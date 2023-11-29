@@ -304,6 +304,13 @@ internal void UpdateAndRender(void *VoidGameState)
 {
     game_state *GameState = (game_state *)VoidGameState;
 
+    if (!IsTextureReady(GameState->ScubaTexture))
+    {
+        printf("texture not ready\n");
+        EndDrawing();
+        return;
+    }
+
     { /* update timer */
         f32 Time = GetTime();
         f32 DeltaTime = Time - GameState->LastTime;
