@@ -27,6 +27,30 @@ int SCREEN_HEIGHT = 700;
 
 global_variable Color BackgroundColor = (Color){20, 116, 92, 255};
 
+#define MAP_WIDTH 16
+#define MAP_HEIGHT 16
+#define o '\0' /* open space */
+#define W 'w' /* wall */
+global_variable u8 Map[MAP_HEIGHT][MAP_WIDTH] = {
+    {W,W,W,W,W,W,W,W,W,W,W,W,W,W,W,W},
+    {W,o,W,o,o,o,o,o,o,o,o,o,o,o,o,W},
+    {W,o,W,o,o,o,o,o,o,o,o,o,o,o,o,W},
+    {W,o,W,W,o,o,o,o,o,o,o,o,o,o,o,W},
+    {W,o,o,o,o,o,o,o,o,o,o,o,o,o,o,W},
+    {W,W,W,W,o,o,o,o,o,o,o,o,o,o,o,W},
+    {W,o,o,o,o,o,o,o,o,o,o,o,o,o,o,W},
+    {W,o,o,o,o,o,o,o,o,o,o,o,o,o,o,W},
+    {W,o,o,o,o,o,o,o,o,o,o,o,o,o,o,W},
+    {W,o,o,o,o,o,o,o,o,o,o,o,o,o,o,W},
+    {W,o,o,o,o,o,o,o,o,o,o,o,o,o,o,W},
+    {W,o,o,o,o,o,o,o,o,o,o,o,o,o,o,W},
+    {W,o,o,o,o,o,o,o,o,o,o,o,o,o,o,W},
+    {W,o,o,o,o,o,o,o,o,o,o,o,o,o,o,W},
+    {W,o,o,o,o,o,o,o,o,o,o,o,o,o,o,W},
+    {W,W,W,W,W,W,W,W,W,W,W,W,W,W,W,W},
+};
+#undef o
+#undef W
 
 typedef enum
 {
@@ -34,6 +58,7 @@ typedef enum
     sprite_type_Fish,
     sprite_type_Eel,
     sprite_type_Coral,
+    sprite_type_Wall,
     sprite_type_Cage,
     sprite_type_Crab,
     sprite_type_Count,
@@ -77,10 +102,13 @@ typedef struct
     s32 CollisionAreaCount;
     collision_area CollisionAreas[MAX_COLLISION_AREA_COUNT];
 
+    Vector2 CameraPosition;
+
     /* TODO: don't store these entity pointers. Instead, loop through entities to update/render them */
     entity *PlayerEntity;
     entity *EelEntity;
     entity *CoralEntity;
+    entity *WallEntity;
     entity *CageEntity;
     entity *CrabEntity;
 
@@ -292,19 +320,49 @@ internal void UpdateAndRender(void *VoidGameState)
 
     { /* draw coral background */
         entity *CoralEntity = GameState->CoralEntity;
+        entity *WallEntity = GameState->WallEntity;
+
         Rectangle CoralSpriteRectangle = GetSpriteRectangle(CoralEntity);
 
-        s32 WallColumnCount = 2 + (SCREEN_WIDTH / CoralSpriteRectangle.width);
-        s32 WallRowCount = 2 + (SCREEN_HEIGHT / CoralSpriteRectangle.height);
+        Vector2 CameraPosition = GameState->CameraPosition;
 
-        for (s32 Y = 0; Y < WallRowCount; ++Y)
+        f32 HalfWidth = SCREEN_WIDTH / 2.0f;
+        f32 HalfHeight = SCREEN_HEIGHT / 2.0f;
+
+        s32 TilesPerScreenX = SCREEN_WIDTH / CoralSpriteRectangle.width;
+        s32 TilesPerScreenY = SCREEN_HEIGHT / CoralSpriteRectangle.height;
+
+        s32 MinX = (CameraPosition.x - HalfWidth) / CoralSpriteRectangle.width;
+        s32 MinY = (CameraPosition.y - HalfHeight) / CoralSpriteRectangle.height;
+
+        s32 MaxX = MinX + TilesPerScreenX;
+        s32 MaxY = MinY + TilesPerScreenY;
+
+        MinX = MaxS32(0, MinX);
+        MaxX = MinS32(MAP_WIDTH - 1, MaxX);
+        MinY = MaxS32(0, MinY);
+        MaxY = MinS32(MAP_HEIGHT - 1, MaxY);
+
+        for (s32 Y = MinY; Y < MaxY; ++Y)
         {
-            for (s32 X = 0; X < WallColumnCount; ++X)
+            for (s32 X = MinX; X < MaxX; ++X)
             {
-                CoralEntity->Position.x = (X - 1) * CoralSpriteRectangle.width;
-                CoralEntity->Position.y = (Y - 1) * CoralSpriteRectangle.height;
+                entity *Entity = 0;
 
-                DrawSprite(GameState, CoralEntity, 0);
+                switch (Map[Y][X])
+                {
+                case '\0': Entity = CoralEntity; break;
+                case 'w': Entity = WallEntity; break;
+                }
+
+                if (Entity)
+                {
+                    Entity->Position.x = X * CoralSpriteRectangle.width;
+                    Entity->Position.y = Y * CoralSpriteRectangle.height;
+
+
+                    DrawSprite(GameState, Entity, 0);
+                }
             }
         }
     }
@@ -370,6 +428,8 @@ internal game_state InitGameState(Texture2D ScubaTexture)
 
     GameState.ScubaTexture = ScubaTexture;
 
+    GameState.CameraPosition = V2(500.0f, 500.0f);
+
     { /* init entities */
         GameState.PlayerEntity = AddEntity(&GameState);
         GameState.PlayerEntity->Sprites[0].Type = sprite_type_Fish;
@@ -407,6 +467,16 @@ internal game_state InitGameState(Texture2D ScubaTexture)
         GameState.CoralEntity->Sprites[0].Type = sprite_type_Coral;
         GameState.CoralEntity->Sprites[0].SourceRectangle = R2(464,7,24,24);
         GameState.CoralEntity->Sprites[0].DepthZ = 0;
+
+        GameState.WallEntity = AddEntity(&GameState);
+        GameState.WallEntity->Sprites[0].Type = sprite_type_Wall;
+        GameState.WallEntity->Sprites[0].SourceRectangle = R2(464,36,24,24);
+        GameState.WallEntity->Sprites[0].DepthZ = 0;
+        GameState.WallEntity->CollisionArea = AddCollisionArea(&GameState);
+        GameState.WallEntity->CollisionArea->Area = R2(0 * TEXTURE_MAP_SCALE,
+                                                       0 * TEXTURE_MAP_SCALE,
+                                                       24 * TEXTURE_MAP_SCALE,
+                                                       24 * TEXTURE_MAP_SCALE);
 
         GameState.CageEntity = AddEntity(&GameState);
         GameState.CageEntity->Sprites[0].Type = sprite_type_Cage;
