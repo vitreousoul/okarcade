@@ -108,7 +108,7 @@ internal void GenerateGameAssets(linear_allocator TempString)
         }
 
 
-        for (s32 Y = 0; Y < TextureHeight; ++Y)
+        for (s32 Y = 0; Y < TextureHeight * 4; ++Y)
         {
             for (s32 X = 0; X < TextureWidth; X += 4)
             {

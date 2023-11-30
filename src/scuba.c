@@ -525,16 +525,16 @@ int main(void)
 
         if (AssetSize > 2)
         {
-            s32 AssetWidth = ScubaAssetData[0];
-            s32 AssetHeight = ScubaAssetData[1];
-            u32 PixelCount = AssetWidth * AssetHeight;
+            u32 AssetWidth = ScubaAssetData[0];
+            u32 AssetHeight = ScubaAssetData[1];
+            u64 PixelCount = AssetWidth * AssetHeight;
 
             Image ScubaImage = GenImageColor(AssetWidth, AssetHeight, (Color){255,0,255,255});
 
-            for (u32 I = 2; I < PixelCount + 2; ++I)
+            for (u64 I = 2; I < PixelCount + 2; ++I)
             {
-                s32 X = (I - 2) % AssetWidth;
-                s32 Y = (I - 2) / AssetWidth;
+                u32 X = (I - 2) % AssetWidth;
+                u32 Y = (I - 2) / AssetWidth;
                 if (X < AssetWidth && X >= 0 && Y < AssetHeight && Y >= 0)
                 {
                     /* NOTE: We could pack our colors and just cast the u32,
@@ -546,6 +546,11 @@ int main(void)
                     Color PixelColor = (Color){R, G, B, A};
 
                     ImageDrawPixel(&ScubaImage, X, Y, PixelColor);
+                }
+                else
+                {
+                    LogError("out of bounds scuba asset access");
+                    break;
                 }
             }
 
