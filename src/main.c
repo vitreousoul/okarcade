@@ -80,6 +80,7 @@ internal command_line_arg_type ParseCommandLineArgs(s32 ArgCount, char **Args)
 
 internal void GenerateGameAssets(linear_allocator TempString)
 {
+    /* NOTE: for now GenerateGameAssets just generates assets for scuba. */
     u8 *ScubaAssetPath = (u8 *)"../assets/scuba.png";
     u8 *ScubaDataPath = (u8 *)"../gen/scuba.h";
 
@@ -92,6 +93,7 @@ internal void GenerateGameAssets(linear_allocator TempString)
     }
     else
     {
+        /* TODO: compress the asset data!!!!!! */
         u8 *ScubaOutput = GetLinearAllocatorWriteLocation(&TempString);
         u64 BeginningOffset = TempString.Offset;
         u8 HexData[16] = {};
