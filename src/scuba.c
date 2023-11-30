@@ -160,8 +160,6 @@ internal void HandleUserInput(game_state *GameState)
 
 internal void DrawSprite(game_state *GameState, entity *Entity, s32 DepthZ)
 {
-    /* Rectangle SourceRectangle = Sprites[Entity->SpriteType].SourceRectangle; */
-
     for (s32 I = 0; I < ENTITY_SPRITE_COUNT; ++I)
     {
         sprite Sprite = Entity->Sprites[I];
@@ -306,7 +304,6 @@ internal void UpdateAndRender(void *VoidGameState)
 
     if (!IsTextureReady(GameState->ScubaTexture))
     {
-        printf("texture not ready\n");
         EndDrawing();
         return;
     }
@@ -439,65 +436,71 @@ internal game_state InitGameState(Texture2D ScubaTexture)
 
     { /* init entities */
         GameState.PlayerEntity = AddEntity(&GameState);
-        GameState.PlayerEntity->Sprites[0].Type = sprite_type_Fish;
-        GameState.PlayerEntity->Sprites[0].SourceRectangle = R2(5,3,12,9);
-        GameState.PlayerEntity->Sprites[0].DepthZ = 1;
-        GameState.PlayerEntity->CollisionArea = AddCollisionArea(&GameState);
-        GameState.PlayerEntity->CollisionArea->Area = R2(1 * TEXTURE_MAP_SCALE,
-                                                         1 * TEXTURE_MAP_SCALE,
-                                                         10 * TEXTURE_MAP_SCALE,
-                                                         6 * TEXTURE_MAP_SCALE);
+        entity *PlayerEntity = GameState.PlayerEntity;
+        PlayerEntity->Sprites[0].Type = sprite_type_Fish;
+        PlayerEntity->Sprites[0].SourceRectangle = R2(5,3,12,9);
+        PlayerEntity->Sprites[0].DepthZ = 1;
+        PlayerEntity->CollisionArea = AddCollisionArea(&GameState);
+        PlayerEntity->CollisionArea->Area = R2(1 * TEXTURE_MAP_SCALE,
+                                               1 * TEXTURE_MAP_SCALE,
+                                               10 * TEXTURE_MAP_SCALE,
+                                               6 * TEXTURE_MAP_SCALE);
 
         GameState.EelEntity = AddEntity(&GameState);
-        GameState.EelEntity->Sprites[0].Type = sprite_type_Eel;
-        GameState.EelEntity->Sprites[0].SourceRectangle = R2(1,27,34,20);
-        GameState.EelEntity->Sprites[0].DepthZ = 1;
-        GameState.EelEntity->Position = V2(0.0f, 200.0f);
-        GameState.EelEntity->CollisionArea = AddCollisionArea(&GameState);
-        GameState.EelEntity->CollisionArea->Area = R2(12 * TEXTURE_MAP_SCALE,
-                                                      12 * TEXTURE_MAP_SCALE,
-                                                      22 * TEXTURE_MAP_SCALE,
-                                                      8 * TEXTURE_MAP_SCALE);
+        entity *EelEntity = GameState.EelEntity;
+        EelEntity->Sprites[0].Type = sprite_type_Eel;
+        EelEntity->Sprites[0].SourceRectangle = R2(1,27,34,20);
+        EelEntity->Sprites[0].DepthZ = 1;
+        EelEntity->Position = V2(0.0f, 200.0f);
+        EelEntity->CollisionArea = AddCollisionArea(&GameState);
+        EelEntity->CollisionArea->Area = R2(12 * TEXTURE_MAP_SCALE,
+                                            12 * TEXTURE_MAP_SCALE,
+                                            22 * TEXTURE_MAP_SCALE,
+                                            8 * TEXTURE_MAP_SCALE);
 
         GameState.CrabEntity = AddEntity(&GameState);
-        GameState.CrabEntity->Sprites[0].Type = sprite_type_Crab;
-        GameState.CrabEntity->Sprites[0].SourceRectangle = R2(14,69,39,20);
-        GameState.CrabEntity->Sprites[0].DepthZ = 1;
-        GameState.CrabEntity->Position = V2(340.0f, 280.0f);
-        GameState.CrabEntity->CollisionArea = AddCollisionArea(&GameState);
-        GameState.CrabEntity->CollisionArea->Area = R2(13 * TEXTURE_MAP_SCALE,
-                                                       3 * TEXTURE_MAP_SCALE,
-                                                       16 * TEXTURE_MAP_SCALE,
-                                                       9 * TEXTURE_MAP_SCALE);
+        entity *CrabEntity = GameState.CrabEntity;
+        CrabEntity->Sprites[0].Type = sprite_type_Crab;
+        CrabEntity->Sprites[0].SourceRectangle = R2(14,69,39,20);
+        CrabEntity->Sprites[0].DepthZ = 1;
+        CrabEntity->Position = V2(340.0f, 280.0f);
+        CrabEntity->CollisionArea = AddCollisionArea(&GameState);
+        CrabEntity->CollisionArea->Area = R2(13 * TEXTURE_MAP_SCALE,
+                                             3 * TEXTURE_MAP_SCALE,
+                                             16 * TEXTURE_MAP_SCALE,
+                                             9 * TEXTURE_MAP_SCALE);
 
         GameState.CoralEntity = AddEntity(&GameState);
-        GameState.CoralEntity->Sprites[0].Type = sprite_type_Coral;
-        GameState.CoralEntity->Sprites[0].SourceRectangle = R2(13,118,24,24);
-        GameState.CoralEntity->Sprites[0].DepthZ = 0;
+        entity *CoralEntity = GameState.CoralEntity;
+        CoralEntity->Sprites[0].Type = sprite_type_Coral;
+        CoralEntity->Sprites[0].SourceRectangle = R2(13,118,24,24);
+        CoralEntity->Sprites[0].DepthZ = 0;
 
         GameState.WallEntity = AddEntity(&GameState);
-        GameState.WallEntity->Sprites[0].Type = sprite_type_Wall;
-        GameState.WallEntity->Sprites[0].SourceRectangle = R2(13,147,24,24);
-        GameState.WallEntity->Sprites[0].DepthZ = 0;
-        GameState.WallEntity->CollisionArea = AddCollisionArea(&GameState);
-        GameState.WallEntity->CollisionArea->Area = R2(0 * TEXTURE_MAP_SCALE,
-                                                       0 * TEXTURE_MAP_SCALE,
-                                                       24 * TEXTURE_MAP_SCALE,
-                                                       24 * TEXTURE_MAP_SCALE);
+        entity *WallEntity = GameState.WallEntity;
+        WallEntity->Sprites[0].Type = sprite_type_Wall;
+        WallEntity->Sprites[0].SourceRectangle = R2(13,147,24,24);
+        WallEntity->Sprites[0].DepthZ = 0;
+        WallEntity->CollisionArea = AddCollisionArea(&GameState);
+        WallEntity->CollisionArea->Area = R2(0 * TEXTURE_MAP_SCALE,
+                                             0 * TEXTURE_MAP_SCALE,
+                                             24 * TEXTURE_MAP_SCALE,
+                                             24 * TEXTURE_MAP_SCALE);
 
         GameState.CageEntity = AddEntity(&GameState);
-        GameState.CageEntity->Sprites[0].Type = sprite_type_Cage;
-        GameState.CageEntity->Sprites[0].SourceRectangle = R2(90,6,110,70);
-        GameState.CageEntity->Sprites[0].DepthZ = 0;
-        GameState.CageEntity->Sprites[1].Type = sprite_type_Cage;
-        GameState.CageEntity->Sprites[1].SourceRectangle = R2(90,101,110,70);
-        GameState.CageEntity->Sprites[1].DepthZ = 1;
-        GameState.CageEntity->Position = V2(250.0f, 130.0f);
-        GameState.CageEntity->CollisionArea = AddCollisionArea(&GameState);
-        GameState.CageEntity->CollisionArea->Area = R2(1 * TEXTURE_MAP_SCALE,
-                                                       1 * TEXTURE_MAP_SCALE,
-                                                       110 * TEXTURE_MAP_SCALE,
-                                                       70 * TEXTURE_MAP_SCALE);
+        entity *CageEntity = GameState.CageEntity;
+        CageEntity->Sprites[0].Type = sprite_type_Cage;
+        CageEntity->Sprites[0].SourceRectangle = R2(90,6,110,70);
+        CageEntity->Sprites[0].DepthZ = 0;
+        CageEntity->Sprites[1].Type = sprite_type_Cage;
+        CageEntity->Sprites[1].SourceRectangle = R2(90,101,110,70);
+        CageEntity->Sprites[1].DepthZ = 1;
+        CageEntity->Position = V2(250.0f, 130.0f);
+        CageEntity->CollisionArea = AddCollisionArea(&GameState);
+        CageEntity->CollisionArea->Area = R2(1 * TEXTURE_MAP_SCALE,
+                                             1 * TEXTURE_MAP_SCALE,
+                                             110 * TEXTURE_MAP_SCALE,
+                                             70 * TEXTURE_MAP_SCALE);
     }
 
     GameState.LastTime = GetTime();
@@ -514,20 +517,65 @@ int main(void)
 
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "SCUBA");
 
-    Image ScubaImage = LoadImageFromMemory(".png", ScubaAssetData, sizeof(ScubaAssetData));
-    Texture2D ScubaTexture = LoadTextureFromImage(ScubaImage);
+    Texture2D ScubaTexture = {0};
+    b32 TextureLoadSuccess = 0;
 
-    game_state GameState = InitGameState(ScubaTexture);
+    { /* read image data into  */
+        s32 AssetSize = ArrayCount(ScubaAssetData);
+
+        if (AssetSize > 2)
+        {
+            s32 AssetWidth = ScubaAssetData[0];
+            s32 AssetHeight = ScubaAssetData[1];
+            u32 PixelCount = AssetWidth * AssetHeight;
+
+            Image ScubaImage = GenImageColor(AssetWidth, AssetHeight, (Color){255,0,255,255});
+
+            for (u32 I = 2; I < PixelCount + 2; ++I)
+            {
+                s32 X = (I - 2) % AssetWidth;
+                s32 Y = (I - 2) / AssetWidth;
+                if (X < AssetWidth && X >= 0 && Y < AssetHeight && Y >= 0)
+                {
+                    /* NOTE: We could pack our colors and just cast the u32,
+                     * but for now we break the color components out and re-write them. */
+                    u8 R = (ScubaAssetData[I] >> 24) & 0xff;
+                    u8 G = (ScubaAssetData[I] >> 16) & 0xff;
+                    u8 B = (ScubaAssetData[I] >>  8) & 0xff;
+                    u8 A = (ScubaAssetData[I]      ) & 0xff;
+                    Color PixelColor = (Color){R, G, B, A};
+
+                    ImageDrawPixel(&ScubaImage, X, Y, PixelColor);
+                }
+            }
+
+            ScubaTexture = LoadTextureFromImage(ScubaImage);
+            TextureLoadSuccess = 1;
+        }
+        else
+        {
+            LogError("Scuba asset is too small to be useful, there was likely an error generating game assets.");
+        }
+    }
+
+    if (TextureLoadSuccess)
+    {
+        game_state GameState = InitGameState(ScubaTexture);
 
 #if defined(PLATFORM_WEB)
-    emscripten_set_main_loop_arg(UpdateAndRender, &GameState, 0, 1);
+        emscripten_set_main_loop_arg(UpdateAndRender, &GameState, 0, 1);
 #else
-    SetTargetFPS(60);
-    while (!WindowShouldClose())
-    {
-        UpdateAndRender(&GameState);
-    }
+        SetTargetFPS(60);
+        while (!WindowShouldClose())
+        {
+            UpdateAndRender(&GameState);
+        }
 #endif
+    }
+    else
+    {
+        LogError("loading scuba asset texture.");
+    }
 
     CloseWindow();
 }

@@ -5,6 +5,9 @@
 #include "types.h"
 #include "core.c"
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "../lib/stb_image.h"
+
 #include "ryn_prof.h"
 
 #include "platform.h"
@@ -80,43 +83,57 @@ internal void GenerateGameAssets(linear_allocator TempString)
     u8 *ScubaAssetPath = (u8 *)"../assets/scuba.png";
     u8 *ScubaDataPath = (u8 *)"../gen/scuba.h";
 
-    u64 FileSize = GetFileSize(ScubaAssetPath);
-    u8 *ScubaData = PushLinearAllocator(&TempString, FileSize);
+    int TextureWidth, TextureHeight, BitsPerChannel;
+    u8 *TextureData = stbi_load((char *)ScubaAssetPath, &TextureWidth, &TextureHeight, &BitsPerChannel, 0);
 
-    if (ScubaData)
+    if (!TextureData)
     {
-        ReadFileIntoData(ScubaAssetPath, ScubaData, FileSize);
+        LogError("loading scuba texture");
+    }
+    else
+    {
         u8 *ScubaOutput = GetLinearAllocatorWriteLocation(&TempString);
         u64 BeginningOffset = TempString.Offset;
         u8 HexData[16] = {};
 
-        PushString(&TempString, (u8 *)"u8 ScubaAssetData[] = {");
+        PushString(&TempString, (u8 *)"/* NOTE: The first two u32 values in ScubaAssetData are for image-width and image-height respectively. */\n");
+        PushString(&TempString, (u8 *)"u32 ScubaAssetData[] = {    \n");
 
-        for (u64 I = 0; I < FileSize; ++I)
-        {
-            if (I % 16 == 0)
-            {
-                PushString(&TempString, (u8 *)"\n    ");
-            }
-            if (I == FileSize - 1)
-            {
-                sprintf((char *)HexData, "0x%02x", ScubaData[I]);
-            }
-            else
-            {
-                sprintf((char *)HexData, "0x%02x,", ScubaData[I]);
-            }
+        { /* write texture width/height to data */
+            sprintf((char *)HexData, "0x%08x,", TextureWidth);
             PushString(&TempString, HexData);
+
+            sprintf((char *)HexData, "0x%08x,", TextureHeight);
+            PushString(&TempString, HexData);
+        }
+
+
+        for (s32 Y = 0; Y < TextureHeight; ++Y)
+        {
+            for (s32 X = 0; X < TextureWidth; X += 4)
+            {
+                s32 PixelIndex = Y * TextureWidth + X;
+                b32 IsLastPixel = PixelIndex - 1 == TextureWidth * TextureHeight;
+
+                u32 R = TextureData[PixelIndex];
+                u32 G = TextureData[PixelIndex + 1];
+                u32 B = TextureData[PixelIndex + 2];
+                u32 A = TextureData[PixelIndex + 3];
+
+                u32 Pixel = (R << 24) | (G << 16) | (B << 8) | A;
+                char *FormatString = IsLastPixel ? "0x%08x" : "0x%08x,";
+                sprintf((char *)HexData, FormatString, Pixel);
+
+                PushString(&TempString, HexData);
+            }
+
+            PushString(&TempString, (u8 *)"\n    ");
         }
 
         PushString(&TempString, (u8 *)"\n};\0");
 
         u64 FileSize = TempString.Offset - BeginningOffset;
         WriteFile(ScubaDataPath, ScubaOutput, FileSize);
-    }
-    else
-    {
-        LogError("pushing TempString allocator");
     }
 }
 
