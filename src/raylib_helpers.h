@@ -4,7 +4,6 @@ f32 Max(f32 ValueA, f32 ValueB);
 Vector2 V2(f32 X, f32 Y);
 Vector2 AddV2(Vector2 VectorA, Vector2 VectorB);
 Vector2 MultiplyV2(Vector2 VectorA, Vector2 VectorB);
-Vector2 MultiplyV2S(Vector2 VectorA, f32 Scalar);
 Vector2 ClampV2(Vector2 VectorA, f32 Min, f32 Max);
 
 
@@ -36,12 +35,6 @@ inline Vector2 AddV2(Vector2 VectorA, Vector2 VectorB)
 inline Vector2 MultiplyV2(Vector2 VectorA, Vector2 VectorB)
 {
     Vector2 Result = (Vector2){VectorA.x * VectorB.x, VectorA.y * VectorB.y};
-    return Result;
-}
-
-inline Vector2 MultiplyV2S(Vector2 VectorA, f32 Scalar)
-{
-    Vector2 Result = (Vector2){VectorA.x * Scalar, VectorA.y * Scalar};
     return Result;
 }
 

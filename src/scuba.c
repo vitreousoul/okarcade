@@ -158,26 +158,47 @@ internal void HandleUserInput(game_state *GameState)
     }
 }
 
+internal Vector2 WorldToScreenPosition(Vector2 Position)
+{
+    Vector2 ScreenOffset = V2(SCREEN_WIDTH / 2.0f, SCREEN_HEIGHT / 2.0f);
+    Vector2 Result = AddV2(Position, ScreenOffset);
+
+    return Result;
+}
+
+internal Rectangle WorldToScreenRectangle(game_state *GameState, Rectangle R)
+{
+    Vector2 ScreenOffset = V2(SCREEN_WIDTH / 2.0f, SCREEN_HEIGHT / 2.0f);
+    Vector2 Offset = SubtractV2(ScreenOffset, GameState->CameraPosition);
+    Rectangle Result = R2(R.x + Offset.x, R.y + Offset.y, R.width, R.height);
+
+    return Result;
+}
+
 internal void DrawSprite(game_state *GameState, entity *Entity, s32 DepthZ)
 {
     for (s32 I = 0; I < ENTITY_SPRITE_COUNT; ++I)
     {
         sprite Sprite = Entity->Sprites[I];
+        Rectangle SourceRectangle = Sprite.SourceRectangle;
+        Vector2 SpriteSize = (Vector2){TEXTURE_MAP_SCALE*SourceRectangle.width,
+                                       TEXTURE_MAP_SCALE*SourceRectangle.height};
+
+        Vector2 CameraOffset = V2(SCREEN_WIDTH / 2.0f, SCREEN_HEIGHT / 2.0f);
+        Vector2 SpriteOffset = MultiplyV2S(SpriteSize, -1.0f);
+        Vector2 Offset = AddV2(CameraOffset, SpriteOffset);
+        Vector2 Position = AddV2(SubtractV2(Entity->Position, GameState->CameraPosition),
+                                 Offset);
 
         if (Sprite.Type)
         {
             if (Sprite.DepthZ == DepthZ)
             {
-                Rectangle SourceRectangle = Sprite.SourceRectangle;
-                Rectangle DestRectangle = R2(Entity->Position.x,
-                                             Entity->Position.y,
-                                             TEXTURE_MAP_SCALE*SourceRectangle.width,
-                                             TEXTURE_MAP_SCALE*SourceRectangle.height);
+                Rectangle DestRectangle = R2(Position.x, Position.y, SpriteSize.x, SpriteSize.y);
                 Color Tint = (Color){255,255,255,255};
                 Vector2 Origin = (Vector2){0,0};
 
                 DrawTexturePro(GameState->ScubaTexture, SourceRectangle, DestRectangle, Origin, 0.0f, Tint);
-
             }
         }
         else
@@ -233,7 +254,7 @@ internal b32 CollideRanges(f32 ValueA, f32 LengthA, f32 ValueB, f32 LengthB)
     return Collides;
 }
 
-internal b32 CollideEntities(entity *EntityA, entity *EntityB)
+internal b32 CollideEntities(game_state *GameState, entity *EntityA, entity *EntityB)
 {
     sprite SpriteA = EntityA->Sprites[0];
     sprite SpriteB = EntityB->Sprites[0];
@@ -261,8 +282,11 @@ internal b32 CollideEntities(entity *EntityA, entity *EntityB)
 #if 1
     if (Collides)
     {
-        DrawRectangleLinesEx(A, 2.0f, (Color){220,40,220,255});
-        DrawRectangleLinesEx(B, 2.0f, (Color){220,40,220,255});
+        Rectangle ScreenRectangleA = WorldToScreenRectangle(GameState, A);
+        Rectangle ScreenRectangleB = WorldToScreenRectangle(GameState, B);
+
+        DrawRectangleLinesEx(ScreenRectangleA, 2.0f, (Color){220,40,220,255});
+        DrawRectangleLinesEx(ScreenRectangleB, 2.0f, (Color){220,40,220,255});
     }
 #endif
 
@@ -293,7 +317,7 @@ internal void DebugDrawCollisions(game_state *GameState)
                 break;
             }
 
-            b32 Collides = CollideEntities(EntityA, EntityB);
+            b32 Collides = CollideEntities(GameState, EntityA, EntityB);
         }
     }
 }
@@ -318,6 +342,13 @@ internal void UpdateAndRender(void *VoidGameState)
     HandleUserInput(GameState);
 
     f32 StartTime = GetTime();
+
+    {
+        UpdateEntity(GameState, GameState->EelEntity);
+        UpdateEntity(GameState, GameState->CrabEntity);
+        UpdateEntity(GameState, GameState->PlayerEntity);
+        GameState->CameraPosition = GameState->PlayerEntity->Position;
+    }
 
     BeginDrawing();
     ClearBackground(BackgroundColor);
@@ -432,8 +463,6 @@ internal game_state InitGameState(Texture2D ScubaTexture)
 
     GameState.ScubaTexture = ScubaTexture;
 
-    GameState.CameraPosition = V2(500.0f, 500.0f);
-
     { /* init entities */
         GameState.PlayerEntity = AddEntity(&GameState);
         entity *PlayerEntity = GameState.PlayerEntity;
@@ -502,6 +531,8 @@ internal game_state InitGameState(Texture2D ScubaTexture)
                                              110 * TEXTURE_MAP_SCALE,
                                              70 * TEXTURE_MAP_SCALE);
     }
+
+    GameState.CameraPosition = GameState.PlayerEntity->Position;
 
     GameState.LastTime = GetTime();
 

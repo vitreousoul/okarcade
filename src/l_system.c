@@ -250,7 +250,7 @@ internal void DrawLSystem(app_state *AppState, s32 Depth)
                     if (*TurtleStackIndex < TURTLE_STACK_MAX - 1)
                     {
                         f32 RotationAmount = AppState->RotationAmount;
-                        Vector2 NewHeading = RotateVector2(Turtle->Heading, RotationAmount);
+                        Vector2 NewHeading = RotateV2(Turtle->Heading, RotationAmount);
                         *TurtleStackIndex += 1;
                         CopyTurtle(Turtle, &TurtleStack[*TurtleStackIndex]);
                         TurtleStack[*TurtleStackIndex].Heading = NewHeading;
@@ -262,7 +262,7 @@ internal void DrawLSystem(app_state *AppState, s32 Depth)
                     {
                         f32 RotationAmount = -AppState->RotationAmount;
                         *TurtleStackIndex -= 1;
-                        Vector2 NewHeading = RotateVector2(TurtleStack[*TurtleStackIndex].Heading, RotationAmount);
+                        Vector2 NewHeading = RotateV2(TurtleStack[*TurtleStackIndex].Heading, RotationAmount);
                         TurtleStack[*TurtleStackIndex].Heading = NewHeading;
                     }
                 } break;
