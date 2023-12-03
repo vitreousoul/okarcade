@@ -158,18 +158,22 @@ internal void HandleUserInput(game_state *GameState)
     }
 }
 
-internal Vector2 WorldToScreenPosition(Vector2 Position)
+internal Vector2 WorldToScreenPosition(game_state *GameState, Vector2 P)
 {
-    Vector2 ScreenOffset = V2(SCREEN_WIDTH / 2.0f, SCREEN_HEIGHT / 2.0f);
-    Vector2 Result = AddV2(Position, ScreenOffset);
+    Vector2 HalfScreen = MultiplyV2S(V2(SCREEN_WIDTH, SCREEN_HEIGHT), 0.5f);
+    Vector2 Offset = AddV2(SubtractV2(P, GameState->CameraPosition), HalfScreen);
+    Vector2 Result = AddV2(P, Offset);
 
     return Result;
 }
 
+
 internal Rectangle WorldToScreenRectangle(game_state *GameState, Rectangle R)
 {
-    Vector2 ScreenOffset = V2(SCREEN_WIDTH / 2.0f, SCREEN_HEIGHT / 2.0f);
-    Vector2 Offset = SubtractV2(ScreenOffset, GameState->CameraPosition);
+    Vector2 HalfScreen = MultiplyV2S(V2(SCREEN_WIDTH, SCREEN_HEIGHT), 0.5f);
+    Vector2 RectPosition = V2(R.x, R.y);
+    Vector2 Offset = AddV2(SubtractV2(RectPosition, GameState->CameraPosition),
+                           HalfScreen);
     Rectangle Result = R2(R.x + Offset.x, R.y + Offset.y, R.width, R.height);
 
     return Result;
@@ -185,7 +189,7 @@ internal void DrawSprite(game_state *GameState, entity *Entity, s32 DepthZ)
                                        TEXTURE_MAP_SCALE*SourceRectangle.height};
 
         Vector2 CameraOffset = V2(SCREEN_WIDTH / 2.0f, SCREEN_HEIGHT / 2.0f);
-        Vector2 SpriteOffset = MultiplyV2S(SpriteSize, -1.0f);
+        Vector2 SpriteOffset = MultiplyV2S(SpriteSize, -0.5f);
         Vector2 Offset = AddV2(CameraOffset, SpriteOffset);
         Vector2 Position = AddV2(SubtractV2(Entity->Position, GameState->CameraPosition),
                                  Offset);
@@ -284,12 +288,10 @@ internal b32 CollideEntities(game_state *GameState, entity *EntityA, entity *Ent
     {
         Rectangle ScreenRectangleA = WorldToScreenRectangle(GameState, A);
         Rectangle ScreenRectangleB = WorldToScreenRectangle(GameState, B);
-
         DrawRectangleLinesEx(ScreenRectangleA, 2.0f, (Color){220,40,220,255});
         DrawRectangleLinesEx(ScreenRectangleB, 2.0f, (Color){220,40,220,255});
     }
 #endif
-
 
     return Collides;
 }
@@ -369,7 +371,6 @@ internal void UpdateAndRender(void *VoidGameState)
 
         s32 MinX = (CameraPosition.x - HalfWidth) / CoralSpriteRectangle.width;
         s32 MinY = (CameraPosition.y - HalfHeight) / CoralSpriteRectangle.height;
-
         s32 MaxX = MinX + TilesPerScreenX;
         s32 MaxY = MinY + TilesPerScreenY;
 
@@ -403,32 +404,19 @@ internal void UpdateAndRender(void *VoidGameState)
     }
 
     /* TODO: loop through entities to do update/render (have to do z-sorting) */
-
-    { /* draw back of cage */
+    { /* entities */
         DrawSprite(GameState, GameState->CageEntity, 0);
-    }
-
-    { /* draw eel */
-        UpdateEntity(GameState, GameState->EelEntity);
         DrawSprite(GameState, GameState->EelEntity, 1);
-    }
-
-    { /* draw crab */
-        UpdateEntity(GameState, GameState->CrabEntity);
         DrawSprite(GameState, GameState->CrabEntity, 1);
-    }
-
-    { /* draw player */
-        UpdateEntity(GameState, GameState->PlayerEntity);
         DrawSprite(GameState, GameState->PlayerEntity, 1);
-    }
-
-    { /* draw front of cage */
         DrawSprite(GameState, GameState->CageEntity, 1);
     }
 
     { /* debug graphics */
         DebugDrawCollisions(GameState);
+
+        Vector2 CenterPoint = WorldToScreenPosition(GameState, V2(0.0f,0.0f));
+        DrawRectangle(CenterPoint.x, CenterPoint.y, 4.0f, 4.0f, (Color){220,40,220,255});
 
         { /* draw time */
             char DebugTextBuffer[128] = {};
@@ -469,6 +457,7 @@ internal game_state InitGameState(Texture2D ScubaTexture)
         PlayerEntity->Sprites[0].Type = sprite_type_Fish;
         PlayerEntity->Sprites[0].SourceRectangle = R2(5,3,12,9);
         PlayerEntity->Sprites[0].DepthZ = 1;
+        PlayerEntity->Position = V2(0.0f, 00.0f);
         PlayerEntity->CollisionArea = AddCollisionArea(&GameState);
         PlayerEntity->CollisionArea->Area = R2(1 * TEXTURE_MAP_SCALE,
                                                1 * TEXTURE_MAP_SCALE,
@@ -480,7 +469,7 @@ internal game_state InitGameState(Texture2D ScubaTexture)
         EelEntity->Sprites[0].Type = sprite_type_Eel;
         EelEntity->Sprites[0].SourceRectangle = R2(1,27,34,20);
         EelEntity->Sprites[0].DepthZ = 1;
-        EelEntity->Position = V2(0.0f, 200.0f);
+        EelEntity->Position = V2(0.0f, 00.0f);
         EelEntity->CollisionArea = AddCollisionArea(&GameState);
         EelEntity->CollisionArea->Area = R2(12 * TEXTURE_MAP_SCALE,
                                             12 * TEXTURE_MAP_SCALE,
@@ -492,7 +481,7 @@ internal game_state InitGameState(Texture2D ScubaTexture)
         CrabEntity->Sprites[0].Type = sprite_type_Crab;
         CrabEntity->Sprites[0].SourceRectangle = R2(14,69,39,20);
         CrabEntity->Sprites[0].DepthZ = 1;
-        CrabEntity->Position = V2(340.0f, 280.0f);
+        CrabEntity->Position = V2(670.0f, 380.0f);
         CrabEntity->CollisionArea = AddCollisionArea(&GameState);
         CrabEntity->CollisionArea->Area = R2(13 * TEXTURE_MAP_SCALE,
                                              3 * TEXTURE_MAP_SCALE,
@@ -524,7 +513,7 @@ internal game_state InitGameState(Texture2D ScubaTexture)
         CageEntity->Sprites[1].Type = sprite_type_Cage;
         CageEntity->Sprites[1].SourceRectangle = R2(90,101,110,70);
         CageEntity->Sprites[1].DepthZ = 1;
-        CageEntity->Position = V2(250.0f, 130.0f);
+        CageEntity->Position = V2(850.0f, 430.0f);
         CageEntity->CollisionArea = AddCollisionArea(&GameState);
         CageEntity->CollisionArea->Area = R2(1 * TEXTURE_MAP_SCALE,
                                              1 * TEXTURE_MAP_SCALE,
