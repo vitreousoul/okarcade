@@ -80,8 +80,16 @@ typedef struct collision_area collision_area;
 
 #define ENTITY_SPRITE_COUNT 3
 
+typedef enum
+{
+    entity_type_Undefined,
+    entity_type_Base,
+} entity_type;
+
 typedef struct
 {
+    entity_type Type;
+
     Vector2 Position;
     Vector2 Velocity;
     Vector2 Acceleration;
@@ -415,8 +423,21 @@ internal void UpdateAndRender(void *VoidGameState)
     { /* debug graphics */
         DebugDrawCollisions(GameState);
 
-        Vector2 CenterPoint = WorldToScreenPosition(GameState, V2(0.0f,0.0f));
-        DrawRectangle(CenterPoint.x, CenterPoint.y, 4.0f, 4.0f, (Color){220,40,220,255});
+
+        { /* draw entity dots */
+            for (s32 I = 0; I < MAX_ENTITY_COUNT; ++I)
+            {
+                entity *Entity = GameState->Entities + I;
+
+                if (!Entity->Type)
+                {
+                    break;
+                }
+
+                Vector2 Position = WorldToScreenPosition(GameState, Entity->Position);
+                DrawRectangle(Position.x, Position.y, 4.0f, 4.0f, (Color){220,40,220,255});
+            }
+        }
 
         { /* draw time */
             char DebugTextBuffer[128] = {};
@@ -454,6 +475,7 @@ internal game_state InitGameState(Texture2D ScubaTexture)
     { /* init entities */
         GameState.PlayerEntity = AddEntity(&GameState);
         entity *PlayerEntity = GameState.PlayerEntity;
+        PlayerEntity->Type = entity_type_Base;
         PlayerEntity->Sprites[0].Type = sprite_type_Fish;
         PlayerEntity->Sprites[0].SourceRectangle = R2(5,3,12,9);
         PlayerEntity->Sprites[0].DepthZ = 1;
@@ -466,6 +488,7 @@ internal game_state InitGameState(Texture2D ScubaTexture)
 
         GameState.EelEntity = AddEntity(&GameState);
         entity *EelEntity = GameState.EelEntity;
+        EelEntity->Type = entity_type_Base;
         EelEntity->Sprites[0].Type = sprite_type_Eel;
         EelEntity->Sprites[0].SourceRectangle = R2(1,27,34,20);
         EelEntity->Sprites[0].DepthZ = 1;
@@ -478,6 +501,7 @@ internal game_state InitGameState(Texture2D ScubaTexture)
 
         GameState.CrabEntity = AddEntity(&GameState);
         entity *CrabEntity = GameState.CrabEntity;
+        CrabEntity->Type = entity_type_Base;
         CrabEntity->Sprites[0].Type = sprite_type_Crab;
         CrabEntity->Sprites[0].SourceRectangle = R2(14,69,39,20);
         CrabEntity->Sprites[0].DepthZ = 1;
@@ -490,12 +514,14 @@ internal game_state InitGameState(Texture2D ScubaTexture)
 
         GameState.CoralEntity = AddEntity(&GameState);
         entity *CoralEntity = GameState.CoralEntity;
+        CoralEntity->Type = entity_type_Base;
         CoralEntity->Sprites[0].Type = sprite_type_Coral;
         CoralEntity->Sprites[0].SourceRectangle = R2(13,118,24,24);
         CoralEntity->Sprites[0].DepthZ = 0;
 
         GameState.WallEntity = AddEntity(&GameState);
         entity *WallEntity = GameState.WallEntity;
+        WallEntity->Type = entity_type_Base;
         WallEntity->Sprites[0].Type = sprite_type_Wall;
         WallEntity->Sprites[0].SourceRectangle = R2(13,147,24,24);
         WallEntity->Sprites[0].DepthZ = 0;
@@ -507,6 +533,7 @@ internal game_state InitGameState(Texture2D ScubaTexture)
 
         GameState.CageEntity = AddEntity(&GameState);
         entity *CageEntity = GameState.CageEntity;
+        CageEntity->Type = entity_type_Base;
         CageEntity->Sprites[0].Type = sprite_type_Cage;
         CageEntity->Sprites[0].SourceRectangle = R2(90,6,110,70);
         CageEntity->Sprites[0].DepthZ = 0;
