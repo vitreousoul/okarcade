@@ -20,7 +20,7 @@ int SCREEN_HEIGHT = 700;
 #include "raylib_helpers.h"
 #include "ui.c"
 
-#define TEXTURE_MAP_SCALE 7
+#define TEXTURE_MAP_SCALE 5
 #define MAX_ENTITY_COUNT 256
 #define MAX_COLLISION_AREA_COUNT 256
 #define MAX_DELTA_TIME (1.0f/50.0f)
@@ -384,9 +384,9 @@ internal void UpdateAndRender(void *VoidGameState)
         s32 Padding = 2;
 
         s32 MinX = MaxS32(0, MinCorner.x - Padding);
-        s32 MaxX = MinS32(MAP_WIDTH - Padding, MaxCorner.x + Padding);
+        s32 MaxX = MinS32(MAP_WIDTH, MaxCorner.x + Padding);
         s32 MinY = MaxS32(0, MinCorner.y - Padding);
-        s32 MaxY = MinS32(MAP_HEIGHT - Padding, MaxCorner.y + Padding);
+        s32 MaxY = MinS32(MAP_HEIGHT, MaxCorner.y + Padding);
 
         s32 SpriteCount = 0;
 
@@ -445,7 +445,7 @@ internal void UpdateAndRender(void *VoidGameState)
         { /* draw time */
             char DebugTextBuffer[128] = {};
             f32 DeltaTime = GetTime() - StartTime;
-            sprintf(DebugTextBuffer, "dt %.4f", 1000 * DeltaTime);
+            sprintf(DebugTextBuffer, "dt (ms) %.4f ", 1000 * DeltaTime);
             DrawText(DebugTextBuffer, 11, 11, 12, (Color){0,0,0,255});
             DrawText(DebugTextBuffer, 10, 10, 12, (Color){255,255,255,255});
         }
@@ -511,8 +511,8 @@ internal game_state InitGameState(Texture2D ScubaTexture)
         CrabEntity->Sprites[0].DepthZ = 1;
         CrabEntity->Position = MultiplyV2S(V2(9.0f, 7.0f), TILE_SIZE * TEXTURE_MAP_SCALE);
         CrabEntity->CollisionArea = AddCollisionArea(&GameState);
-        CrabEntity->CollisionArea->Area = R2(13 * TEXTURE_MAP_SCALE,
-                                             3 * TEXTURE_MAP_SCALE,
+        CrabEntity->CollisionArea->Area = R2(2 * TEXTURE_MAP_SCALE,
+                                             -3 * TEXTURE_MAP_SCALE,
                                              16 * TEXTURE_MAP_SCALE,
                                              9 * TEXTURE_MAP_SCALE);
 
