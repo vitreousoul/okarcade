@@ -8,6 +8,8 @@ s32 MaxS32(s32 A, s32 B);
 
 Vector2 RotateV2(Vector2 V, f32 Theta);
 Vector2 SubtractV2(Vector2 A, Vector2 B);
+Vector2 DivideV2(Vector2 A, Vector2 B);
+
 
 Vector2 MultiplyV2S(Vector2 A, f32 S);
 
@@ -40,6 +42,12 @@ Vector2 RotateV2(Vector2 V, f32 Theta)
 Vector2 SubtractV2(Vector2 A, Vector2 B)
 {
     Vector2 Result = (Vector2){ A.x - B.x, A.y - B.y };
+    return Result;
+}
+
+Vector2 DivideV2(Vector2 A, Vector2 B)
+{
+    Vector2 Result = (Vector2){ A.x / B.x, A.y / B.y };
     return Result;
 }
 

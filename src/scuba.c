@@ -169,8 +169,7 @@ internal void HandleUserInput(game_state *GameState)
 internal Vector2 WorldToScreenPosition(game_state *GameState, Vector2 P)
 {
     Vector2 HalfScreen = MultiplyV2S(V2(SCREEN_WIDTH, SCREEN_HEIGHT), 0.5f);
-    Vector2 Offset = AddV2(SubtractV2(P, GameState->CameraPosition), HalfScreen);
-    Vector2 Result = AddV2(P, Offset);
+    Vector2 Result = AddV2(SubtractV2(P, GameState->CameraPosition), HalfScreen);
 
     return Result;
 }
@@ -179,8 +178,16 @@ internal Rectangle WorldToScreenRectangle(game_state *GameState, Rectangle R)
 {
     Vector2 HalfScreen = MultiplyV2S(V2(SCREEN_WIDTH, SCREEN_HEIGHT), 0.5f);
     Vector2 RectPosition = V2(R.x, R.y);
-    Vector2 Offset = AddV2(SubtractV2(RectPosition, GameState->CameraPosition), HalfScreen);
-    Rectangle Result = R2(R.x + Offset.x, R.y + Offset.y, R.width, R.height);
+    Vector2 Position = AddV2(SubtractV2(RectPosition, GameState->CameraPosition), HalfScreen);
+    Rectangle Result = R2(Position.x, Position.y, R.width, R.height);
+
+    return Result;
+}
+
+internal Vector2 ScreenToWorldPosition(game_state *GameState, Vector2 P)
+{
+    Vector2 HalfScreen = MultiplyV2S(V2(SCREEN_WIDTH, SCREEN_HEIGHT), 0.5f);
+    Vector2 Result = SubtractV2(AddV2(P, GameState->CameraPosition), HalfScreen);
 
     return Result;
 }
@@ -360,29 +367,29 @@ internal void UpdateAndRender(void *VoidGameState)
     BeginDrawing();
     ClearBackground(BackgroundColor);
 
-    if(0){ /* draw coral background */
+    { /* draw coral background */
         entity *CoralEntity = GameState->CoralEntity;
         entity *WallEntity = GameState->WallEntity;
 
-        Rectangle CoralSpriteRectangle = GetSpriteRectangle(CoralEntity);
+        Rectangle CoralRect = GetSpriteRectangle(CoralEntity);
+        Vector2 SpriteScale = MultiplyV2S(V2(CoralRect.width, CoralRect.height), 1);
 
         Vector2 CameraPosition = GameState->CameraPosition;
 
-        f32 HalfWidth = SCREEN_WIDTH / 2.0f;
-        f32 HalfHeight = SCREEN_HEIGHT / 2.0f;
+        Vector2 MinCorner = ScreenToWorldPosition(GameState, V2(0.0f, 0.0f));
+        Vector2 MaxCorner = ScreenToWorldPosition(GameState, V2(SCREEN_WIDTH, SCREEN_HEIGHT));
 
-        s32 TilesPerScreenX = SCREEN_WIDTH / CoralSpriteRectangle.width;
-        s32 TilesPerScreenY = SCREEN_HEIGHT / CoralSpriteRectangle.height;
+        MinCorner = DivideV2(MinCorner, SpriteScale);
+        MaxCorner = DivideV2(MaxCorner, SpriteScale);
 
-        s32 MinX = (CameraPosition.x - HalfWidth) / CoralSpriteRectangle.width;
-        s32 MinY = (CameraPosition.y - HalfHeight) / CoralSpriteRectangle.height;
-        s32 MaxX = MinX + TilesPerScreenX;
-        s32 MaxY = MinY + TilesPerScreenY;
+        s32 Padding = 2;
 
-        MinX = MaxS32(0, MinX);
-        MaxX = MinS32(MAP_WIDTH - 1, MaxX);
-        MinY = MaxS32(0, MinY);
-        MaxY = MinS32(MAP_HEIGHT - 1, MaxY);
+        s32 MinX = MaxS32(0, MinCorner.x - Padding);
+        s32 MaxX = MinS32(MAP_WIDTH - Padding, MaxCorner.x + Padding);
+        s32 MinY = MaxS32(0, MinCorner.y - Padding);
+        s32 MaxY = MinS32(MAP_HEIGHT - Padding, MaxCorner.y + Padding);
+
+        s32 SpriteCount = 0;
 
         for (s32 Y = MinY; Y < MaxY; ++Y)
         {
@@ -398,14 +405,15 @@ internal void UpdateAndRender(void *VoidGameState)
 
                 if (Entity)
                 {
-                    Entity->Position.x = X * CoralSpriteRectangle.width / 2.0f;
-                    Entity->Position.y = Y * CoralSpriteRectangle.height / 2.0f;
+                    Entity->Position.x = X * CoralRect.width;
+                    Entity->Position.y = Y * CoralRect.height;
 
-
+                    ++SpriteCount;
                     DrawSprite(GameState, Entity, 0);
                 }
             }
         }
+        printf("sprite count %d\n", SpriteCount);
     }
 
     /* TODO: loop through entities to do update/render (have to do z-sorting) */
@@ -476,7 +484,7 @@ internal game_state InitGameState(Texture2D ScubaTexture)
         PlayerEntity->Sprites[0].Type = sprite_type_Fish;
         PlayerEntity->Sprites[0].SourceRectangle = R2(5,3,12,9);
         PlayerEntity->Sprites[0].DepthZ = 1;
-        PlayerEntity->Position = V2(33.0f, 00.0f);
+        PlayerEntity->Position = V2(0.0f, 0.0f);
         PlayerEntity->CollisionArea = AddCollisionArea(&GameState);
         PlayerEntity->CollisionArea->Area = R2(1 * TEXTURE_MAP_SCALE,
                                                1 * TEXTURE_MAP_SCALE,
@@ -489,7 +497,7 @@ internal game_state InitGameState(Texture2D ScubaTexture)
         EelEntity->Sprites[0].Type = sprite_type_Eel;
         EelEntity->Sprites[0].SourceRectangle = R2(1,27,34,20);
         EelEntity->Sprites[0].DepthZ = 1;
-        EelEntity->Position = V2(0.0f, 00.0f);
+        EelEntity->Position = V2(0.0f, 0.0f);
         EelEntity->CollisionArea = AddCollisionArea(&GameState);
         EelEntity->CollisionArea->Area = R2(12 * TEXTURE_MAP_SCALE,
                                             12 * TEXTURE_MAP_SCALE,
