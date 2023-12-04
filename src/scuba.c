@@ -374,8 +374,6 @@ internal void UpdateAndRender(void *VoidGameState)
         Rectangle CoralRect = GetSpriteRectangle(CoralEntity);
         Vector2 SpriteScale = MultiplyV2S(V2(CoralRect.width, CoralRect.height), 1);
 
-        Vector2 CameraPosition = GameState->CameraPosition;
-
         Vector2 MinCorner = ScreenToWorldPosition(GameState, V2(0.0f, 0.0f));
         Vector2 MaxCorner = ScreenToWorldPosition(GameState, V2(SCREEN_WIDTH, SCREEN_HEIGHT));
 
@@ -413,7 +411,6 @@ internal void UpdateAndRender(void *VoidGameState)
                 }
             }
         }
-        printf("sprite count %d\n", SpriteCount);
     }
 
     /* TODO: loop through entities to do update/render (have to do z-sorting) */
