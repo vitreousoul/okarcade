@@ -27,6 +27,7 @@ int SCREEN_HEIGHT = 700;
 
 global_variable Color BackgroundColor = (Color){20, 116, 92, 255};
 
+#define TILE_SIZE 24
 #define MAP_WIDTH 16
 #define MAP_HEIGHT 16
 #define o '\0' /* open space */
@@ -482,6 +483,7 @@ internal game_state InitGameState(Texture2D ScubaTexture)
         PlayerEntity->Sprites[0].SourceRectangle = R2(5,3,12,9);
         PlayerEntity->Sprites[0].DepthZ = 1;
         PlayerEntity->Position = V2(0.0f, 0.0f);
+        PlayerEntity->Position = MultiplyV2S(V2(1.0f, 1.0f), TILE_SIZE * TEXTURE_MAP_SCALE);
         PlayerEntity->CollisionArea = AddCollisionArea(&GameState);
         PlayerEntity->CollisionArea->Area = R2(1 * TEXTURE_MAP_SCALE,
                                                1 * TEXTURE_MAP_SCALE,
@@ -494,10 +496,10 @@ internal game_state InitGameState(Texture2D ScubaTexture)
         EelEntity->Sprites[0].Type = sprite_type_Eel;
         EelEntity->Sprites[0].SourceRectangle = R2(1,27,34,20);
         EelEntity->Sprites[0].DepthZ = 1;
-        EelEntity->Position = V2(0.0f, 0.0f);
+        EelEntity->Position = MultiplyV2S(V2(0.25f, 4.0f), TILE_SIZE * TEXTURE_MAP_SCALE);
         EelEntity->CollisionArea = AddCollisionArea(&GameState);
-        EelEntity->CollisionArea->Area = R2(12 * TEXTURE_MAP_SCALE,
-                                            12 * TEXTURE_MAP_SCALE,
+        EelEntity->CollisionArea->Area = R2(6 * TEXTURE_MAP_SCALE,
+                                            6 * TEXTURE_MAP_SCALE,
                                             22 * TEXTURE_MAP_SCALE,
                                             8 * TEXTURE_MAP_SCALE);
 
@@ -507,7 +509,7 @@ internal game_state InitGameState(Texture2D ScubaTexture)
         CrabEntity->Sprites[0].Type = sprite_type_Crab;
         CrabEntity->Sprites[0].SourceRectangle = R2(14,69,39,20);
         CrabEntity->Sprites[0].DepthZ = 1;
-        CrabEntity->Position = V2(670.0f, 380.0f);
+        CrabEntity->Position = MultiplyV2S(V2(9.0f, 7.0f), TILE_SIZE * TEXTURE_MAP_SCALE);
         CrabEntity->CollisionArea = AddCollisionArea(&GameState);
         CrabEntity->CollisionArea->Area = R2(13 * TEXTURE_MAP_SCALE,
                                              3 * TEXTURE_MAP_SCALE,
@@ -518,20 +520,20 @@ internal game_state InitGameState(Texture2D ScubaTexture)
         entity *CoralEntity = GameState.CoralEntity;
         CoralEntity->Type = entity_type_Base;
         CoralEntity->Sprites[0].Type = sprite_type_Coral;
-        CoralEntity->Sprites[0].SourceRectangle = R2(13,118,24,24);
+        CoralEntity->Sprites[0].SourceRectangle = R2(13,118,TILE_SIZE,TILE_SIZE);
         CoralEntity->Sprites[0].DepthZ = 0;
 
         GameState.WallEntity = AddEntity(&GameState);
         entity *WallEntity = GameState.WallEntity;
         WallEntity->Type = entity_type_Base;
         WallEntity->Sprites[0].Type = sprite_type_Wall;
-        WallEntity->Sprites[0].SourceRectangle = R2(13,147,24,24);
+        WallEntity->Sprites[0].SourceRectangle = R2(13,147,TILE_SIZE,TILE_SIZE);
         WallEntity->Sprites[0].DepthZ = 0;
         WallEntity->CollisionArea = AddCollisionArea(&GameState);
         WallEntity->CollisionArea->Area = R2(0 * TEXTURE_MAP_SCALE,
                                              0 * TEXTURE_MAP_SCALE,
-                                             24 * TEXTURE_MAP_SCALE,
-                                             24 * TEXTURE_MAP_SCALE);
+                                             TILE_SIZE * TEXTURE_MAP_SCALE,
+                                             TILE_SIZE * TEXTURE_MAP_SCALE);
 
         GameState.CageEntity = AddEntity(&GameState);
         entity *CageEntity = GameState.CageEntity;
@@ -542,7 +544,7 @@ internal game_state InitGameState(Texture2D ScubaTexture)
         CageEntity->Sprites[1].Type = sprite_type_Cage;
         CageEntity->Sprites[1].SourceRectangle = R2(90,101,110,70);
         CageEntity->Sprites[1].DepthZ = 1;
-        CageEntity->Position = V2(850.0f, 430.0f);
+        CageEntity->Position = MultiplyV2S(V2(9.0f, 7.0f), TILE_SIZE * TEXTURE_MAP_SCALE);
         CageEntity->CollisionArea = AddCollisionArea(&GameState);
         CageEntity->CollisionArea->Area = R2(1 * TEXTURE_MAP_SCALE,
                                              1 * TEXTURE_MAP_SCALE,
