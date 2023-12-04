@@ -175,13 +175,11 @@ internal Vector2 WorldToScreenPosition(game_state *GameState, Vector2 P)
     return Result;
 }
 
-
 internal Rectangle WorldToScreenRectangle(game_state *GameState, Rectangle R)
 {
     Vector2 HalfScreen = MultiplyV2S(V2(SCREEN_WIDTH, SCREEN_HEIGHT), 0.5f);
     Vector2 RectPosition = V2(R.x, R.y);
-    Vector2 Offset = AddV2(SubtractV2(RectPosition, GameState->CameraPosition),
-                           HalfScreen);
+    Vector2 Offset = AddV2(SubtractV2(RectPosition, GameState->CameraPosition), HalfScreen);
     Rectangle Result = R2(R.x + Offset.x, R.y + Offset.y, R.width, R.height);
 
     return Result;
@@ -196,11 +194,9 @@ internal void DrawSprite(game_state *GameState, entity *Entity, s32 DepthZ)
         Vector2 SpriteSize = (Vector2){TEXTURE_MAP_SCALE*SourceRectangle.width,
                                        TEXTURE_MAP_SCALE*SourceRectangle.height};
 
-        Vector2 CameraOffset = V2(SCREEN_WIDTH / 2.0f, SCREEN_HEIGHT / 2.0f);
+        Vector2 EntityScreenPosition = WorldToScreenPosition(GameState, Entity->Position);
         Vector2 SpriteOffset = MultiplyV2S(SpriteSize, -0.5f);
-        Vector2 Offset = AddV2(CameraOffset, SpriteOffset);
-        Vector2 Position = AddV2(SubtractV2(Entity->Position, GameState->CameraPosition),
-                                 Offset);
+        Vector2 Position = AddV2(EntityScreenPosition, SpriteOffset);
 
         if (Sprite.Type)
         {
@@ -279,12 +275,12 @@ internal b32 CollideEntities(game_state *GameState, entity *EntityA, entity *Ent
     /* TODO: handle multiple collision areas by traversing the collision_area list */
 
     Rectangle A = EntityA->CollisionArea->Area;
-    A.x += EntityA->Position.x;
-    A.y += EntityA->Position.y;
+    A.x += EntityA->Position.x - (A.width / 2.0f);
+    A.y += EntityA->Position.y - (A.height / 2.0f);
 
     Rectangle B = EntityB->CollisionArea->Area;
-    B.x += EntityB->Position.x;
-    B.y += EntityB->Position.y;
+    B.x += EntityB->Position.x - (B.width / 2.0f);
+    B.y += EntityB->Position.y - (B.height / 2.0f);
 
     b32 XCollides = CollideRanges(A.x, A.width, B.x, B.width);
     b32 YCollides = CollideRanges(A.y, A.height, B.y, B.height);
@@ -296,6 +292,7 @@ internal b32 CollideEntities(game_state *GameState, entity *EntityA, entity *Ent
     {
         Rectangle ScreenRectangleA = WorldToScreenRectangle(GameState, A);
         Rectangle ScreenRectangleB = WorldToScreenRectangle(GameState, B);
+
         DrawRectangleLinesEx(ScreenRectangleA, 2.0f, (Color){220,40,220,255});
         DrawRectangleLinesEx(ScreenRectangleB, 2.0f, (Color){220,40,220,255});
     }
@@ -363,7 +360,7 @@ internal void UpdateAndRender(void *VoidGameState)
     BeginDrawing();
     ClearBackground(BackgroundColor);
 
-    { /* draw coral background */
+    if(0){ /* draw coral background */
         entity *CoralEntity = GameState->CoralEntity;
         entity *WallEntity = GameState->WallEntity;
 
@@ -401,8 +398,8 @@ internal void UpdateAndRender(void *VoidGameState)
 
                 if (Entity)
                 {
-                    Entity->Position.x = X * CoralSpriteRectangle.width;
-                    Entity->Position.y = Y * CoralSpriteRectangle.height;
+                    Entity->Position.x = X * CoralSpriteRectangle.width / 2.0f;
+                    Entity->Position.y = Y * CoralSpriteRectangle.height / 2.0f;
 
 
                     DrawSprite(GameState, Entity, 0);
@@ -479,7 +476,7 @@ internal game_state InitGameState(Texture2D ScubaTexture)
         PlayerEntity->Sprites[0].Type = sprite_type_Fish;
         PlayerEntity->Sprites[0].SourceRectangle = R2(5,3,12,9);
         PlayerEntity->Sprites[0].DepthZ = 1;
-        PlayerEntity->Position = V2(0.0f, 00.0f);
+        PlayerEntity->Position = V2(33.0f, 00.0f);
         PlayerEntity->CollisionArea = AddCollisionArea(&GameState);
         PlayerEntity->CollisionArea->Area = R2(1 * TEXTURE_MAP_SCALE,
                                                1 * TEXTURE_MAP_SCALE,
