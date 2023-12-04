@@ -557,6 +557,52 @@ internal game_state InitGameState(Texture2D ScubaTexture)
     return GameState;
 }
 
+internal b32 LoadScubaTexture(Texture2D *Texture)
+{
+    b32 Error = 0;
+    s32 AssetSize = ArrayCount(ScubaAssetData);
+
+    if (AssetSize > 2)
+    {
+        u32 AssetWidth = ScubaAssetData[0];
+        u32 AssetHeight = ScubaAssetData[1];
+        u64 PixelCount = AssetWidth * AssetHeight;
+
+        Image ScubaImage = GenImageColor(AssetWidth, AssetHeight, (Color){255,0,255,255});
+
+        for (u64 I = 2; I < PixelCount + 2; ++I)
+        {
+            u32 X = (I - 2) % AssetWidth;
+            u32 Y = (I - 2) / AssetWidth;
+            if (X < AssetWidth && X >= 0 && Y < AssetHeight && Y >= 0)
+            {
+                /* NOTE: We could pack our colors and just cast the u32,
+                 * but for now we break the color components out and re-write them. */
+                u8 R = (ScubaAssetData[I] >> 24) & 0xff;
+                u8 G = (ScubaAssetData[I] >> 16) & 0xff;
+                u8 B = (ScubaAssetData[I] >>  8) & 0xff;
+                u8 A = (ScubaAssetData[I]      ) & 0xff;
+                Color PixelColor = (Color){R, G, B, A};
+
+                ImageDrawPixel(&ScubaImage, X, Y, PixelColor);
+            }
+            else
+            {
+                LogError("out of bounds scuba asset access");
+                break;
+            }
+        }
+
+        *Texture = LoadTextureFromImage(ScubaImage);
+    }
+    else
+    {
+        LogError("Scuba asset is too small to be useful, there was likely an error generating game assets.");
+    }
+
+    return Error;
+}
+
 int main(void)
 {
     printf("entity size %lu\n", sizeof(entity));
@@ -567,52 +613,13 @@ int main(void)
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "SCUBA");
 
     Texture2D ScubaTexture = {0};
-    b32 TextureLoadSuccess = 0;
+    b32 TextureError = LoadScubaTexture(&ScubaTexture);
 
-    { /* read image data into  */
-        s32 AssetSize = ArrayCount(ScubaAssetData);
-
-        if (AssetSize > 2)
-        {
-            u32 AssetWidth = ScubaAssetData[0];
-            u32 AssetHeight = ScubaAssetData[1];
-            u64 PixelCount = AssetWidth * AssetHeight;
-
-            Image ScubaImage = GenImageColor(AssetWidth, AssetHeight, (Color){255,0,255,255});
-
-            for (u64 I = 2; I < PixelCount + 2; ++I)
-            {
-                u32 X = (I - 2) % AssetWidth;
-                u32 Y = (I - 2) / AssetWidth;
-                if (X < AssetWidth && X >= 0 && Y < AssetHeight && Y >= 0)
-                {
-                    /* NOTE: We could pack our colors and just cast the u32,
-                     * but for now we break the color components out and re-write them. */
-                    u8 R = (ScubaAssetData[I] >> 24) & 0xff;
-                    u8 G = (ScubaAssetData[I] >> 16) & 0xff;
-                    u8 B = (ScubaAssetData[I] >>  8) & 0xff;
-                    u8 A = (ScubaAssetData[I]      ) & 0xff;
-                    Color PixelColor = (Color){R, G, B, A};
-
-                    ImageDrawPixel(&ScubaImage, X, Y, PixelColor);
-                }
-                else
-                {
-                    LogError("out of bounds scuba asset access");
-                    break;
-                }
-            }
-
-            ScubaTexture = LoadTextureFromImage(ScubaImage);
-            TextureLoadSuccess = 1;
-        }
-        else
-        {
-            LogError("Scuba asset is too small to be useful, there was likely an error generating game assets.");
-        }
+    if (TextureError)
+    {
+        LogError("loading scuba asset texture.");
     }
-
-    if (TextureLoadSuccess)
+    else
     {
         game_state GameState = InitGameState(ScubaTexture);
 
@@ -625,10 +632,6 @@ int main(void)
             UpdateAndRender(&GameState);
         }
 #endif
-    }
-    else
-    {
-        LogError("loading scuba asset texture.");
     }
 
     CloseWindow();
