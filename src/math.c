@@ -12,6 +12,7 @@ Vector2 SubtractV2(Vector2 A, Vector2 B);
 Vector2 DivideV2(Vector2 A, Vector2 B);
 
 
+Vector2 AddV2S(Vector2 A, f32 S);
 Vector2 MultiplyV2S(Vector2 A, f32 S);
 
 
@@ -62,6 +63,12 @@ Vector2 DivideV2(Vector2 A, Vector2 B)
 Vector2 MultiplyV2S(Vector2 A, f32 S)
 {
     Vector2 Result = (Vector2){A.x * S, A.y * S};
+    return Result;
+}
+
+Vector2 AddV2S(Vector2 A, f32 S)
+{
+    Vector2 Result = (Vector2){A.x + S, A.y + S};
     return Result;
 }
 
