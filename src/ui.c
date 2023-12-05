@@ -49,12 +49,10 @@ typedef struct
     };
 } ui_element;
 
-typedef s32 ui_id;
-
 typedef struct
 {
-    ui_id Active;
-    ui_id Hot;
+    s32 Active;
+    s32 Hot;
 
     s32 FontSize;
 
@@ -65,13 +63,15 @@ typedef struct
     Vector2 ActivationPosition;
 } ui;
 
-button CreateButton(Vector2 Position, u8 *Text, ui_id Id);
+button CreateButton(Vector2 Position, u8 *Text, s32 Id);
+
 b32 DoButton(ui *UI, button *Button);
+b32 DoButtonWith(ui *UI, s32 Id, u8 *Text, Vector2 Position);
 b32 DoSlider(ui *UI, slider *Slider);
 b32 DoTablet(ui *UI, tablet *Tablet);
 b32 DoUiElement(ui *UI, ui_element *UiElement);
 
-button CreateButton(Vector2 Position, u8 *Text, ui_id Id)
+button CreateButton(Vector2 Position, u8 *Text, s32 Id)
 {
     button Button;
 
@@ -114,45 +114,6 @@ internal b32 PositionIsInsideTablet(Vector2 Position, tablet *Tablet)
     f32 Y0 = Tablet->Position.y;
     f32 X1 = Tablet->Position.x + Tablet->Size.x;
     f32 Y1 = Tablet->Position.y + Tablet->Size.y;
-
-    return ((Position.x >= X0) &&
-            (Position.x <= X1) &&
-            (Position.y >= Y0) &&
-            (Position.y <= Y1));
-}
-
-/* TODO Delete PositionIsInsideUiElement if it is not used */
-internal b32 PositionIsInsideUiElement(ui_element *UiElement, Vector2 Position)
-{
-    f32 X0 = 0.0f;
-    f32 Y0 = 0.0f;
-    f32 X1 = 0.0f;
-    f32 Y1 = 0.0f;
-
-    switch (UiElement->Type)
-    {
-    case ui_element_type_Button:
-    {
-        button Button = UiElement->Button;
-
-        X0 = Button.Position.x;
-        Y0 = Button.Position.y;
-        X1 = Button.Position.x + Button.Size.x;
-        Y1 = Button.Position.y + Button.Size.y;
-    } break;
-    case ui_element_type_Slider:
-    {
-        slider Slider = UiElement->Slider;
-
-        X0 = Slider.Position.x;
-        Y0 = Slider.Position.y;
-        X1 = Slider.Position.x + Slider.Size.x;
-        Y1 = Slider.Position.y + Slider.Size.y;
-    } break;
-    case ui_element_type_Tablet:
-        break;
-    default: break;
-    }
 
     return ((Position.x >= X0) &&
             (Position.x <= X1) &&
@@ -224,6 +185,20 @@ b32 DoButton(ui *UI, button *Button)
              UI->FontSize, TextColor);
 
     return ButtonPressed;
+}
+
+b32 DoButtonWith(ui *UI, s32 Id, u8 *Text, Vector2 Position)
+{
+    button Button;
+
+    Button.Id = Id;
+    Button.Position = Position;
+    Button.Size = V2(0.0f, 0.0f);
+    Button.Text = Text;
+
+    b32 Pressed = DoButton(UI, &Button);
+
+    return Pressed;
 }
 
 b32 DoSlider(ui *UI, slider *Slider)

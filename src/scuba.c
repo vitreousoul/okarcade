@@ -55,6 +55,12 @@ global_variable u8 Map[MAP_HEIGHT][MAP_WIDTH] = {
 
 typedef enum
 {
+    ui_id_Null,
+    ui_id_PlayButton,
+} ui_id;
+
+typedef enum
+{
     sprite_type_NONE,
     sprite_type_Fish,
     sprite_type_Eel,
@@ -100,10 +106,20 @@ typedef struct
     collision_area *CollisionArea;
 } entity;
 
+typedef enum
+{
+    game_mode_Start,
+    game_mode_Play,
+    game_mode_GameOver,
+} game_mode;
+
 typedef struct
 {
     f32 DeltaTime;
     f32 LastTime;
+
+    game_mode Mode;
+    ui UI;
 
     s32 EntityCount;
     entity Entities[MAX_ENTITY_COUNT];
@@ -143,6 +159,10 @@ internal entity *AddEntity(game_state *GameState)
 
 internal void HandleUserInput(game_state *GameState)
 {
+    GameState->UI.MousePosition = GetMousePosition();
+    GameState->UI.MouseButtonPressed = IsMouseButtonPressed(0);
+    GameState->UI.MouseButtonReleased = IsMouseButtonReleased(0);
+
     GameState->PlayerEntity->Acceleration.x = 0;
     GameState->PlayerEntity->Acceleration.y = 0;
 
@@ -261,6 +281,7 @@ internal Rectangle GetSpriteRectangle(entity *Entity)
 
 internal b32 CollideRanges(f32 ValueA, f32 LengthA, f32 ValueB, f32 LengthB)
 {
+    Assert(LengthA > 0.0f && LengthB > 0.0f);
     f32 MaxA = ValueA + LengthA;
     f32 MaxB = ValueB + LengthB;
 
@@ -342,118 +363,143 @@ internal void DebugDrawCollisions(game_state *GameState)
 internal void UpdateAndRender(void *VoidGameState)
 {
     game_state *GameState = (game_state *)VoidGameState;
-
-    if (!IsTextureReady(GameState->ScubaTexture))
-    {
-        EndDrawing();
-        return;
-    }
-
-    { /* update timer */
-        f32 Time = GetTime();
-        f32 DeltaTime = Time - GameState->LastTime;
-        GameState->DeltaTime = MinF32(MAX_DELTA_TIME, DeltaTime);
-        GameState->LastTime = Time;
-    }
+    ui *UI = &GameState->UI;
 
     HandleUserInput(GameState);
 
-    f32 StartTime = GetTime();
-
+    switch(GameState->Mode)
     {
-        UpdateEntity(GameState, GameState->EelEntity);
-        UpdateEntity(GameState, GameState->CrabEntity);
-        UpdateEntity(GameState, GameState->PlayerEntity);
-        GameState->CameraPosition = GameState->PlayerEntity->Position;
-    }
+    case game_mode_Start:
+    {
+        f32 CenterX = SCREEN_WIDTH / 2.0;
+        f32 StartY = SCREEN_HEIGHT * 0.4;
 
-    BeginDrawing();
-    ClearBackground(BackgroundColor);
+        b32 Pressed = DoButtonWith(UI, ui_id_PlayButton, (u8 *)"Play", V2(CenterX, StartY));
 
-    { /* draw coral background */
-        entity *CoralEntity = GameState->CoralEntity;
-        entity *WallEntity = GameState->WallEntity;
-
-        Rectangle CoralRect = GetSpriteRectangle(CoralEntity);
-        Vector2 SpriteScale = MultiplyV2S(V2(CoralRect.width, CoralRect.height), 1);
-
-        Vector2 MinCorner = ScreenToWorldPosition(GameState, V2(0.0f, 0.0f));
-        Vector2 MaxCorner = ScreenToWorldPosition(GameState, V2(SCREEN_WIDTH, SCREEN_HEIGHT));
-
-        MinCorner = DivideV2(MinCorner, SpriteScale);
-        MaxCorner = DivideV2(MaxCorner, SpriteScale);
-
-        s32 Padding = 2;
-
-        s32 MinX = MaxS32(0, MinCorner.x - Padding);
-        s32 MaxX = MinS32(MAP_WIDTH, MaxCorner.x + Padding);
-        s32 MinY = MaxS32(0, MinCorner.y - Padding);
-        s32 MaxY = MinS32(MAP_HEIGHT, MaxCorner.y + Padding);
-
-        s32 SpriteCount = 0;
-
-        for (s32 Y = MinY; Y < MaxY; ++Y)
+        if (Pressed)
         {
-            for (s32 X = MinX; X < MaxX; ++X)
+            GameState->Mode = game_mode_Play;
+        }
+
+        EndDrawing();
+    } break;
+    case game_mode_GameOver:
+    {
+        EndDrawing();
+    } break;
+    case game_mode_Play:
+    {
+        if (!IsTextureReady(GameState->ScubaTexture))
+        {
+            EndDrawing();
+            return;
+        }
+
+        { /* update timer */
+            f32 Time = GetTime();
+            f32 DeltaTime = Time - GameState->LastTime;
+            GameState->DeltaTime = MinF32(MAX_DELTA_TIME, DeltaTime);
+            GameState->LastTime = Time;
+        }
+
+        f32 StartTime = GetTime();
+
+        {
+            UpdateEntity(GameState, GameState->EelEntity);
+            UpdateEntity(GameState, GameState->CrabEntity);
+            UpdateEntity(GameState, GameState->PlayerEntity);
+            GameState->CameraPosition = GameState->PlayerEntity->Position;
+        }
+
+        BeginDrawing();
+        ClearBackground(BackgroundColor);
+
+        { /* draw coral background */
+            entity *CoralEntity = GameState->CoralEntity;
+            entity *WallEntity = GameState->WallEntity;
+
+            Rectangle CoralRect = GetSpriteRectangle(CoralEntity);
+            Vector2 SpriteScale = MultiplyV2S(V2(CoralRect.width, CoralRect.height), 1);
+
+            Vector2 MinCorner = ScreenToWorldPosition(GameState, V2(0.0f, 0.0f));
+            Vector2 MaxCorner = ScreenToWorldPosition(GameState, V2(SCREEN_WIDTH, SCREEN_HEIGHT));
+
+            MinCorner = DivideV2(MinCorner, SpriteScale);
+            MaxCorner = DivideV2(MaxCorner, SpriteScale);
+
+            s32 Padding = 2;
+
+            s32 MinX = MaxS32(0, MinCorner.x - Padding);
+            s32 MaxX = MinS32(MAP_WIDTH, MaxCorner.x + Padding);
+            s32 MinY = MaxS32(0, MinCorner.y - Padding);
+            s32 MaxY = MinS32(MAP_HEIGHT, MaxCorner.y + Padding);
+
+            s32 SpriteCount = 0;
+
+            for (s32 Y = MinY; Y < MaxY; ++Y)
             {
-                entity *Entity = 0;
-
-                switch (Map[Y][X])
+                for (s32 X = MinX; X < MaxX; ++X)
                 {
-                case '\0': Entity = CoralEntity; break;
-                case 'w': Entity = WallEntity; break;
-                }
+                    entity *Entity = 0;
 
-                if (Entity)
-                {
-                    Entity->Position.x = X * CoralRect.width;
-                    Entity->Position.y = Y * CoralRect.height;
+                    switch (Map[Y][X])
+                    {
+                    case '\0': Entity = CoralEntity; break;
+                    case 'w': Entity = WallEntity; break;
+                    }
 
-                    ++SpriteCount;
-                    DrawSprite(GameState, Entity, 0);
+                    if (Entity)
+                    {
+                        Entity->Position.x = X * CoralRect.width;
+                        Entity->Position.y = Y * CoralRect.height;
+
+                        ++SpriteCount;
+                        DrawSprite(GameState, Entity, 0);
+                    }
                 }
             }
         }
-    }
 
-    /* TODO: loop through entities to do update/render (have to do z-sorting) */
-    { /* entities */
-        DrawSprite(GameState, GameState->CageEntity, 0);
-        DrawSprite(GameState, GameState->EelEntity, 1);
-        DrawSprite(GameState, GameState->CrabEntity, 1);
-        DrawSprite(GameState, GameState->PlayerEntity, 1);
-        DrawSprite(GameState, GameState->CageEntity, 1);
-    }
+        /* TODO: loop through entities to do update/render (have to do z-sorting) */
+        { /* entities */
+            DrawSprite(GameState, GameState->CageEntity, 0);
+            DrawSprite(GameState, GameState->EelEntity, 1);
+            DrawSprite(GameState, GameState->CrabEntity, 1);
+            DrawSprite(GameState, GameState->PlayerEntity, 1);
+            DrawSprite(GameState, GameState->CageEntity, 1);
+        }
 
-    { /* debug graphics */
-        DebugDrawCollisions(GameState);
+        { /* debug graphics */
+            DebugDrawCollisions(GameState);
 
 
-        { /* draw entity dots */
-            for (s32 I = 0; I < MAX_ENTITY_COUNT; ++I)
-            {
-                entity *Entity = GameState->Entities + I;
-
-                if (!Entity->Type)
+            { /* draw entity dots */
+                for (s32 I = 0; I < MAX_ENTITY_COUNT; ++I)
                 {
-                    break;
-                }
+                    entity *Entity = GameState->Entities + I;
 
-                Vector2 Position = WorldToScreenPosition(GameState, Entity->Position);
-                DrawRectangle(Position.x, Position.y, 4.0f, 4.0f, (Color){220,40,220,255});
+                    if (!Entity->Type)
+                    {
+                        break;
+                    }
+
+                    Vector2 Position = WorldToScreenPosition(GameState, Entity->Position);
+                    DrawRectangle(Position.x, Position.y, 4.0f, 4.0f, (Color){220,40,220,255});
+                }
+            }
+
+            { /* draw time */
+                char DebugTextBuffer[128] = {};
+                f32 DeltaTime = GetTime() - StartTime;
+                sprintf(DebugTextBuffer, "dt (ms) %.4f ", 1000 * DeltaTime);
+                DrawText(DebugTextBuffer, 11, 11, 12, (Color){0,0,0,255});
+                DrawText(DebugTextBuffer, 10, 10, 12, (Color){255,255,255,255});
             }
         }
 
-        { /* draw time */
-            char DebugTextBuffer[128] = {};
-            f32 DeltaTime = GetTime() - StartTime;
-            sprintf(DebugTextBuffer, "dt (ms) %.4f ", 1000 * DeltaTime);
-            DrawText(DebugTextBuffer, 11, 11, 12, (Color){0,0,0,255});
-            DrawText(DebugTextBuffer, 10, 10, 12, (Color){255,255,255,255});
-        }
+        EndDrawing();
+    } break;
     }
-
-    EndDrawing();
 }
 
 internal collision_area *AddCollisionArea(game_state *GameState)
@@ -474,6 +520,10 @@ internal collision_area *AddCollisionArea(game_state *GameState)
 internal game_state InitGameState(Texture2D ScubaTexture)
 {
     game_state GameState = {0};
+
+    GameState.Mode = game_mode_Start;
+
+    GameState.UI.FontSize = 16;
 
     GameState.ScubaTexture = ScubaTexture;
 
