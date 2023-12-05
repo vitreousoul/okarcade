@@ -226,13 +226,15 @@ internal void DrawSprite(game_state *GameState, entity *Entity, s32 DepthZ)
 
 internal void UpdateEntity(game_state *GameState, entity *Entity)
 {
-    f32 AccelerationScale = 800.0f;
+    f32 AccelerationScale = 900.0f;
     f32 DT = GameState->DeltaTime;
 
     Vector2 P = Entity->Position;
     Vector2 V = Entity->Velocity;
     Vector2 A = MultiplyV2S(Entity->Acceleration, AccelerationScale);
-    A = AddV2(A, MultiplyV2S(V, -2.0f)); /* friction */
+    V = AddV2(V, MultiplyV2S(A, 0.01f));
+    A = AddV2(A, MultiplyV2S(V, -4.0f)); /* friction */
+    V = ClampV2(V, -200.0f, 200.0f);
 
     Vector2 NewVelocity = AddV2(MultiplyV2S(A, DT), V);
     Vector2 NewPosition = AddV2(AddV2(MultiplyV2S(A, 0.5f * DT * DT),

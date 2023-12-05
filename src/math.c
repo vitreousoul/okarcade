@@ -1,6 +1,7 @@
 f32 MinF32(f32 A, f32 B);
 f32 MaxF32(f32 A, f32 B);
 f32 ClampF32(f32 Value, f32 Low, f32 High);
+Vector2 ClampV32(Vector2 A, f32 Low, f32 High);
 
 s32 MinS32(s32 A, s32 B);
 s32 MaxS32(s32 A, s32 B);
@@ -27,6 +28,13 @@ f32 MaxF32(f32 A, f32 B)
 f32 ClampF32(f32 Value, f32 Low, f32 High)
 {
     return MinF32(MaxF32(Value, Low), High);
+}
+
+Vector2 ClampV32(Vector2 A, f32 Low, f32 High)
+{
+    Vector2 Result = (Vector2){ClampF32(A.x, Low, High),
+                               ClampF32(A.y, Low, High)};
+    return Result;
 }
 
 Vector2 RotateV2(Vector2 V, f32 Theta)
