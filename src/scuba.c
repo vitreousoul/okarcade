@@ -57,6 +57,7 @@ typedef enum
 {
     ui_id_Null,
     ui_id_PlayButton,
+    ui_id_QuitButton,
 } ui_id;
 
 typedef enum
@@ -111,6 +112,7 @@ typedef enum
     game_mode_Start,
     game_mode_Play,
     game_mode_GameOver,
+    game_mode_Quit,
 } game_mode;
 
 typedef struct
@@ -332,6 +334,7 @@ internal b32 CollideEntities(game_state *GameState, entity *EntityA, entity *Ent
     return Collides;
 }
 
+/* TODO rename this function, since it does more than debug collision drawing now..... */
 internal void DebugDrawCollisions(game_state *GameState)
 {
     /* O(n^2) loop to check if any entity collides with another. */
@@ -356,8 +359,124 @@ internal void DebugDrawCollisions(game_state *GameState)
             }
 
             b32 Collides = CollideEntities(GameState, EntityA, EntityB);
+
+            b32 PlayerAndEel = ((SpriteA.Type == sprite_type_Fish && SpriteB.Type == sprite_type_Eel) ||
+                                (SpriteA.Type == sprite_type_Eel && SpriteB.Type == sprite_type_Fish));
+
+            if (Collides && PlayerAndEel)
+            {
+                GameState->Mode = game_mode_GameOver;
+            }
         }
     }
+}
+
+internal collision_area *AddCollisionArea(game_state *GameState)
+{
+    collision_area *CollisionArea = 0;
+
+    if (GameState->CollisionAreaCount < MAX_COLLISION_AREA_COUNT)
+    {
+        CollisionArea = GameState->CollisionAreas + GameState->CollisionAreaCount;
+        CollisionArea->Area = (Rectangle){0};
+        CollisionArea->Next = 0;
+        GameState->CollisionAreaCount += 1;
+    }
+
+    return CollisionArea;
+}
+
+static entity NullEntity;
+
+internal void ResetGame(game_state *GameState)
+{
+    GameState->EntityCount = 0;
+
+    for (s32 I = 0; I < MAX_ENTITY_COUNT; ++I)
+    {
+        GameState->Entities[I] = NullEntity;
+    }
+
+    { /* init entities */
+        GameState->PlayerEntity = AddEntity(GameState);
+        entity *PlayerEntity = GameState->PlayerEntity;
+        PlayerEntity->Type = entity_type_Base;
+        PlayerEntity->Sprites[0].Type = sprite_type_Fish;
+        PlayerEntity->Sprites[0].SourceRectangle = R2(5,3,12,9);
+        PlayerEntity->Sprites[0].DepthZ = 1;
+        PlayerEntity->Position = V2(0.0f, 0.0f);
+        PlayerEntity->Position = MultiplyV2S(V2(1.0f, 1.0f), TILE_SIZE * TEXTURE_MAP_SCALE);
+        PlayerEntity->CollisionArea = AddCollisionArea(GameState);
+        PlayerEntity->CollisionArea->Area = R2(1 * TEXTURE_MAP_SCALE,
+                                               1 * TEXTURE_MAP_SCALE,
+                                               10 * TEXTURE_MAP_SCALE,
+                                               6 * TEXTURE_MAP_SCALE);
+
+        GameState->EelEntity = AddEntity(GameState);
+        entity *EelEntity = GameState->EelEntity;
+        EelEntity->Type = entity_type_Base;
+        EelEntity->Sprites[0].Type = sprite_type_Eel;
+        EelEntity->Sprites[0].SourceRectangle = R2(1,27,34,20);
+        EelEntity->Sprites[0].DepthZ = 1;
+        EelEntity->Position = MultiplyV2S(V2(0.25f, 4.0f), TILE_SIZE * TEXTURE_MAP_SCALE);
+        EelEntity->CollisionArea = AddCollisionArea(GameState);
+        EelEntity->CollisionArea->Area = R2(6 * TEXTURE_MAP_SCALE,
+                                            6 * TEXTURE_MAP_SCALE,
+                                            22 * TEXTURE_MAP_SCALE,
+                                            8 * TEXTURE_MAP_SCALE);
+
+        GameState->CrabEntity = AddEntity(GameState);
+        entity *CrabEntity = GameState->CrabEntity;
+        CrabEntity->Type = entity_type_Base;
+        CrabEntity->Sprites[0].Type = sprite_type_Crab;
+        CrabEntity->Sprites[0].SourceRectangle = R2(14,69,39,20);
+        CrabEntity->Sprites[0].DepthZ = 1;
+        CrabEntity->Position = MultiplyV2S(V2(9.0f, 7.0f), TILE_SIZE * TEXTURE_MAP_SCALE);
+        CrabEntity->CollisionArea = AddCollisionArea(GameState);
+        CrabEntity->CollisionArea->Area = R2(2 * TEXTURE_MAP_SCALE,
+                                             -3 * TEXTURE_MAP_SCALE,
+                                             16 * TEXTURE_MAP_SCALE,
+                                             9 * TEXTURE_MAP_SCALE);
+
+        GameState->CoralEntity = AddEntity(GameState);
+        entity *CoralEntity = GameState->CoralEntity;
+        CoralEntity->Type = entity_type_Base;
+        CoralEntity->Sprites[0].Type = sprite_type_Coral;
+        CoralEntity->Sprites[0].SourceRectangle = R2(13,118,TILE_SIZE,TILE_SIZE);
+        CoralEntity->Sprites[0].DepthZ = 0;
+
+        GameState->WallEntity = AddEntity(GameState);
+        entity *WallEntity = GameState->WallEntity;
+        WallEntity->Type = entity_type_Base;
+        WallEntity->Sprites[0].Type = sprite_type_Wall;
+        WallEntity->Sprites[0].SourceRectangle = R2(13,147,TILE_SIZE,TILE_SIZE);
+        WallEntity->Sprites[0].DepthZ = 0;
+        WallEntity->CollisionArea = AddCollisionArea(GameState);
+        WallEntity->CollisionArea->Area = R2(0 * TEXTURE_MAP_SCALE,
+                                             0 * TEXTURE_MAP_SCALE,
+                                             TILE_SIZE * TEXTURE_MAP_SCALE,
+                                             TILE_SIZE * TEXTURE_MAP_SCALE);
+
+        GameState->CageEntity = AddEntity(GameState);
+        entity *CageEntity = GameState->CageEntity;
+        CageEntity->Type = entity_type_Base;
+        CageEntity->Sprites[0].Type = sprite_type_Cage;
+        CageEntity->Sprites[0].SourceRectangle = R2(90,6,110,70);
+        CageEntity->Sprites[0].DepthZ = 0;
+        CageEntity->Sprites[1].Type = sprite_type_Cage;
+        CageEntity->Sprites[1].SourceRectangle = R2(90,101,110,70);
+        CageEntity->Sprites[1].DepthZ = 1;
+        CageEntity->Position = MultiplyV2S(V2(9.0f, 7.0f), TILE_SIZE * TEXTURE_MAP_SCALE);
+        CageEntity->CollisionArea = AddCollisionArea(GameState);
+        CageEntity->CollisionArea->Area = R2(1 * TEXTURE_MAP_SCALE,
+                                             1 * TEXTURE_MAP_SCALE,
+                                             110 * TEXTURE_MAP_SCALE,
+                                             70 * TEXTURE_MAP_SCALE);
+    }
+
+    GameState->CameraPosition = GameState->PlayerEntity->Position;
+    GameState->Mode = game_mode_Start;
+    GameState->LastTime = GetTime();
 }
 
 internal void UpdateAndRender(void *VoidGameState)
@@ -366,6 +485,7 @@ internal void UpdateAndRender(void *VoidGameState)
     ui *UI = &GameState->UI;
 
     HandleUserInput(GameState);
+    BeginDrawing();
 
     switch(GameState->Mode)
     {
@@ -373,6 +493,8 @@ internal void UpdateAndRender(void *VoidGameState)
     {
         f32 CenterX = SCREEN_WIDTH / 2.0;
         f32 StartY = SCREEN_HEIGHT * 0.4;
+
+        ClearBackground(BackgroundColor);
 
         b32 Pressed = DoButtonWith(UI, ui_id_PlayButton, (u8 *)"Play", V2(CenterX, StartY));
 
@@ -385,6 +507,24 @@ internal void UpdateAndRender(void *VoidGameState)
     } break;
     case game_mode_GameOver:
     {
+        f32 CenterX = SCREEN_WIDTH / 2.0;
+        f32 StartY = SCREEN_HEIGHT * 0.4;
+
+        ClearBackground(BackgroundColor);
+
+        b32 PlayPressed = DoButtonWith(UI, ui_id_PlayButton, (u8 *)"Play Again", V2(CenterX, StartY));
+        b32 QuitPressed = DoButtonWith(UI, ui_id_QuitButton, (u8 *)"Quit", V2(CenterX, StartY + 44));
+
+        if (PlayPressed)
+        {
+            ResetGame(GameState);
+            GameState->Mode = game_mode_Play;
+        }
+        else if (QuitPressed)
+        {
+            GameState->Mode = game_mode_Quit;
+        }
+
         EndDrawing();
     } break;
     case game_mode_Play:
@@ -411,7 +551,6 @@ internal void UpdateAndRender(void *VoidGameState)
             GameState->CameraPosition = GameState->PlayerEntity->Position;
         }
 
-        BeginDrawing();
         ClearBackground(BackgroundColor);
 
         { /* draw coral background */
@@ -499,114 +638,18 @@ internal void UpdateAndRender(void *VoidGameState)
 
         EndDrawing();
     } break;
+    default: EndDrawing();
     }
-}
-
-internal collision_area *AddCollisionArea(game_state *GameState)
-{
-    collision_area *CollisionArea = 0;
-
-    if (GameState->CollisionAreaCount < MAX_COLLISION_AREA_COUNT)
-    {
-        CollisionArea = GameState->CollisionAreas + GameState->CollisionAreaCount;
-        CollisionArea->Area = (Rectangle){0};
-        CollisionArea->Next = 0;
-        GameState->CollisionAreaCount += 1;
-    }
-
-    return CollisionArea;
 }
 
 internal game_state InitGameState(Texture2D ScubaTexture)
 {
     game_state GameState = {0};
 
-    GameState.Mode = game_mode_Start;
-
     GameState.UI.FontSize = 16;
-
     GameState.ScubaTexture = ScubaTexture;
 
-    { /* init entities */
-        GameState.PlayerEntity = AddEntity(&GameState);
-        entity *PlayerEntity = GameState.PlayerEntity;
-        PlayerEntity->Type = entity_type_Base;
-        PlayerEntity->Sprites[0].Type = sprite_type_Fish;
-        PlayerEntity->Sprites[0].SourceRectangle = R2(5,3,12,9);
-        PlayerEntity->Sprites[0].DepthZ = 1;
-        PlayerEntity->Position = V2(0.0f, 0.0f);
-        PlayerEntity->Position = MultiplyV2S(V2(1.0f, 1.0f), TILE_SIZE * TEXTURE_MAP_SCALE);
-        PlayerEntity->CollisionArea = AddCollisionArea(&GameState);
-        PlayerEntity->CollisionArea->Area = R2(1 * TEXTURE_MAP_SCALE,
-                                               1 * TEXTURE_MAP_SCALE,
-                                               10 * TEXTURE_MAP_SCALE,
-                                               6 * TEXTURE_MAP_SCALE);
-
-        GameState.EelEntity = AddEntity(&GameState);
-        entity *EelEntity = GameState.EelEntity;
-        EelEntity->Type = entity_type_Base;
-        EelEntity->Sprites[0].Type = sprite_type_Eel;
-        EelEntity->Sprites[0].SourceRectangle = R2(1,27,34,20);
-        EelEntity->Sprites[0].DepthZ = 1;
-        EelEntity->Position = MultiplyV2S(V2(0.25f, 4.0f), TILE_SIZE * TEXTURE_MAP_SCALE);
-        EelEntity->CollisionArea = AddCollisionArea(&GameState);
-        EelEntity->CollisionArea->Area = R2(6 * TEXTURE_MAP_SCALE,
-                                            6 * TEXTURE_MAP_SCALE,
-                                            22 * TEXTURE_MAP_SCALE,
-                                            8 * TEXTURE_MAP_SCALE);
-
-        GameState.CrabEntity = AddEntity(&GameState);
-        entity *CrabEntity = GameState.CrabEntity;
-        CrabEntity->Type = entity_type_Base;
-        CrabEntity->Sprites[0].Type = sprite_type_Crab;
-        CrabEntity->Sprites[0].SourceRectangle = R2(14,69,39,20);
-        CrabEntity->Sprites[0].DepthZ = 1;
-        CrabEntity->Position = MultiplyV2S(V2(9.0f, 7.0f), TILE_SIZE * TEXTURE_MAP_SCALE);
-        CrabEntity->CollisionArea = AddCollisionArea(&GameState);
-        CrabEntity->CollisionArea->Area = R2(2 * TEXTURE_MAP_SCALE,
-                                             -3 * TEXTURE_MAP_SCALE,
-                                             16 * TEXTURE_MAP_SCALE,
-                                             9 * TEXTURE_MAP_SCALE);
-
-        GameState.CoralEntity = AddEntity(&GameState);
-        entity *CoralEntity = GameState.CoralEntity;
-        CoralEntity->Type = entity_type_Base;
-        CoralEntity->Sprites[0].Type = sprite_type_Coral;
-        CoralEntity->Sprites[0].SourceRectangle = R2(13,118,TILE_SIZE,TILE_SIZE);
-        CoralEntity->Sprites[0].DepthZ = 0;
-
-        GameState.WallEntity = AddEntity(&GameState);
-        entity *WallEntity = GameState.WallEntity;
-        WallEntity->Type = entity_type_Base;
-        WallEntity->Sprites[0].Type = sprite_type_Wall;
-        WallEntity->Sprites[0].SourceRectangle = R2(13,147,TILE_SIZE,TILE_SIZE);
-        WallEntity->Sprites[0].DepthZ = 0;
-        WallEntity->CollisionArea = AddCollisionArea(&GameState);
-        WallEntity->CollisionArea->Area = R2(0 * TEXTURE_MAP_SCALE,
-                                             0 * TEXTURE_MAP_SCALE,
-                                             TILE_SIZE * TEXTURE_MAP_SCALE,
-                                             TILE_SIZE * TEXTURE_MAP_SCALE);
-
-        GameState.CageEntity = AddEntity(&GameState);
-        entity *CageEntity = GameState.CageEntity;
-        CageEntity->Type = entity_type_Base;
-        CageEntity->Sprites[0].Type = sprite_type_Cage;
-        CageEntity->Sprites[0].SourceRectangle = R2(90,6,110,70);
-        CageEntity->Sprites[0].DepthZ = 0;
-        CageEntity->Sprites[1].Type = sprite_type_Cage;
-        CageEntity->Sprites[1].SourceRectangle = R2(90,101,110,70);
-        CageEntity->Sprites[1].DepthZ = 1;
-        CageEntity->Position = MultiplyV2S(V2(9.0f, 7.0f), TILE_SIZE * TEXTURE_MAP_SCALE);
-        CageEntity->CollisionArea = AddCollisionArea(&GameState);
-        CageEntity->CollisionArea->Area = R2(1 * TEXTURE_MAP_SCALE,
-                                             1 * TEXTURE_MAP_SCALE,
-                                             110 * TEXTURE_MAP_SCALE,
-                                             70 * TEXTURE_MAP_SCALE);
-    }
-
-    GameState.CameraPosition = GameState.PlayerEntity->Position;
-
-    GameState.LastTime = GetTime();
+    ResetGame(&GameState);
 
     return GameState;
 }
@@ -681,7 +724,7 @@ int main(void)
         emscripten_set_main_loop_arg(UpdateAndRender, &GameState, 0, 1);
 #else
         SetTargetFPS(60);
-        while (!WindowShouldClose())
+        while (!WindowShouldClose() && GameState.Mode != game_mode_Quit)
         {
             UpdateAndRender(&GameState);
         }
