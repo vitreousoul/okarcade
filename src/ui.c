@@ -9,11 +9,26 @@ typedef enum
     ui_element_type_Count,
 } ui_element_type;
 
+typedef enum
+{
+   alignment_TopLeft,
+   alignment_TopCenter,
+   alignment_TopRight,
+   alignment_CenterRight,
+   alignment_BottomRight,
+   alignment_BottomCenter,
+   alignment_BottomLeft,
+   alignment_CenterLeft,
+   alignment_CenterCenter,
+} alignment;
+
 typedef struct
 {
     s32 Id;
 
     Vector2 Position;
+    alignment Alignment;
+
     Vector2 Size;
     u8 *Text;
 } button;
@@ -66,7 +81,7 @@ typedef struct
 button CreateButton(Vector2 Position, u8 *Text, s32 Id);
 
 b32 DoButton(ui *UI, button *Button);
-b32 DoButtonWith(ui *UI, s32 Id, u8 *Text, Vector2 Position);
+b32 DoButtonWith(ui *UI, s32 Id, u8 *Text, Vector2 Position, alignment Alignment);
 b32 DoSlider(ui *UI, slider *Slider);
 b32 DoTablet(ui *UI, tablet *Tablet);
 b32 DoUiElement(ui *UI, ui_element *UiElement);
@@ -82,17 +97,17 @@ button CreateButton(Vector2 Position, u8 *Text, s32 Id)
     return Button;
 }
 
-internal b32 PositionIsInsideButton(Vector2 Position, button *Button)
+internal b32 PositionIsInsideRect(Vector2 Position, Rectangle Rect)
 {
-    f32 X0 = Button->Position.x;
-    f32 Y0 = Button->Position.y;
-    f32 X1 = Button->Position.x + Button->Size.x;
-    f32 Y1 = Button->Position.y + Button->Size.y;
+    f32 x0 = Rect.x;
+    f32 y0 = Rect.y;
+    f32 x1 = x0 + Rect.width;
+    f32 y1 = y0 + Rect.height;
 
-    return ((Position.x >= X0) &&
-            (Position.x <= X1) &&
-            (Position.y >= Y0) &&
-            (Position.y <= Y1));
+    return ((Position.x >= x0) &&
+            (Position.x <= x1) &&
+            (Position.y >= y0) &&
+            (Position.y <= y1));
 }
 
 internal b32 PositionIsInsideSliderHandle(Vector2 Position, slider *Slider)
@@ -121,6 +136,31 @@ internal b32 PositionIsInsideTablet(Vector2 Position, tablet *Tablet)
             (Position.y <= Y1));
 }
 
+internal Rectangle GetAlignedRectangle(Vector2 Position, Vector2 Size, alignment Alignment)
+{
+    Rectangle Result;
+    Vector2 HalfSize = V2(Size.x / 2.0f, Size.y / 2.0f);
+    Vector2 Offset = V2(0.0f, 0.0f);
+
+    switch(Alignment)
+    {
+    case alignment_TopLeft: Offset = V2(0.0f, 0.0f); break;
+    case alignment_TopCenter: Offset = V2(-HalfSize.x, 0.0f); break;
+    case alignment_TopRight: Offset = V2(-Size.x, 0.0f); break;
+    case alignment_CenterRight: Offset = V2(-Size.x, -HalfSize.y); break;
+    case alignment_BottomRight: Offset = V2(-Size.x, -Size.y); break;
+    case alignment_BottomCenter: Offset = V2(-HalfSize.x, -Size.y); break;
+    case alignment_BottomLeft: Offset = V2(0.0f, -Size.y); break;
+    case alignment_CenterLeft: Offset = V2(0.0f, -HalfSize.y); break;
+    case alignment_CenterCenter:
+    default: Offset = V2(-HalfSize.x, -HalfSize.y);
+    }
+
+    Result = R2(Position.x + Offset.x, Position.y + Offset.y, Size.x, Size.y);
+
+    return Result;
+}
+
 b32 DoButton(ui *UI, button *Button)
 {
     b32 ButtonPressed = 0;
@@ -134,7 +174,9 @@ b32 DoButton(ui *UI, button *Button)
     f32 TwicePadding = 2 * BUTTON_PADDING;
     Button->Size = V2(TextWidth + TwicePadding, UI->FontSize + TwicePadding);
 
-    b32 IsHot = PositionIsInsideButton(UI->MousePosition, Button);
+    Rectangle AlignedRect = GetAlignedRectangle(Button->Position, Button->Size, Button->Alignment);
+
+    b32 IsHot = PositionIsInsideRect(UI->MousePosition, AlignedRect);
     b32 IsActive = UI->Active == Button->Id;
 
     if (IsHot)
@@ -165,10 +207,10 @@ b32 DoButton(ui *UI, button *Button)
         }
     }
 
-    Rectangle Rect = (Rectangle){Button->Position.x, Button->Position.y,
-                                 Button->Size.x, Button->Size.y};
-    Rectangle UnderRect = (Rectangle){Button->Position.x + 2.0f, Button->Position.y + 2.0f,
-                                      Button->Size.x, Button->Size.y};
+    Rectangle Rect = (Rectangle){AlignedRect.x, AlignedRect.y,
+                                 AlignedRect.width, AlignedRect.height};
+    Rectangle UnderRect = (Rectangle){AlignedRect.x + 2.0f, AlignedRect.y + 2.0f,
+                                      AlignedRect.width, AlignedRect.height};
 
     Color ButtonColor = IsActive ? ActiveColor : InactiveColor;
 
@@ -181,18 +223,19 @@ b32 DoButton(ui *UI, button *Button)
     }
 
     DrawText((char *)Button->Text,
-             Button->Position.x + BUTTON_PADDING, Button->Position.y + BUTTON_PADDING,
+             AlignedRect.x + BUTTON_PADDING, AlignedRect.y + BUTTON_PADDING,
              UI->FontSize, TextColor);
 
     return ButtonPressed;
 }
 
-b32 DoButtonWith(ui *UI, s32 Id, u8 *Text, Vector2 Position)
+b32 DoButtonWith(ui *UI, s32 Id, u8 *Text, Vector2 Position, alignment Alignment)
 {
     button Button;
 
     Button.Id = Id;
     Button.Position = Position;
+    Button.Alignment = Alignment;
     Button.Size = V2(0.0f, 0.0f);
     Button.Text = Text;
 

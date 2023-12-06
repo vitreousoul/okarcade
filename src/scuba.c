@@ -492,11 +492,12 @@ internal void UpdateAndRender(void *VoidGameState)
     case game_mode_Start:
     {
         f32 CenterX = SCREEN_WIDTH / 2.0;
-        f32 StartY = SCREEN_HEIGHT * 0.4;
+        f32 StartY = SCREEN_HEIGHT * 0.5;
 
         ClearBackground(BackgroundColor);
 
-        b32 Pressed = DoButtonWith(UI, ui_id_PlayButton, (u8 *)"Play", V2(CenterX, StartY));
+        alignment Alignment = alignment_CenterCenter;
+        b32 Pressed = DoButtonWith(UI, ui_id_PlayButton, (u8 *)"Play", V2(CenterX, StartY), Alignment);
 
         if (Pressed)
         {
@@ -512,8 +513,9 @@ internal void UpdateAndRender(void *VoidGameState)
 
         ClearBackground(BackgroundColor);
 
-        b32 PlayPressed = DoButtonWith(UI, ui_id_PlayButton, (u8 *)"Play Again", V2(CenterX, StartY));
-        b32 QuitPressed = DoButtonWith(UI, ui_id_QuitButton, (u8 *)"Quit", V2(CenterX, StartY + 44));
+        alignment Alignment = alignment_CenterCenter;
+        b32 PlayPressed = DoButtonWith(UI, ui_id_PlayButton, (u8 *)"Play Again", V2(CenterX, StartY), Alignment);
+        b32 QuitPressed = DoButtonWith(UI, ui_id_QuitButton, (u8 *)"Quit", V2(CenterX, StartY + 44), Alignment);
 
         if (PlayPressed)
         {
