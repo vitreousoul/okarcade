@@ -165,28 +165,32 @@ internal void HandleUserInput(game_state *GameState)
     GameState->UI.MouseButtonPressed = IsMouseButtonPressed(0);
     GameState->UI.MouseButtonReleased = IsMouseButtonReleased(0);
 
-    GameState->PlayerEntity->Acceleration.x = 0;
-    GameState->PlayerEntity->Acceleration.y = 0;
+    Vector2 *Acceleration = &GameState->PlayerEntity->Acceleration;
+
+    Acceleration->x = 0;
+    Acceleration->y = 0;
 
     if (IsKeyDown(KEY_D))
     {
-        GameState->PlayerEntity->Acceleration.x += 1.0f;
+        Acceleration->x += 1.0f;
     }
 
     if (IsKeyDown(KEY_S))
     {
-        GameState->PlayerEntity->Acceleration.y += 1.0f;
+        Acceleration->y += 1.0f;
     }
 
     if (IsKeyDown(KEY_A))
     {
-        GameState->PlayerEntity->Acceleration.x -= 1.0f;
+        Acceleration->x -= 1.0f;
     }
 
     if (IsKeyDown(KEY_W))
     {
-        GameState->PlayerEntity->Acceleration.y -= 1.0f;
+        Acceleration->y -= 1.0f;
     }
+
+    *Acceleration = NormalizeV2(*Acceleration);
 }
 
 internal Vector2 WorldToScreenPosition(game_state *GameState, Vector2 P)
@@ -248,9 +252,16 @@ internal void DrawSprite(game_state *GameState, entity *Entity, s32 DepthZ)
 
 internal void UpdateEntity(game_state *GameState, entity *Entity)
 {
-    /* TODO Fix the drift that occurs with updated entities!!!!!!!!
-            We should probably only call UpdateEntity if we really want
-            to update the entity's position! */
+    f32 AccelerationThreshold = 0.0001f;
+    f32 VelocityThreshold = 1.0f;
+    if ((LengthSquaredV2(Entity->Acceleration) < AccelerationThreshold &&
+         LengthSquaredV2(Entity->Velocity) < VelocityThreshold))
+    {
+        Entity->Acceleration = V2(0.0f, 0.0f);
+        Entity->Velocity = V2(0.0f, 0.0f);
+        return;
+    }
+
     f32 AccelerationScale = 1000.0f;
     f32 DT = GameState->DeltaTime;
 
@@ -266,11 +277,8 @@ internal void UpdateEntity(game_state *GameState, entity *Entity)
                                       MultiplyV2S(V, DT)),
                                 P);
 
-    if ((AbsF32(NewVelocity.x) > 0.0001) && AbsF32(NewVelocity.y) > 0.0001)
-    {
-        Entity->Velocity = NewVelocity;
-        Entity->Position = NewPosition;
-    }
+    Entity->Velocity = NewVelocity;
+    Entity->Position = NewPosition;
 }
 
 internal Rectangle GetSpriteRectangle(entity *Entity)
