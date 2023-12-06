@@ -515,7 +515,11 @@ internal void UpdateAndRender(void *VoidGameState)
 
         alignment Alignment = alignment_CenterCenter;
         b32 PlayPressed = DoButtonWith(UI, ui_id_PlayButton, (u8 *)"Play Again", V2(CenterX, StartY), Alignment);
-        b32 QuitPressed = DoButtonWith(UI, ui_id_QuitButton, (u8 *)"Quit", V2(CenterX, StartY + 44), Alignment);
+        b32 QuitPressed = 0;
+
+#if !PLATFORM_WEB
+        QuitPressed = DoButtonWith(UI, ui_id_QuitButton, (u8 *)"Quit", V2(CenterX, StartY + 44), Alignment);
+#endif
 
         if (PlayPressed)
         {
