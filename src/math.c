@@ -1,6 +1,7 @@
 f32 MinF32(f32 A, f32 B);
 f32 MaxF32(f32 A, f32 B);
 f32 ClampF32(f32 Value, f32 Low, f32 High);
+f32 AbsF32(f32 Value);
 Vector2 ClampV32(Vector2 A, f32 Low, f32 High);
 
 s32 MinS32(s32 A, s32 B);
@@ -29,6 +30,18 @@ f32 MaxF32(f32 A, f32 B)
 f32 ClampF32(f32 Value, f32 Low, f32 High)
 {
     return MinF32(MaxF32(Value, Low), High);
+}
+
+f32 AbsF32(f32 Value)
+{
+    f32 Result = Value;
+
+    if (Result < 0.0f)
+    {
+        Result = -1.0f * Result;
+    }
+
+    return Result;
 }
 
 Vector2 ClampV32(Vector2 A, f32 Low, f32 High)

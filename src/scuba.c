@@ -248,6 +248,9 @@ internal void DrawSprite(game_state *GameState, entity *Entity, s32 DepthZ)
 
 internal void UpdateEntity(game_state *GameState, entity *Entity)
 {
+    /* TODO Fix the drift that occurs with updated entities!!!!!!!!
+            We should probably only call UpdateEntity if we really want
+            to update the entity's position! */
     f32 AccelerationScale = 1000.0f;
     f32 DT = GameState->DeltaTime;
 
@@ -263,8 +266,11 @@ internal void UpdateEntity(game_state *GameState, entity *Entity)
                                       MultiplyV2S(V, DT)),
                                 P);
 
-    Entity->Velocity = NewVelocity;
-    Entity->Position = NewPosition;
+    if ((AbsF32(NewVelocity.x) > 0.0001) && AbsF32(NewVelocity.y) > 0.0001)
+    {
+        Entity->Velocity = NewVelocity;
+        Entity->Position = NewPosition;
+    }
 }
 
 internal Rectangle GetSpriteRectangle(entity *Entity)
@@ -634,11 +640,16 @@ internal void UpdateAndRender(void *VoidGameState)
             }
 
             { /* draw time */
+                Color BackgroundColor = (Color){0, 0, 0, 255};
+                Color ForegroundColor = (Color){255, 255, 255, 255};
                 char DebugTextBuffer[128] = {};
                 f32 DeltaTime = GetTime() - StartTime;
+                f32 Spacing = 0;
+
                 sprintf(DebugTextBuffer, "dt (ms) %.4f ", 1000 * DeltaTime);
-                DrawText(DebugTextBuffer, 11, 11, 12, (Color){0,0,0,255});
-                DrawText(DebugTextBuffer, 10, 10, 12, (Color){255,255,255,255});
+
+                DrawTextEx(GameState->UI.Font, DebugTextBuffer, V2(11, 11), 12, Spacing, BackgroundColor);
+                DrawTextEx(GameState->UI.Font, DebugTextBuffer, V2(10, 10), 12, Spacing, ForegroundColor);
             }
         }
 
@@ -708,12 +719,16 @@ internal b32 LoadScubaTexture(Texture2D *Texture)
 
 int main(void)
 {
-    printf("entity size %lu\n", sizeof(entity));
 #if defined(PLATFORM_WEB)
     InitRaylibCanvas();
 #endif
 
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "SCUBA");
+
+    s32 FontSize = 32;
+    s32 *Chars = 0;
+    s32 GlyphCount = 0;
+    Font LoadedFont = LoadFontEx("../assets/Roboto-Regular.ttf", FontSize, Chars, GlyphCount);
 
     Texture2D ScubaTexture = {0};
     b32 TextureError = LoadScubaTexture(&ScubaTexture);
@@ -722,9 +737,14 @@ int main(void)
     {
         LogError("loading scuba asset texture.");
     }
+    else if (!IsFontReady(LoadedFont))
+    {
+        LogError("loading font data");
+    }
     else
     {
         game_state GameState = InitGameState(ScubaTexture);
+        GameState.UI.Font = LoadedFont;
 
 #if defined(PLATFORM_WEB)
         emscripten_set_main_loop_arg(UpdateAndRender, &GameState, 0, 1);

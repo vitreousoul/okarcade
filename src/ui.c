@@ -69,6 +69,8 @@ typedef struct
     s32 Active;
     s32 Hot;
 
+
+    Font Font;
     s32 FontSize;
 
     b32 MouseButtonPressed;
@@ -170,9 +172,11 @@ b32 DoButton(ui *UI, button *Button)
     Color ActiveColor = (Color){40,120,120,255};
     Color TextColor = (Color){0,0,0,255};
 
-    s32 TextWidth = MeasureText((char *)Button->Text, UI->FontSize);
+    f32 FontSpacing = 0;
+    Vector2 TextSize = MeasureTextEx(UI->Font, (char *)Button->Text, UI->FontSize, FontSpacing);
+
     f32 TwicePadding = 2 * BUTTON_PADDING;
-    Button->Size = V2(TextWidth + TwicePadding, UI->FontSize + TwicePadding);
+    Button->Size = V2(TextSize.x + TwicePadding, UI->FontSize + TwicePadding);
 
     Rectangle AlignedRect = GetAlignedRectangle(Button->Position, Button->Size, Button->Alignment);
 
@@ -222,9 +226,9 @@ b32 DoButton(ui *UI, button *Button)
         DrawRectangleLinesEx(Rect, 2.0f, HotColor);
     }
 
-    DrawText((char *)Button->Text,
-             AlignedRect.x + BUTTON_PADDING, AlignedRect.y + BUTTON_PADDING,
-             UI->FontSize, TextColor);
+    Vector2 TextPosition = V2(AlignedRect.x + BUTTON_PADDING, AlignedRect.y + BUTTON_PADDING);
+
+    DrawTextEx(UI->Font, (char *)Button->Text, TextPosition, UI->FontSize, FontSpacing, TextColor);
 
     return ButtonPressed;
 }
