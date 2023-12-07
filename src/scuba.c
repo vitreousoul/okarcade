@@ -555,19 +555,26 @@ internal void UpdateAndRender(void *VoidGameState)
             return;
         }
 
-        { /* update timer */
-            f32 Time = GetTime();
-            f32 DeltaTime = Time - GameState->LastTime;
-            GameState->DeltaTime = MinF32(MAX_DELTA_TIME, DeltaTime);
-            GameState->LastTime = Time;
-        }
-
         f32 StartTime = GetTime();
 
-        {
-            UpdateEntity(GameState, GameState->EelEntity);
-            UpdateEntity(GameState, GameState->CrabEntity);
-            UpdateEntity(GameState, GameState->PlayerEntity);
+        { /* update timer */
+            f32 DeltaTime = StartTime - GameState->LastTime;
+            GameState->DeltaTime = MinF32(MAX_DELTA_TIME, DeltaTime);
+            GameState->LastTime = StartTime;
+        }
+
+        { /* update entities */
+            for (s32 I = 0; I < MAX_ENTITY_COUNT; ++I)
+            {
+                entity *Entity = GameState->Entities + I;
+
+                if (!Entity->Type)
+                {
+                    break;
+                }
+
+                UpdateEntity(GameState, Entity);
+            }
             GameState->CameraPosition = GameState->PlayerEntity->Position;
         }
 
