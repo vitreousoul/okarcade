@@ -385,12 +385,44 @@ internal b32 CollideEntities(game_state *GameState, entity *EntityA, entity *Ent
 
 #define MAX_COLLISION_COUNT 16
 
+internal void UpdateEntity(game_state *GameState, entity *Entity)
+{
+    f32 AccelerationThreshold = 0.0001f;
+    f32 VelocityThreshold = 1.0f;
+
+    if ((LengthSquaredV2(Entity->Acceleration) < AccelerationThreshold &&
+         LengthSquaredV2(Entity->Velocity) < VelocityThreshold))
+    {
+        Entity->Acceleration = V2(0.0f, 0.0f);
+        Entity->Velocity = V2(0.0f, 0.0f);
+        return;
+    }
+
+    f32 AccelerationScale = 1000.0f;
+    f32 DT = GameState->DeltaTime;
+
+    Vector2 P = Entity->Position;
+    Vector2 V = Entity->Velocity;
+    Vector2 A = MultiplyV2S(Entity->Acceleration, AccelerationScale);
+    V = AddV2(V, MultiplyV2S(A, 0.01f));
+    A = AddV2(A, AddV2S(MultiplyV2S(V, -4.0f), -1.0f)); /* friction */
+    V = ClampV2(V, -300.0f, 300.0f);
+
+    Vector2 NewVelocity = AddV2(MultiplyV2S(A, DT), V);
+    Vector2 NewPosition = AddV2(AddV2(MultiplyV2S(A, 0.5f * DT * DT),
+                                      MultiplyV2S(V, DT)),
+                                P);
+
+    Entity->Velocity = NewVelocity;
+    Entity->Position = NewPosition;
+}
+
 internal void UpdateEntities(game_state *GameState)
 {
     /* TODO: Define new loop that:
-                 finds soonest collision,
-                 update entities using collision,
-                 repeat until all entities are out of movement.
+       finds soonest collision,
+       update entities using collision,
+       repeat until all entities are out of movement.
     */
     for (s32 I = 0; I < MAX_ENTITY_COUNT; ++I)
     {
@@ -403,55 +435,39 @@ internal void UpdateEntities(game_state *GameState)
             break;
         }
 
-        for (s32 J = 0; J < MAX_ENTITY_COUNT; ++J)
+        if (I == 0)
+        {
+            UpdateEntity(GameState, Entity);
+        }
+
+        for (s32 J = I + 1; J < MAX_ENTITY_COUNT; ++J)
         {
             entity *TestEntity = GameState->Entities + J;
-
-            if (I == J)
-            {
-                continue;
-            }
 
             if (!TestEntity->Type)
             {
                 break;
             }
 
+            UpdateEntity(GameState, TestEntity);
+
             b32 Collides = CollideEntities(GameState, Entity, TestEntity);
+
+            sprite_type SpriteType = Entity->Sprites[0].Type;
+            sprite_type TestSpriteType = TestEntity->Sprites[0].Type;
+            b32 PlayerAndEel = ((SpriteType == sprite_type_Fish && TestSpriteType == sprite_type_Eel) ||
+                                (SpriteType == sprite_type_Eel && TestSpriteType == sprite_type_Fish));
+
+            if (Collides && PlayerAndEel)
+            {
+                GameState->Mode = game_mode_GameOver;
+            }
 
             if (Collides && CollisionIndex < MAX_COLLISION_COUNT)
             {
                 CollisionTypes[CollisionIndex++] = TestEntity->Sprites[0].Type;
             }
         }
-
-        f32 AccelerationThreshold = 0.0001f;
-        f32 VelocityThreshold = 1.0f;
-        if ((LengthSquaredV2(Entity->Acceleration) < AccelerationThreshold &&
-             LengthSquaredV2(Entity->Velocity) < VelocityThreshold))
-        {
-            Entity->Acceleration = V2(0.0f, 0.0f);
-            Entity->Velocity = V2(0.0f, 0.0f);
-            return;
-        }
-
-        f32 AccelerationScale = 1000.0f;
-        f32 DT = GameState->DeltaTime;
-
-        Vector2 P = Entity->Position;
-        Vector2 V = Entity->Velocity;
-        Vector2 A = MultiplyV2S(Entity->Acceleration, AccelerationScale);
-        V = AddV2(V, MultiplyV2S(A, 0.01f));
-        A = AddV2(A, AddV2S(MultiplyV2S(V, -4.0f), -1.0f)); /* friction */
-        V = ClampV2(V, -300.0f, 300.0f);
-
-        Vector2 NewVelocity = AddV2(MultiplyV2S(A, DT), V);
-        Vector2 NewPosition = AddV2(AddV2(MultiplyV2S(A, 0.5f * DT * DT),
-                                          MultiplyV2S(V, DT)),
-                                    P);
-
-        Entity->Velocity = NewVelocity;
-        Entity->Position = NewPosition;
     }
 }
 
@@ -469,44 +485,7 @@ internal Rectangle GetSpriteRectangle(entity *Entity)
     return SpriteRectangle;
 }
 
-/* TODO rename this function, since it does more than debug collision drawing now..... */
-internal void DebugDrawCollisions(game_state *GameState)
-{
-    /* O(n^2) loop to check if any entity collides with another. */
-    for (s32 I = 0; I < MAX_ENTITY_COUNT; ++I)
-    {
-        entity *EntityA = GameState->Entities + I;
-        sprite SpriteA = EntityA->Sprites[0];
-
-        if (!SpriteA.Type)
-        {
-            break;
-        }
-
-        for (s32 J = I + 1; J < MAX_ENTITY_COUNT; ++J)
-        {
-            entity *EntityB = GameState->Entities + J;
-            sprite SpriteB = EntityB->Sprites[0];
-
-            if (!SpriteB.Type)
-            {
-                break;
-            }
-
-            b32 Collides = CollideEntities(GameState, EntityA, EntityB);
-
-            b32 PlayerAndEel = ((SpriteA.Type == sprite_type_Fish && SpriteB.Type == sprite_type_Eel) ||
-                                (SpriteA.Type == sprite_type_Eel && SpriteB.Type == sprite_type_Fish));
-
-            if (Collides && PlayerAndEel)
-            {
-                GameState->Mode = game_mode_GameOver;
-            }
-        }
-    }
-}
-
-static entity NullEntity;
+global_variable entity NullEntity;
 
 internal void ResetGame(game_state *GameState)
 {
@@ -677,9 +656,6 @@ internal void UpdateAndRender(void *VoidGameState)
         }
 
         { /* debug graphics */
-            DebugDrawCollisions(GameState);
-
-
             { /* draw entity dots */
                 for (s32 I = 0; I < MAX_ENTITY_COUNT; ++I)
                 {
