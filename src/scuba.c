@@ -387,6 +387,11 @@ internal b32 CollideEntities(game_state *GameState, entity *EntityA, entity *Ent
 
 internal void UpdateEntities(game_state *GameState)
 {
+    /* TODO: Define new loop that:
+                 finds soonest collision,
+                 update entities using collision,
+                 repeat until all entities are out of movement.
+    */
     for (s32 I = 0; I < MAX_ENTITY_COUNT; ++I)
     {
         entity *Entity = GameState->Entities + I;
