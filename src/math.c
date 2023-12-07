@@ -15,6 +15,8 @@ Vector2 DivideV2S(Vector2 A, f32 S);
 Vector2 AddV2S(Vector2 A, f32 S);
 Vector2 MultiplyV2S(Vector2 A, f32 S);
 
+Rectangle MultiplyR2S(Rectangle Rect, f32 S);
+
 f32 LengthSquaredV2(Vector2 Vector);
 f32 LengthV2(Vector2 Vector);
 
@@ -93,6 +95,16 @@ Vector2 DivideV2S(Vector2 A, f32 S)
 Vector2 MultiplyV2S(Vector2 A, f32 S)
 {
     Vector2 Result = (Vector2){A.x * S, A.y * S};
+    return Result;
+}
+
+Rectangle MultiplyR2S(Rectangle Rect, f32 S)
+{
+    Rectangle Result = (Rectangle){S * Rect.x,
+                                   S * Rect.y,
+                                   S * Rect.width,
+                                   S * Rect.height};
+
     return Result;
 }
 
