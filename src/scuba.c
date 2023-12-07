@@ -330,51 +330,6 @@ internal void DrawSprite(game_state *GameState, entity *Entity, s32 DepthZ)
     }
 }
 
-internal void UpdateEntity(game_state *GameState, entity *Entity)
-{
-    f32 AccelerationThreshold = 0.0001f;
-    f32 VelocityThreshold = 1.0f;
-    if ((LengthSquaredV2(Entity->Acceleration) < AccelerationThreshold &&
-         LengthSquaredV2(Entity->Velocity) < VelocityThreshold))
-    {
-        Entity->Acceleration = V2(0.0f, 0.0f);
-        Entity->Velocity = V2(0.0f, 0.0f);
-        return;
-    }
-
-    f32 AccelerationScale = 1000.0f;
-    f32 DT = GameState->DeltaTime;
-
-    Vector2 P = Entity->Position;
-    Vector2 V = Entity->Velocity;
-    Vector2 A = MultiplyV2S(Entity->Acceleration, AccelerationScale);
-    V = AddV2(V, MultiplyV2S(A, 0.01f));
-    A = AddV2(A, AddV2S(MultiplyV2S(V, -4.0f), -1.0f)); /* friction */
-    V = ClampV2(V, -300.0f, 300.0f);
-
-    Vector2 NewVelocity = AddV2(MultiplyV2S(A, DT), V);
-    Vector2 NewPosition = AddV2(AddV2(MultiplyV2S(A, 0.5f * DT * DT),
-                                      MultiplyV2S(V, DT)),
-                                P);
-
-    Entity->Velocity = NewVelocity;
-    Entity->Position = NewPosition;
-}
-
-internal Rectangle GetSpriteRectangle(entity *Entity)
-{
-    Rectangle SourceRectangle = Entity->Sprites[0].SourceRectangle;
-
-    Rectangle SpriteRectangle = (Rectangle){
-        Entity->Position.x,
-        Entity->Position.y,
-        TEXTURE_MAP_SCALE * SourceRectangle.width,
-        TEXTURE_MAP_SCALE * SourceRectangle.height
-    };
-
-    return SpriteRectangle;
-}
-
 internal b32 CollideRanges(f32 ValueA, f32 LengthA, f32 ValueB, f32 LengthB)
 {
     Assert(LengthA > 0.0f && LengthB > 0.0f);
@@ -426,6 +381,87 @@ internal b32 CollideEntities(game_state *GameState, entity *EntityA, entity *Ent
 #endif
 
     return Collides;
+}
+
+#define MAX_COLLISION_COUNT 16
+
+internal void UpdateEntities(game_state *GameState)
+{
+    for (s32 I = 0; I < MAX_ENTITY_COUNT; ++I)
+    {
+        entity *Entity = GameState->Entities + I;
+        sprite_type CollisionTypes[MAX_COLLISION_COUNT];
+        s32 CollisionIndex = 0;
+
+        if (!Entity->Type)
+        {
+            break;
+        }
+
+        for (s32 J = 0; J < MAX_ENTITY_COUNT; ++J)
+        {
+            entity *TestEntity = GameState->Entities + J;
+
+            if (I == J)
+            {
+                continue;
+            }
+
+            if (!TestEntity->Type)
+            {
+                break;
+            }
+
+            b32 Collides = CollideEntities(GameState, Entity, TestEntity);
+
+            if (Collides && CollisionIndex < MAX_COLLISION_COUNT)
+            {
+                CollisionTypes[CollisionIndex++] = TestEntity->Sprites[0].Type;
+            }
+        }
+
+        f32 AccelerationThreshold = 0.0001f;
+        f32 VelocityThreshold = 1.0f;
+        if ((LengthSquaredV2(Entity->Acceleration) < AccelerationThreshold &&
+             LengthSquaredV2(Entity->Velocity) < VelocityThreshold))
+        {
+            Entity->Acceleration = V2(0.0f, 0.0f);
+            Entity->Velocity = V2(0.0f, 0.0f);
+            return;
+        }
+
+        f32 AccelerationScale = 1000.0f;
+        f32 DT = GameState->DeltaTime;
+
+        Vector2 P = Entity->Position;
+        Vector2 V = Entity->Velocity;
+        Vector2 A = MultiplyV2S(Entity->Acceleration, AccelerationScale);
+        V = AddV2(V, MultiplyV2S(A, 0.01f));
+        A = AddV2(A, AddV2S(MultiplyV2S(V, -4.0f), -1.0f)); /* friction */
+        V = ClampV2(V, -300.0f, 300.0f);
+
+        Vector2 NewVelocity = AddV2(MultiplyV2S(A, DT), V);
+        Vector2 NewPosition = AddV2(AddV2(MultiplyV2S(A, 0.5f * DT * DT),
+                                          MultiplyV2S(V, DT)),
+                                    P);
+
+        Entity->Velocity = NewVelocity;
+        Entity->Position = NewPosition;
+    }
+}
+
+internal Rectangle GetSpriteRectangle(entity *Entity)
+{
+    Rectangle SourceRectangle = Entity->Sprites[0].SourceRectangle;
+
+    Rectangle SpriteRectangle = (Rectangle){
+        Entity->Position.x,
+        Entity->Position.y,
+        TEXTURE_MAP_SCALE * SourceRectangle.width,
+        TEXTURE_MAP_SCALE * SourceRectangle.height
+    };
+
+    return SpriteRectangle;
 }
 
 /* TODO rename this function, since it does more than debug collision drawing now..... */
@@ -574,17 +610,7 @@ internal void UpdateAndRender(void *VoidGameState)
         }
 
         { /* update entities */
-            for (s32 I = 0; I < MAX_ENTITY_COUNT; ++I)
-            {
-                entity *Entity = GameState->Entities + I;
-
-                if (!Entity->Type)
-                {
-                    break;
-                }
-
-                UpdateEntity(GameState, Entity);
-            }
+            UpdateEntities(GameState);
             GameState->CameraPosition = GameState->PlayerEntity->Position;
         }
 
