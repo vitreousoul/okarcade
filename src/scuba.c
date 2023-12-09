@@ -99,6 +99,7 @@ typedef struct
     entity_type Type;
 
     Vector2 Position;
+    Vector2 OldPosition;
     Vector2 Velocity;
     Vector2 Acceleration;
 
@@ -330,20 +331,6 @@ internal void DrawSprite(game_state *GameState, entity *Entity, s32 DepthZ)
     }
 }
 
-internal b32 CollideRanges(f32 ValueA, f32 LengthA, f32 ValueB, f32 LengthB)
-{
-    Assert(LengthA > 0.0f && LengthB > 0.0f);
-    f32 MaxA = ValueA + LengthA;
-    f32 MaxB = ValueB + LengthB;
-
-    b32 ALessThanB = MaxA < ValueB;
-    b32 BLessThanA = MaxB < ValueA;
-
-    b32 Collides = !(ALessThanB || BLessThanA);
-
-    return Collides;
-}
-
 internal b32 CollideEntities(game_state *GameState, entity *EntityA, entity *EntityB)
 {
     sprite SpriteA = EntityA->Sprites[0];
@@ -364,21 +351,10 @@ internal b32 CollideEntities(game_state *GameState, entity *EntityA, entity *Ent
     B.x += EntityB->Position.x - (B.width / 2.0f);
     B.y += EntityB->Position.y - (B.height / 2.0f);
 
-    b32 XCollides = CollideRanges(A.x, A.width, B.x, B.width);
-    b32 YCollides = CollideRanges(A.y, A.height, B.y, B.height);
+    b32 CollidesInX = !(A.x + A.width < B.x || B.x + B.width < A.x);
+    b32 CollidesInY = !(A.y + A.height < B.y || B.y + B.height < A.y);
 
-    b32 Collides = XCollides && YCollides;
-
-#if 1
-    if (Collides)
-    {
-        Rectangle ScreenRectangleA = WorldToScreenRectangle(GameState, A);
-        Rectangle ScreenRectangleB = WorldToScreenRectangle(GameState, B);
-
-        DrawRectangleLinesEx(ScreenRectangleA, 2.0f, (Color){220,40,220,255});
-        DrawRectangleLinesEx(ScreenRectangleB, 2.0f, (Color){220,40,220,255});
-    }
-#endif
+    b32 Collides = CollidesInX && CollidesInY;
 
     return Collides;
 }
@@ -389,6 +365,8 @@ internal void UpdateEntity(game_state *GameState, entity *Entity)
 {
     f32 AccelerationThreshold = 0.0001f;
     f32 VelocityThreshold = 1.0f;
+
+    Entity->OldPosition = Entity->Position;
 
     if ((LengthSquaredV2(Entity->Acceleration) < AccelerationThreshold &&
          LengthSquaredV2(Entity->Velocity) < VelocityThreshold))
@@ -424,7 +402,24 @@ internal void UpdateEntities(game_state *GameState)
        update entities using collision,
        repeat until all entities are out of movement.
     */
-    for (s32 I = 0; I < MAX_ENTITY_COUNT; ++I)
+    f32 LeastTimeTaken = INFINITY;
+    { /* find nearest collision */
+        for (s32 I = 0; I < GameState->EntityCount; ++I)
+        {
+            entity *Entity = GameState->Entities + I;
+            UpdateEntity(GameState, Entity); /* TODO this is just during collision testing, please delete!!!!!! */
+
+            for (s32 J = I + 1; J < GameState->EntityCount; ++J)
+            {
+                entity *TestEntity = GameState->Entities + J;
+
+                f32 TimeTaken = CollideEntities(GameState, Entity, TestEntity);
+            }
+        }
+
+    }
+#if 0
+    for (s32 I = 0; I < GameState->EntityCount; ++I)
     {
         entity *Entity = GameState->Entities + I;
         sprite_type CollisionTypes[MAX_COLLISION_COUNT];
@@ -440,7 +435,7 @@ internal void UpdateEntities(game_state *GameState)
             UpdateEntity(GameState, Entity);
         }
 
-        for (s32 J = I + 1; J < MAX_ENTITY_COUNT; ++J)
+        for (s32 J = I + 1; J < GameState->EntityCount; ++J)
         {
             entity *TestEntity = GameState->Entities + J;
 
@@ -450,7 +445,6 @@ internal void UpdateEntities(game_state *GameState)
             }
 
             UpdateEntity(GameState, TestEntity);
-
             b32 Collides = CollideEntities(GameState, Entity, TestEntity);
 
             sprite_type SpriteType = Entity->Sprites[0].Type;
@@ -469,6 +463,7 @@ internal void UpdateEntities(game_state *GameState)
             }
         }
     }
+#endif
 }
 
 internal Rectangle GetSpriteRectangle(entity *Entity)
@@ -527,6 +522,100 @@ internal void UpdateAndRender(void *VoidGameState)
 {
     game_state *GameState = (game_state *)VoidGameState;
     ui *UI = &GameState->UI;
+
+    { /* TODO: This is testing quadratic collisions and should be pulled out into a useable function or something..... */
+        Vector2 MouseP = GetMousePosition();
+        typedef struct
+        {
+            Vector2 Start;
+            Vector2 End;
+        } line;
+
+        typedef struct
+        {
+            f32 I;
+            f32 J;
+            f32 R;
+        } circle;
+
+        typedef struct
+        {
+            line Line;
+            circle Circle;
+        } collision_pair;
+
+        collision_pair Pairs[] = {
+            {{V2(100, 100), V2(700, 500)}, {MouseP.x, MouseP.y, 128}},
+        };
+
+        BeginDrawing();
+        ClearBackground((Color){0,0,0,255});
+
+        for (u32 Index = 0; Index < ArrayCount(Pairs); ++Index)
+        {
+            line Line = Pairs[Index].Line;
+            circle Circle = Pairs[Index].Circle;
+
+            /* (X - I)^2 + (Y - J)^2 - R = 0 */
+            f32 I = Circle.I;
+            f32 J = Circle.J;
+            f32 R = Circle.R;
+
+            /* M*X + N*Y + P = 0 */
+            f32 M = Line.End.y - Line.Start.y;
+            f32 N = Line.Start.x - Line.End.x;
+            f32 P = Line.End.x * Line.Start.y - Line.Start.x * Line.End.y;
+
+            f32 A = M*M + N*N;
+            f32 B = 2 * (M*P + M*N*J - N*N*I);
+            f32 C = P*P + 2*N*P*J - N*N*(R*R - I*I - J*J);
+
+            f32 Discriminant = B*B - 4*A*C;
+
+            Color CircleColor = (Color){100, 40, 100, 255};
+            Color LineColor = (Color){40, 200, 200, 255};
+            Color RectColor = (Color){200, 200, 40, 255};
+
+            DrawCircle(Circle.I, Circle.J, Circle.R, CircleColor);
+            DrawLineEx(Line.Start, Line.End, 2.0f, LineColor);
+
+            if (Discriminant >= 0.0f)
+            {
+                f32 MinX = MinF32(Line.Start.x, Line.End.x);
+                f32 MinY = MinF32(Line.Start.y, Line.End.y);
+                f32 MaxX = MaxF32(Line.Start.x, Line.End.x);
+                f32 MaxY = MaxF32(Line.Start.y, Line.End.y);
+
+                f32 SqrtDiscriminant = sqrt(Discriminant);
+                f32 DividendPlus = -B + SqrtDiscriminant;
+                f32 DividendMinus = -B - SqrtDiscriminant;
+                f32 Divisor = 2 * A;
+
+                f32 CollisionXPlus = DividendPlus / Divisor;
+                f32 CollisionXMinus = DividendMinus / Divisor;
+
+                f32 CollisionYPlus = (-M * CollisionXPlus - P) / N;
+                f32 CollisionYMinus = (-M * CollisionXMinus - P) / N;
+
+                f32 BoxRadius = 4.0f;
+
+                if (CollisionXPlus >= MinX && CollisionXPlus <= MaxX &&
+                    CollisionYPlus >= MinY && CollisionYPlus <= MaxY)
+                {
+                    DrawRectangle(CollisionXPlus - BoxRadius, CollisionYPlus - BoxRadius, 2*BoxRadius, 2*BoxRadius, RectColor);
+                }
+
+                if (CollisionXMinus >= MinX && CollisionXMinus <= MaxX &&
+                    CollisionYMinus >= MinY && CollisionYMinus <= MaxY)
+                {
+                    DrawRectangle(CollisionXMinus - BoxRadius, CollisionYMinus - BoxRadius, 2*BoxRadius, 2*BoxRadius, RectColor);
+                }
+            }
+        }
+
+        EndDrawing();
+        return;
+    }
 
     HandleUserInput(GameState);
     BeginDrawing();
@@ -657,14 +746,9 @@ internal void UpdateAndRender(void *VoidGameState)
 
         { /* debug graphics */
             { /* draw entity dots */
-                for (s32 I = 0; I < MAX_ENTITY_COUNT; ++I)
+                for (s32 I = 0; I < GameState->EntityCount; ++I)
                 {
                     entity *Entity = GameState->Entities + I;
-
-                    if (!Entity->Type)
-                    {
-                        break;
-                    }
 
                     Vector2 Position = WorldToScreenPosition(GameState, Entity->Position);
                     DrawRectangle(Position.x, Position.y, 4.0f, 4.0f, (Color){220,40,220,255});
@@ -785,7 +869,7 @@ int main(void)
 
         for (;;)
         {
-            b32 ShouldCloseWindow = WindowShouldClose() && !IsKeyPressed(KEY_ESCAPE);
+            b32 ShouldCloseWindow = WindowShouldClose();// && !IsKeyPressed(KEY_ESCAPE); /* TODO add back in escape key ignore */
             b32 IsQuitMode = GameState.Mode == game_mode_Quit;
 
             if (ShouldCloseWindow || IsQuitMode)
