@@ -143,6 +143,25 @@ typedef struct
     Texture2D ScubaTexture;
 } game_state;
 
+typedef struct
+{
+    Vector2 Start;
+    Vector2 End;
+} line;
+
+typedef struct
+{
+    f32 I;
+    f32 J;
+    f32 R;
+} circle;
+
+typedef struct
+{
+    s32 Count;
+    Vector2 Collisions[2];
+} collision_result;
+
 internal collision_area *AddCollisionArea(game_state *GameState)
 {
     collision_area *CollisionArea = 0;
@@ -157,6 +176,10 @@ internal collision_area *AddCollisionArea(game_state *GameState)
 
     return CollisionArea;
 }
+
+
+global_variable entity NullEntity;
+
 
 internal entity *AddEntity(game_state *GameState, sprite_type SpriteType)
 {
@@ -480,8 +503,6 @@ internal Rectangle GetSpriteRectangle(entity *Entity)
     return SpriteRectangle;
 }
 
-global_variable entity NullEntity;
-
 internal void ResetGame(game_state *GameState)
 {
     GameState->EntityCount = 0;
@@ -518,31 +539,82 @@ internal void ResetGame(game_state *GameState)
     GameState->LastTime = GetTime();
 }
 
+internal collision_result CollideCircleAndLine(circle Circle, line Line)
+{
+    /* TODO Handle vertical and near-vertical line cases! */
+    /* TODO   ^------ Consider detecting if line is near vertical, swap x-and-y,
+            do the collision code, then swap x-and-y back. This is maybe the easiest to
+            implement, and is less math code. */
+    /* TODO Do some more testing before running in game! */
+    collision_result Result = {0};
+
+    /* (X - I)^2 + (Y - J)^2 - R = 0 */
+    f32 I = Circle.I;
+    f32 J = Circle.J;
+    f32 R = Circle.R;
+
+    /* M*X + N*Y + P = 0 */
+    f32 M = Line.End.y - Line.Start.y;
+    f32 N = Line.Start.x - Line.End.x;
+    f32 P = Line.End.x * Line.Start.y - Line.Start.x * Line.End.y;
+
+    f32 A = M*M + N*N;
+    f32 B = 2 * (M*P + M*N*J - N*N*I);
+    f32 C = P*P + 2*N*P*J - N*N*(R*R - I*I - J*J);
+
+    f32 Discriminant = B*B - 4*A*C;
+
+    if (Discriminant >= 0.0f)
+    {
+        f32 MinX = MinF32(Line.Start.x, Line.End.x);
+        f32 MinY = MinF32(Line.Start.y, Line.End.y);
+        f32 MaxX = MaxF32(Line.Start.x, Line.End.x);
+        f32 MaxY = MaxF32(Line.Start.y, Line.End.y);
+
+        f32 SqrtDiscriminant = sqrt(Discriminant);
+        f32 DividendPlus = -B + SqrtDiscriminant;
+        f32 DividendMinus = -B - SqrtDiscriminant;
+        f32 Divisor = 2 * A;
+
+        f32 CollisionXPlus = DividendPlus / Divisor;
+        f32 CollisionXMinus = DividendMinus / Divisor;
+
+        f32 CollisionYPlus = (-M * CollisionXPlus - P) / N;
+        f32 CollisionYMinus = (-M * CollisionXMinus - P) / N;
+
+        if (CollisionXPlus >= MinX && CollisionXPlus <= MaxX &&
+            CollisionYPlus >= MinY && CollisionYPlus <= MaxY)
+        {
+            Result.Collisions[Result.Count++] = V2(CollisionXPlus, CollisionYPlus);
+        }
+
+        if (CollisionXMinus >= MinX && CollisionXMinus <= MaxX &&
+            CollisionYMinus >= MinY && CollisionYMinus <= MaxY)
+        {
+            Result.Collisions[Result.Count++] = V2(CollisionXMinus, CollisionYMinus);
+        }
+    }
+
+    return Result;
+}
+
 internal void UpdateAndRender(void *VoidGameState)
 {
     game_state *GameState = (game_state *)VoidGameState;
     ui *UI = &GameState->UI;
 
     { /* TODO: This is testing quadratic collisions and should be pulled out into a useable function or something..... */
-        Vector2 MouseP = GetMousePosition();
-        typedef struct
-        {
-            Vector2 Start;
-            Vector2 End;
-        } line;
-
-        typedef struct
-        {
-            f32 I;
-            f32 J;
-            f32 R;
-        } circle;
-
         typedef struct
         {
             line Line;
             circle Circle;
         } collision_pair;
+
+        Color CircleColor = (Color){100, 40, 100, 255};
+        Color LineColor = (Color){40, 200, 200, 255};
+        Color RectColor = (Color){200, 200, 40, 255};
+
+        Vector2 MouseP = GetMousePosition();
 
         collision_pair Pairs[] = {
             {{V2(100, 100), V2(700, 500)}, {MouseP.x, MouseP.y, 128}},
@@ -556,60 +628,17 @@ internal void UpdateAndRender(void *VoidGameState)
             line Line = Pairs[Index].Line;
             circle Circle = Pairs[Index].Circle;
 
-            /* (X - I)^2 + (Y - J)^2 - R = 0 */
-            f32 I = Circle.I;
-            f32 J = Circle.J;
-            f32 R = Circle.R;
-
-            /* M*X + N*Y + P = 0 */
-            f32 M = Line.End.y - Line.Start.y;
-            f32 N = Line.Start.x - Line.End.x;
-            f32 P = Line.End.x * Line.Start.y - Line.Start.x * Line.End.y;
-
-            f32 A = M*M + N*N;
-            f32 B = 2 * (M*P + M*N*J - N*N*I);
-            f32 C = P*P + 2*N*P*J - N*N*(R*R - I*I - J*J);
-
-            f32 Discriminant = B*B - 4*A*C;
-
-            Color CircleColor = (Color){100, 40, 100, 255};
-            Color LineColor = (Color){40, 200, 200, 255};
-            Color RectColor = (Color){200, 200, 40, 255};
+            collision_result Collision = CollideCircleAndLine(Circle, Line);
 
             DrawCircle(Circle.I, Circle.J, Circle.R, CircleColor);
             DrawLineEx(Line.Start, Line.End, 2.0f, LineColor);
 
-            if (Discriminant >= 0.0f)
+            f32 BoxRadius = 4.0f;
+
+            for (s32 I = 0; I < Collision.Count; ++I)
             {
-                f32 MinX = MinF32(Line.Start.x, Line.End.x);
-                f32 MinY = MinF32(Line.Start.y, Line.End.y);
-                f32 MaxX = MaxF32(Line.Start.x, Line.End.x);
-                f32 MaxY = MaxF32(Line.Start.y, Line.End.y);
-
-                f32 SqrtDiscriminant = sqrt(Discriminant);
-                f32 DividendPlus = -B + SqrtDiscriminant;
-                f32 DividendMinus = -B - SqrtDiscriminant;
-                f32 Divisor = 2 * A;
-
-                f32 CollisionXPlus = DividendPlus / Divisor;
-                f32 CollisionXMinus = DividendMinus / Divisor;
-
-                f32 CollisionYPlus = (-M * CollisionXPlus - P) / N;
-                f32 CollisionYMinus = (-M * CollisionXMinus - P) / N;
-
-                f32 BoxRadius = 4.0f;
-
-                if (CollisionXPlus >= MinX && CollisionXPlus <= MaxX &&
-                    CollisionYPlus >= MinY && CollisionYPlus <= MaxY)
-                {
-                    DrawRectangle(CollisionXPlus - BoxRadius, CollisionYPlus - BoxRadius, 2*BoxRadius, 2*BoxRadius, RectColor);
-                }
-
-                if (CollisionXMinus >= MinX && CollisionXMinus <= MaxX &&
-                    CollisionYMinus >= MinY && CollisionYMinus <= MaxY)
-                {
-                    DrawRectangle(CollisionXMinus - BoxRadius, CollisionYMinus - BoxRadius, 2*BoxRadius, 2*BoxRadius, RectColor);
-                }
+                Vector2 Point = Collision.Collisions[I];
+                DrawRectangle(Point.x - BoxRadius, Point.y - BoxRadius, 2*BoxRadius, 2*BoxRadius, RectColor);
             }
         }
 
