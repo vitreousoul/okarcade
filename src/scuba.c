@@ -539,6 +539,59 @@ internal void ResetGame(game_state *GameState)
     GameState->LastTime = GetTime();
 }
 
+internal collision_result CollideLineAndLine(line FirstLine, line SecondLine)
+{
+    collision_result Result = {0};
+
+    f32 X1 = FirstLine.Start.x;
+    f32 Y1 = FirstLine.Start.y;
+    f32 X2 = FirstLine.End.x;
+    f32 Y2 = FirstLine.End.y;
+
+    f32 X3 = SecondLine.Start.x;
+    f32 Y3 = SecondLine.Start.y;
+    f32 X4 = SecondLine.End.x;
+    f32 Y4 = SecondLine.End.y;
+
+    /* NOTE: If the divisor is close to 0, then _both_ lines are short. */
+    f32 Divisor = (X1 - X2)*(Y3 - Y4) - (Y1 - Y2)*(X3 - X4);
+
+    /* TODO: What value should Threshold be set at? */
+    f32 Threshold = 0.001f;
+
+    if (Divisor > Threshold || Divisor < Threshold)
+    {
+        f32 FirstDeterminant = X1*Y2 - Y1*X2;
+        f32 SecondDeterminant = X3*Y4 - Y3*X4;
+
+        f32 X = (FirstDeterminant*(X3 - X4) - (X1 - X2)*SecondDeterminant) / Divisor;
+        f32 Y = (FirstDeterminant*(Y3 - Y4) - (Y1 - Y2)*SecondDeterminant) / Divisor;
+
+        f32 FirstMinX = MinS32(FirstLine.Start.x, FirstLine.End.x);
+        f32 FirstMinY = MinS32(FirstLine.Start.y, FirstLine.End.y);
+        f32 FirstMaxX = MaxS32(FirstLine.Start.x, FirstLine.End.x);
+        f32 FirstMaxY = MaxS32(FirstLine.Start.y, FirstLine.End.y);
+
+        f32 SecondMinX = MinS32(SecondLine.Start.x, SecondLine.End.x);
+        f32 SecondMinY = MinS32(SecondLine.Start.y, SecondLine.End.y);
+        f32 SecondMaxX = MaxS32(SecondLine.Start.x, SecondLine.End.x);
+        f32 SecondMaxY = MaxS32(SecondLine.Start.y, SecondLine.End.y);
+
+        f32 CollisionIsInFirst = (X >= FirstMinX && X <= FirstMaxX &&
+                                  Y >= FirstMinY && Y <= FirstMaxY);
+        f32 CollisionIsInSecond = (X >= SecondMinX && X <= SecondMaxX &&
+                                   Y >= SecondMinY && Y <= SecondMaxY);
+
+        if (CollisionIsInFirst && CollisionIsInSecond)
+        {
+            Result.Collisions[0] = V2(X, Y);
+            Result.Count = 1;
+        }
+    }
+
+    return Result;
+}
+
 internal collision_result CollideCircleAndLine(circle Circle, line Line)
 {
     /* TODO Handle vertical and near-vertical line cases! */
@@ -603,42 +656,91 @@ internal void UpdateAndRender(void *VoidGameState)
     game_state *GameState = (game_state *)VoidGameState;
     ui *UI = &GameState->UI;
 
-    { /* TODO: This is testing quadratic collisions and should be pulled out into a useable function or something..... */
+    { /* TODO: Delete this one we are done testing collisions... */
+        typedef enum
+        {
+            collision_type_Circle = 0x1,
+            collision_type_Line = 0x2,
+        } collision_type;
+
         typedef struct
         {
-            line Line;
-            circle Circle;
-        } collision_pair;
+            collision_type Type;
+            union
+            {
+                line Line;
+                circle Circle;
+            };
+        } collision_item;
 
-        Color CircleColor = (Color){100, 40, 100, 255};
-        Color LineColor = (Color){40, 200, 200, 255};
+        Color CircleColor = (Color){100, 40, 100, 100};
+        Color LineColor = (Color){40, 200, 200, 100};
         Color RectColor = (Color){200, 200, 40, 255};
 
         Vector2 MouseP = GetMousePosition();
 
-        collision_pair Pairs[] = {
-            {{V2(100, 100), V2(700, 500)}, {MouseP.x, MouseP.y, 128}},
+        collision_item Items[] = {
+            {collision_type_Line, {{V2(500, 300), V2(800, 400)}}},
+            {collision_type_Circle, {MouseP.x, MouseP.y, 128}},
+            {collision_type_Line, {{V2(MouseP.x, MouseP.y), V2(700, 200)}}},
+            /* {collision_type_Line, {{V2(100, 100), V2(700, 500)}}}, */
         };
+
+        f32 BoxRadius = 4.0f;
 
         BeginDrawing();
         ClearBackground((Color){0,0,0,255});
 
-        for (u32 Index = 0; Index < ArrayCount(Pairs); ++Index)
+        for (u32 IndexA = 0; IndexA < ArrayCount(Items); ++IndexA)
         {
-            line Line = Pairs[Index].Line;
-            circle Circle = Pairs[Index].Circle;
+            collision_item ItemA = Items[IndexA];
 
-            collision_result Collision = CollideCircleAndLine(Circle, Line);
-
-            DrawCircle(Circle.I, Circle.J, Circle.R, CircleColor);
-            DrawLineEx(Line.Start, Line.End, 2.0f, LineColor);
-
-            f32 BoxRadius = 4.0f;
-
-            for (s32 I = 0; I < Collision.Count; ++I)
+            for (u32 IndexB = IndexA + 1; IndexB < ArrayCount(Items); ++IndexB)
             {
-                Vector2 Point = Collision.Collisions[I];
-                DrawRectangle(Point.x - BoxRadius, Point.y - BoxRadius, 2*BoxRadius, 2*BoxRadius, RectColor);
+                collision_result Collision = {0};
+                collision_item ItemB = Items[IndexB];
+
+                collision_type Circle = collision_type_Circle;
+                collision_type Line = collision_type_Line;
+
+                if (ItemA.Type == Circle && ItemB.Type == Line)
+                {
+                    circle Circle = ItemA.Circle;
+                    line Line = ItemB.Line;
+
+                    DrawCircle(Circle.I, Circle.J, Circle.R, CircleColor);
+                    DrawLineEx(Line.Start, Line.End, 2.0f, LineColor);
+
+                    Collision = CollideCircleAndLine(Circle, Line);
+                }
+                else if (ItemA.Type == Line && ItemB.Type == Circle)
+                {
+                    circle Circle = ItemB.Circle;
+                    line Line = ItemA.Line;
+
+                    DrawCircle(Circle.I, Circle.J, Circle.R, CircleColor);
+                    DrawLineEx(Line.Start, Line.End, 2.0f, LineColor);
+
+                    Collision = CollideCircleAndLine(Circle, Line);
+                }
+                else if (ItemA.Type == Line && ItemB.Type == Line)
+                {
+                    DrawLineEx(ItemA.Line.Start, ItemA.Line.End, 2.0f, LineColor);
+                    DrawLineEx(ItemB.Line.Start, ItemB.Line.End, 2.0f, LineColor);
+
+                    Collision = CollideLineAndLine(ItemA.Line, ItemB.Line);
+                }
+                else
+                {
+                    /* TODO: handle other collisions like circle-circle */
+                    Assert(0);
+                }
+
+                for (s32 I = 0; I < Collision.Count; ++I)
+                {
+                    Vector2 Point = Collision.Collisions[I];
+                    DrawRectangle(Point.x - BoxRadius, Point.y - BoxRadius, 2*BoxRadius, 2*BoxRadius, RectColor);
+                }
             }
         }
 
