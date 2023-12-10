@@ -151,8 +151,8 @@ typedef struct
 
 typedef struct
 {
-    f32 I;
-    f32 J;
+    f32 X;
+    f32 Y;
     f32 R;
 } circle;
 
@@ -601,8 +601,8 @@ internal collision_result CollideCircleAndLine(circle Circle, line Line)
     f32 Threshold = 8.0f;
 
     /* (X - I)^2 + (Y - J)^2 - R = 0 */
-    f32 I = Circle.I;
-    f32 J = Circle.J;
+    f32 I = Circle.X;
+    f32 J = Circle.Y;
     f32 R = Circle.R;
 
     /* M*X + N*Y + P = 0 */
@@ -701,8 +701,8 @@ internal collision_result CollideCircleAndCircle(circle FirstCircle, circle Seco
     f32 R0 = FirstCircle.R;
     f32 R1 = SecondCircle.R;
 
-    Vector2 FirstPosition = V2(FirstCircle.I, FirstCircle.J);
-    Vector2 SecondPosition = V2(SecondCircle.I, SecondCircle.J);
+    Vector2 FirstPosition = V2(FirstCircle.X, FirstCircle.Y);
+    Vector2 SecondPosition = V2(SecondCircle.X, SecondCircle.Y);
 
     f32 D = LengthV2(SubtractV2(FirstPosition, SecondPosition));
 
@@ -797,7 +797,7 @@ internal void UpdateAndRender(void *VoidGameState)
                     circle Circle = ItemA.Circle;
                     line Line = ItemB.Line;
 
-                    DrawCircle(Circle.I, Circle.J, Circle.R, CircleColor);
+                    DrawCircle(Circle.X, Circle.Y, Circle.R, CircleColor);
                     DrawLineEx(Line.Start, Line.End, 2.0f, LineColor);
 
                     Collision = CollideCircleAndLine(Circle, Line);
@@ -807,7 +807,7 @@ internal void UpdateAndRender(void *VoidGameState)
                     circle Circle = ItemB.Circle;
                     line Line = ItemA.Line;
 
-                    DrawCircle(Circle.I, Circle.J, Circle.R, CircleColor);
+                    DrawCircle(Circle.X, Circle.Y, Circle.R, CircleColor);
                     DrawLineEx(Line.Start, Line.End, 2.0f, LineColor);
 
                     Collision = CollideCircleAndLine(Circle, Line);
@@ -824,8 +824,8 @@ internal void UpdateAndRender(void *VoidGameState)
                     circle FirstCircle = ItemA.Circle;
                     circle SecondCircle = ItemB.Circle;
 
-                    DrawCircle(FirstCircle.I, FirstCircle.J, FirstCircle.R, CircleColor);
-                    DrawCircle(SecondCircle.I, SecondCircle.J, SecondCircle.R, CircleColor);
+                    DrawCircle(FirstCircle.X, FirstCircle.Y, FirstCircle.R, CircleColor);
+                    DrawCircle(SecondCircle.X, SecondCircle.Y, SecondCircle.R, CircleColor);
 
                     Collision = CollideCircleAndCircle(FirstCircle, SecondCircle);
                 }
