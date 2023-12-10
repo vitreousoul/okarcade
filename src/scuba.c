@@ -719,7 +719,6 @@ internal collision_result CollideCircleAndCircle(circle FirstCircle, circle Seco
 
         if (RadiusMinusA > 0.0f)
         {
-            /* printf("colliding\n"); */
             f32 H = sqrt(RadiusMinusA);
             Vector2 P = AddV2(FirstPosition,
                               DivideV2S(MultiplyV2S(SubtractV2(SecondPosition, FirstPosition),
@@ -731,8 +730,6 @@ internal collision_result CollideCircleAndCircle(circle FirstCircle, circle Seco
 
             Vector2 CollisionPlus = V2(P.x + H * DeltaY / D, P.y - H * DeltaX / D);
             Vector2 CollisionMinus = V2(P.x - H * DeltaY / D, P.y + H * DeltaX / D);
-
-            /* printf("%.02f %.02f %.02f %.02f\n", CollisionPlus.x, CollisionPlus.y, CollisionMinus.x, CollisionMinus.y); */
 
             Result.Collisions[0] = CollisionPlus;
             Result.Collisions[1] = CollisionMinus;
