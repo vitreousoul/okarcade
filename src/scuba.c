@@ -594,12 +594,8 @@ internal collision_result CollideLineAndLine(line FirstLine, line SecondLine)
 
 internal collision_result CollideCircleAndLine(circle Circle, line Line)
 {
-    /* TODO Handle vertical and near-vertical line cases! */
-    /* TODO   ^------ Consider detecting if line is near vertical, swap x-and-y,
-            do the collision code, then swap x-and-y back. This is maybe the easiest to
-            implement, and is less math code. */
-    /* TODO Do some more testing before running in game! */
     collision_result Result = {0};
+    f32 Threshold = 8.0f;
 
     /* (X - I)^2 + (Y - J)^2 - R = 0 */
     f32 I = Circle.I;
@@ -611,9 +607,25 @@ internal collision_result CollideCircleAndLine(circle Circle, line Line)
     f32 N = Line.Start.x - Line.End.x;
     f32 P = Line.End.x * Line.Start.y - Line.Start.x * Line.End.y;
 
-    f32 A = M*M + N*N;
-    f32 B = 2 * (M*P + M*N*J - N*N*I);
-    f32 C = P*P + 2*N*P*J - N*N*(R*R - I*I - J*J);
+    f32 A;
+    f32 B;
+    f32 C;
+
+    f32 SmallN = N < Threshold && N > -Threshold;
+
+    if (SmallN)
+    {
+
+        A = M*M + N*N;
+        B = 2 * (N*P + M*N*I - M*M*J);
+        C = P*P + 2*M*P*I - M*M*(R*R - I*I - J*J);
+    }
+    else
+    {
+        A = M*M + N*N;
+        B = 2 * (M*P + M*N*J - N*N*I);
+        C = P*P + 2*N*P*J - N*N*(R*R - I*I - J*J);
+    }
 
     f32 Discriminant = B*B - 4*A*C;
 
@@ -629,11 +641,27 @@ internal collision_result CollideCircleAndLine(circle Circle, line Line)
         f32 DividendMinus = -B - SqrtDiscriminant;
         f32 Divisor = 2 * A;
 
-        f32 CollisionXPlus = DividendPlus / Divisor;
-        f32 CollisionXMinus = DividendMinus / Divisor;
+        f32 CollisionXPlus;
+        f32 CollisionXMinus;
+        f32 CollisionYPlus;
+        f32 CollisionYMinus;
 
-        f32 CollisionYPlus = (-M * CollisionXPlus - P) / N;
-        f32 CollisionYMinus = (-M * CollisionXMinus - P) / N;
+        if (SmallN)
+        {
+            CollisionYPlus = DividendPlus / Divisor;
+            CollisionYMinus = DividendMinus / Divisor;
+
+            CollisionXPlus = -(N * CollisionYPlus + P) / M;
+            CollisionXMinus = -(N * CollisionYMinus + P) / M;
+        }
+        else
+        {
+            CollisionXPlus = DividendPlus / Divisor;
+            CollisionXMinus = DividendMinus / Divisor;
+
+            CollisionYPlus = -(M * CollisionXPlus + P) / N;
+            CollisionYMinus = -(M * CollisionXMinus + P) / N;
+        }
 
         if (CollisionXPlus >= MinX && CollisionXPlus <= MaxX &&
             CollisionYPlus >= MinY && CollisionYPlus <= MaxY)
@@ -675,7 +703,7 @@ internal void UpdateAndRender(void *VoidGameState)
 
         Color CircleColor = (Color){100, 40, 100, 100};
         Color LineColor = (Color){40, 200, 200, 100};
-        Color RectColor = (Color){200, 200, 40, 255};
+        Color RectColor = (Color){200, 200, 40, 150};
 
         Vector2 MouseP = GetMousePosition();
 
