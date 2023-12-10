@@ -567,19 +567,22 @@ internal collision_result CollideLineAndLine(line FirstLine, line SecondLine)
         f32 X = (FirstDeterminant*(X3 - X4) - (X1 - X2)*SecondDeterminant) / Divisor;
         f32 Y = (FirstDeterminant*(Y3 - Y4) - (Y1 - Y2)*SecondDeterminant) / Divisor;
 
-        f32 FirstMinX = MinS32(FirstLine.Start.x, FirstLine.End.x);
-        f32 FirstMinY = MinS32(FirstLine.Start.y, FirstLine.End.y);
-        f32 FirstMaxX = MaxS32(FirstLine.Start.x, FirstLine.End.x);
-        f32 FirstMaxY = MaxS32(FirstLine.Start.y, FirstLine.End.y);
+        /* TODO: What should ErrorMargin be set to???? */
+        f32 ErrorMargin = 0.7f;
 
-        f32 SecondMinX = MinS32(SecondLine.Start.x, SecondLine.End.x);
-        f32 SecondMinY = MinS32(SecondLine.Start.y, SecondLine.End.y);
-        f32 SecondMaxX = MaxS32(SecondLine.Start.x, SecondLine.End.x);
-        f32 SecondMaxY = MaxS32(SecondLine.Start.y, SecondLine.End.y);
+        f32 FirstMinX = MinS32(FirstLine.Start.x, FirstLine.End.x) - ErrorMargin;
+        f32 FirstMinY = MinS32(FirstLine.Start.y, FirstLine.End.y) - ErrorMargin;
+        f32 FirstMaxX = MaxS32(FirstLine.Start.x, FirstLine.End.x) + ErrorMargin;
+        f32 FirstMaxY = MaxS32(FirstLine.Start.y, FirstLine.End.y) + ErrorMargin;
 
-        f32 CollisionIsInFirst = (X >= FirstMinX && X <= FirstMaxX &&
+        f32 SecondMinX = MinS32(SecondLine.Start.x, SecondLine.End.x) - ErrorMargin;
+        f32 SecondMinY = MinS32(SecondLine.Start.y, SecondLine.End.y) - ErrorMargin;
+        f32 SecondMaxX = MaxS32(SecondLine.Start.x, SecondLine.End.x) + ErrorMargin;
+        f32 SecondMaxY = MaxS32(SecondLine.Start.y, SecondLine.End.y) + ErrorMargin;
+
+        b32 CollisionIsInFirst = (X >= FirstMinX && X <= FirstMaxX &&
                                   Y >= FirstMinY && Y <= FirstMaxY);
-        f32 CollisionIsInSecond = (X >= SecondMinX && X <= SecondMaxX &&
+        b32 CollisionIsInSecond = (X >= SecondMinX && X <= SecondMaxX &&
                                    Y >= SecondMinY && Y <= SecondMaxY);
 
         if (CollisionIsInFirst && CollisionIsInSecond)
