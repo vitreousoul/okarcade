@@ -682,6 +682,67 @@ internal collision_result CollideCircleAndLine(circle Circle, line Line)
     return Result;
 }
 
+
+internal collision_result CollideCircleAndCircle(circle FirstCircle, circle SecondCircle)
+{
+    /*
+              /|\
+         R0 /  |H \ R1
+          /    |    \
+         ---A--P--B---
+          \    |    /
+         R0 \  |H / R1
+              \|/
+
+         D = A + B
+     */
+    collision_result Result = {0};
+
+    f32 R0 = FirstCircle.R;
+    f32 R1 = SecondCircle.R;
+
+    Vector2 FirstPosition = V2(FirstCircle.I, FirstCircle.J);
+    Vector2 SecondPosition = V2(SecondCircle.I, SecondCircle.J);
+
+    f32 D = LengthV2(SubtractV2(FirstPosition, SecondPosition));
+
+    b32 CirclesAreCloseEnough = D < R0 + R1;
+    b32 OneCircleIsInsideTheOther = D < AbsF32(R0 - R1);
+    b32 CirclesInSamePosition = D < 1.0f;
+
+    if (CirclesAreCloseEnough &&
+        !OneCircleIsInsideTheOther &&
+        !CirclesInSamePosition)
+    {
+        f32 A = (R0*R0 - R1*R1 + D*D) / (2*D);
+        f32 RadiusMinusA = R0*R0 - A*A;
+
+        if (RadiusMinusA > 0.0f)
+        {
+            /* printf("colliding\n"); */
+            f32 H = sqrt(RadiusMinusA);
+            Vector2 P = AddV2(FirstPosition,
+                              DivideV2S(MultiplyV2S(SubtractV2(SecondPosition, FirstPosition),
+                                                    A),
+                                        D));
+
+            f32 DeltaX = SecondPosition.x - FirstPosition.x;
+            f32 DeltaY = SecondPosition.y - FirstPosition.y;
+
+            Vector2 CollisionPlus = V2(P.x + H * DeltaY / D, P.y - H * DeltaX / D);
+            Vector2 CollisionMinus = V2(P.x - H * DeltaY / D, P.y + H * DeltaX / D);
+
+            /* printf("%.02f %.02f %.02f %.02f\n", CollisionPlus.x, CollisionPlus.y, CollisionMinus.x, CollisionMinus.y); */
+
+            Result.Collisions[0] = CollisionPlus;
+            Result.Collisions[1] = CollisionMinus;
+            Result.Count = 2;
+        }
+    }
+
+    return Result;
+}
+
 internal void UpdateAndRender(void *VoidGameState)
 {
     game_state *GameState = (game_state *)VoidGameState;
@@ -714,7 +775,7 @@ internal void UpdateAndRender(void *VoidGameState)
             {collision_type_Line, {{V2(500, 300), V2(800, 400)}}},
             {collision_type_Circle, {MouseP.x, MouseP.y, 128}},
             {collision_type_Line, {{V2(MouseP.x, MouseP.y), V2(700, 200)}}},
-            /* {collision_type_Line, {{V2(100, 100), V2(700, 500)}}}, */
+            {collision_type_Circle, {200, 500, 112}},
         };
 
         f32 BoxRadius = 4.0f;
@@ -761,9 +822,19 @@ internal void UpdateAndRender(void *VoidGameState)
 
                     Collision = CollideLineAndLine(ItemA.Line, ItemB.Line);
                 }
+                else if (ItemA.Type == Circle && ItemB.Type == Circle)
+                {
+                    circle FirstCircle = ItemA.Circle;
+                    circle SecondCircle = ItemB.Circle;
+
+                    DrawCircle(FirstCircle.I, FirstCircle.J, FirstCircle.R, CircleColor);
+                    DrawCircle(SecondCircle.I, SecondCircle.J, SecondCircle.R, CircleColor);
+
+                    Collision = CollideCircleAndCircle(FirstCircle, SecondCircle);
+                }
                 else
                 {
-                    /* TODO: handle other collisions like circle-circle */
+                    /* unhandled shape collision */
                     Assert(0);
                 }
 
