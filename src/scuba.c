@@ -79,9 +79,49 @@ typedef struct
     s32 DepthZ;
 } sprite;
 
+typedef struct
+{
+    Vector2 Start;
+    Vector2 End;
+} line;
+
+typedef struct
+{
+    f32 X;
+    f32 Y;
+    f32 R;
+} circle;
+
+typedef struct
+{
+    s32 Count;
+    Vector2 Collisions[2];
+} collision_result;
+
+typedef enum
+{
+    collision_type_Circle = 0x1,
+    collision_type_Line = 0x2,
+} collision_type;
+
+typedef struct
+{
+    collision_type Type;
+    union
+    {
+        line Line;
+        circle Circle;
+    };
+} collision_item;
+
 struct collision_area
 {
-    Rectangle Area;
+    collision_type Type;
+    union
+    {
+        line Line;
+        circle Circle;
+    };
     struct collision_area *Next;
 };
 typedef struct collision_area collision_area;
@@ -101,6 +141,7 @@ typedef struct
     Vector2 Position;
     Vector2 OldPosition;
     Vector2 Velocity;
+    Vector2 OldVelocity;
     Vector2 Acceleration;
 
     sprite Sprites[ENTITY_SPRITE_COUNT];
@@ -143,34 +184,15 @@ typedef struct
     Texture2D ScubaTexture;
 } game_state;
 
-typedef struct
-{
-    Vector2 Start;
-    Vector2 End;
-} line;
-
-typedef struct
-{
-    f32 X;
-    f32 Y;
-    f32 R;
-} circle;
-
-typedef struct
-{
-    s32 Count;
-    Vector2 Collisions[2];
-} collision_result;
-
 internal collision_area *AddCollisionArea(game_state *GameState)
 {
     collision_area *CollisionArea = 0;
+    collision_area NullArea = {0};
 
     if (GameState->CollisionAreaCount < MAX_COLLISION_AREA_COUNT)
     {
         CollisionArea = GameState->CollisionAreas + GameState->CollisionAreaCount;
-        CollisionArea->Area = (Rectangle){0};
-        CollisionArea->Next = 0;
+        *CollisionArea = NullArea;
         GameState->CollisionAreaCount += 1;
     }
 
@@ -200,7 +222,8 @@ internal entity *AddEntity(game_state *GameState, sprite_type SpriteType)
             Entity->Sprites[0].DepthZ = 1;
             Entity->Position = V2(0.0f, 0.0f);
             Entity->CollisionArea = AddCollisionArea(GameState);
-            Entity->CollisionArea->Area = MultiplyR2S(R2(1, 1, 10, 6), TEXTURE_MAP_SCALE);
+            Entity->CollisionArea->Type = collision_type_Circle;
+            Entity->CollisionArea->Circle = (circle){0.0f, 0.0f, 32.0f};
         } break;
         case sprite_type_Eel:
         {
@@ -210,7 +233,8 @@ internal entity *AddEntity(game_state *GameState, sprite_type SpriteType)
             Entity->Sprites[0].DepthZ = 1;
             Entity->Position = V2(0.0f, 0.0f);
             Entity->CollisionArea = AddCollisionArea(GameState);
-            Entity->CollisionArea->Area = MultiplyR2S(R2(6, 6, 22, 8), TEXTURE_MAP_SCALE);
+            Entity->CollisionArea->Type = collision_type_Circle;
+            Entity->CollisionArea->Circle = (circle){0.0f, 0.0f, 32.0f};
         } break;
         case sprite_type_Coral:
         {
@@ -226,7 +250,8 @@ internal entity *AddEntity(game_state *GameState, sprite_type SpriteType)
             Entity->Sprites[0].SourceRectangle = R2(13,147,TILE_SIZE,TILE_SIZE);
             Entity->Sprites[0].DepthZ = 0;
             Entity->CollisionArea = AddCollisionArea(GameState);
-            Entity->CollisionArea->Area = MultiplyR2S(R2(0, 0, TILE_SIZE, TILE_SIZE), TEXTURE_MAP_SCALE);
+            Entity->CollisionArea->Type = collision_type_Circle;
+            Entity->CollisionArea->Circle = (circle){0.0f, 0.0f, 32.0f};
 
         } break;
         case sprite_type_Cage:
@@ -240,7 +265,8 @@ internal entity *AddEntity(game_state *GameState, sprite_type SpriteType)
             Entity->Sprites[1].DepthZ = 1;
             Entity->Position = V2(0.0f, 0.0f);
             Entity->CollisionArea = AddCollisionArea(GameState);
-            Entity->CollisionArea->Area = MultiplyR2S(R2(1, 1, 110, 70), TEXTURE_MAP_SCALE);
+            Entity->CollisionArea->Type = collision_type_Circle;
+            Entity->CollisionArea->Circle = (circle){0.0f, 0.0f, 32.0f};
         } break;
         case sprite_type_Crab:
         {
@@ -250,7 +276,8 @@ internal entity *AddEntity(game_state *GameState, sprite_type SpriteType)
             Entity->Sprites[0].DepthZ = 1;
             Entity->Position = MultiplyV2S(V2(9.0f, 7.0f), TILE_SIZE * TEXTURE_MAP_SCALE);
             Entity->CollisionArea = AddCollisionArea(GameState);
-            Entity->CollisionArea->Area = MultiplyR2S(R2(2, -3, 16, 9), TEXTURE_MAP_SCALE);
+            Entity->CollisionArea->Type = collision_type_Circle;
+            Entity->CollisionArea->Circle = (circle){0.0f, 0.0f, 32.0f};
         } break;
         default: break;
         }
@@ -354,8 +381,14 @@ internal void DrawSprite(game_state *GameState, entity *Entity, s32 DepthZ)
     }
 }
 
-internal b32 CollideEntities(game_state *GameState, entity *EntityA, entity *EntityB)
+internal f32 CollideEntities(game_state *GameState, entity *EntityA, entity *EntityB)
 {
+    b32 Collides = 0;
+
+#if 1
+    circle FirstCircle;
+    circle SecondCircle;
+#else
     sprite SpriteA = EntityA->Sprites[0];
     sprite SpriteB = EntityB->Sprites[0];
 
@@ -377,7 +410,8 @@ internal b32 CollideEntities(game_state *GameState, entity *EntityA, entity *Ent
     b32 CollidesInX = !(A.x + A.width < B.x || B.x + B.width < A.x);
     b32 CollidesInY = !(A.y + A.height < B.y || B.y + B.height < A.y);
 
-    b32 Collides = CollidesInX && CollidesInY;
+    Collides = CollidesInX && CollidesInY;
+#endif
 
     return Collides;
 }
@@ -390,6 +424,7 @@ internal void UpdateEntity(game_state *GameState, entity *Entity)
     f32 VelocityThreshold = 1.0f;
 
     Entity->OldPosition = Entity->Position;
+    Entity->OldVelocity = Entity->Velocity;
 
     if ((LengthSquaredV2(Entity->Acceleration) < AccelerationThreshold &&
          LengthSquaredV2(Entity->Velocity) < VelocityThreshold))
@@ -426,20 +461,37 @@ internal void UpdateEntities(game_state *GameState)
        repeat until all entities are out of movement.
     */
     f32 LeastTimeTaken = INFINITY;
+
     { /* find nearest collision */
         for (s32 I = 0; I < GameState->EntityCount; ++I)
         {
             entity *Entity = GameState->Entities + I;
-            UpdateEntity(GameState, Entity); /* TODO this is just during collision testing, please delete!!!!!! */
 
             for (s32 J = I + 1; J < GameState->EntityCount; ++J)
             {
                 entity *TestEntity = GameState->Entities + J;
 
                 f32 TimeTaken = CollideEntities(GameState, Entity, TestEntity);
+
+                if (TimeTaken < TimeTaken)
+                {
+                    LeastTimeTaken = TimeTaken;
+                }
             }
         }
 
+        if (LeastTimeTaken < INFINITY)
+        {
+            Assert(0);
+        }
+        else
+        {
+            /* no collisions, just update everybody */
+            for (s32 I = 0; I < GameState->EntityCount; ++I)
+            {
+                UpdateEntity(GameState, &GameState->Entities[I]);
+            }
+        }
     }
 #if 0
     for (s32 I = 0; I < GameState->EntityCount; ++I)
@@ -745,108 +797,6 @@ internal void UpdateAndRender(void *VoidGameState)
     game_state *GameState = (game_state *)VoidGameState;
     ui *UI = &GameState->UI;
 
-    { /* TODO: Delete this one we are done testing collisions... */
-        typedef enum
-        {
-            collision_type_Circle = 0x1,
-            collision_type_Line = 0x2,
-        } collision_type;
-
-        typedef struct
-        {
-            collision_type Type;
-            union
-            {
-                line Line;
-                circle Circle;
-            };
-        } collision_item;
-
-        Color CircleColor = (Color){100, 40, 100, 100};
-        Color LineColor = (Color){40, 200, 200, 100};
-        Color RectColor = (Color){200, 200, 40, 150};
-
-        Vector2 MouseP = GetMousePosition();
-
-        collision_item Items[] = {
-            {collision_type_Line, {{V2(500, 300), V2(800, 400)}}},
-            {collision_type_Circle, {MouseP.x, MouseP.y, 128}},
-            {collision_type_Line, {{V2(MouseP.x, MouseP.y), V2(700, 200)}}},
-            {collision_type_Circle, {200, 500, 112}},
-        };
-
-        f32 BoxRadius = 4.0f;
-
-        BeginDrawing();
-        ClearBackground((Color){0,0,0,255});
-
-        for (u32 IndexA = 0; IndexA < ArrayCount(Items); ++IndexA)
-        {
-            collision_item ItemA = Items[IndexA];
-
-            for (u32 IndexB = IndexA + 1; IndexB < ArrayCount(Items); ++IndexB)
-            {
-                collision_result Collision = {0};
-                collision_item ItemB = Items[IndexB];
-
-                collision_type Circle = collision_type_Circle;
-                collision_type Line = collision_type_Line;
-
-                if (ItemA.Type == Circle && ItemB.Type == Line)
-                {
-                    circle Circle = ItemA.Circle;
-                    line Line = ItemB.Line;
-
-                    DrawCircle(Circle.X, Circle.Y, Circle.R, CircleColor);
-                    DrawLineEx(Line.Start, Line.End, 2.0f, LineColor);
-
-                    Collision = CollideCircleAndLine(Circle, Line);
-                }
-                else if (ItemA.Type == Line && ItemB.Type == Circle)
-                {
-                    circle Circle = ItemB.Circle;
-                    line Line = ItemA.Line;
-
-                    DrawCircle(Circle.X, Circle.Y, Circle.R, CircleColor);
-                    DrawLineEx(Line.Start, Line.End, 2.0f, LineColor);
-
-                    Collision = CollideCircleAndLine(Circle, Line);
-                }
-                else if (ItemA.Type == Line && ItemB.Type == Line)
-                {
-                    DrawLineEx(ItemA.Line.Start, ItemA.Line.End, 2.0f, LineColor);
-                    DrawLineEx(ItemB.Line.Start, ItemB.Line.End, 2.0f, LineColor);
-
-                    Collision = CollideLineAndLine(ItemA.Line, ItemB.Line);
-                }
-                else if (ItemA.Type == Circle && ItemB.Type == Circle)
-                {
-                    circle FirstCircle = ItemA.Circle;
-                    circle SecondCircle = ItemB.Circle;
-
-                    DrawCircle(FirstCircle.X, FirstCircle.Y, FirstCircle.R, CircleColor);
-                    DrawCircle(SecondCircle.X, SecondCircle.Y, SecondCircle.R, CircleColor);
-
-                    Collision = CollideCircleAndCircle(FirstCircle, SecondCircle);
-                }
-                else
-                {
-                    /* unhandled shape collision */
-                    Assert(0);
-                }
-
-                for (s32 I = 0; I < Collision.Count; ++I)
-                {
-                    Vector2 Point = Collision.Collisions[I];
-                    DrawRectangle(Point.x - BoxRadius, Point.y - BoxRadius, 2*BoxRadius, 2*BoxRadius, RectColor);
-                }
-            }
-        }
-
-        EndDrawing();
-        return;
-    }
-
     HandleUserInput(GameState);
     BeginDrawing();
 
@@ -1099,7 +1049,7 @@ int main(void)
 
         for (;;)
         {
-            b32 ShouldCloseWindow = WindowShouldClose();// && !IsKeyPressed(KEY_ESCAPE); /* TODO add back in escape key ignore */
+            b32 ShouldCloseWindow = WindowShouldClose() && !IsKeyPressed(KEY_ESCAPE);
             b32 IsQuitMode = GameState.Mode == game_mode_Quit;
 
             if (ShouldCloseWindow || IsQuitMode)
