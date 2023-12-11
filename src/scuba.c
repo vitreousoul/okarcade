@@ -136,12 +136,16 @@ typedef enum
 
 typedef struct
 {
+    Vector2 Position;
+    Vector2 Velocity;
+} entity_movement;
+
+typedef struct
+{
     entity_type Type;
 
     Vector2 Position;
-    Vector2 OldPosition;
     Vector2 Velocity;
-    Vector2 OldVelocity;
     Vector2 Acceleration;
 
     sprite Sprites[ENTITY_SPRITE_COUNT];
@@ -582,39 +586,44 @@ internal collision_result CollideCircleAndCircle(circle FirstCircle, circle Seco
     return Result;
 }
 
-internal void UpdateEntity(game_state *GameState, entity *Entity)
+internal entity_movement GetEntityMovement(game_state *GameState, entity *Entity)
 {
+    entity_movement Movement = {0};
+
     f32 AccelerationThreshold = 0.0001f;
     f32 VelocityThreshold = 1.0f;
 
-    Entity->OldPosition = Entity->Position;
-    Entity->OldVelocity = Entity->Velocity;
-
-    if ((LengthSquaredV2(Entity->Acceleration) < AccelerationThreshold &&
-         LengthSquaredV2(Entity->Velocity) < VelocityThreshold))
+    if ((LengthSquaredV2(Entity->Acceleration) > AccelerationThreshold ||
+         LengthSquaredV2(Entity->Velocity) > VelocityThreshold))
     {
-        Entity->Acceleration = V2(0.0f, 0.0f);
-        Entity->Velocity = V2(0.0f, 0.0f);
-        return;
+        f32 AccelerationScale = 1000.0f;
+        f32 DT = GameState->DeltaTime;
+
+        Vector2 P = Entity->Position;
+        Vector2 V = Entity->Velocity;
+        Vector2 A = MultiplyV2S(Entity->Acceleration, AccelerationScale);
+        V = AddV2(V, MultiplyV2S(A, 0.01f));
+        A = AddV2(A, AddV2S(MultiplyV2S(V, -4.0f), -1.0f)); /* friction */
+        V = ClampV2(V, -300.0f, 300.0f);
+
+        Vector2 NewVelocity = AddV2(MultiplyV2S(A, DT), V);
+        Vector2 NewPosition = AddV2(AddV2(MultiplyV2S(A, 0.5f * DT * DT),
+                                          MultiplyV2S(V, DT)),
+                                    P);
+
+        Movement.Position = SubtractV2(NewPosition, Entity->Position);
+        Movement.Velocity = SubtractV2(NewVelocity, Entity->Velocity);
     }
 
-    f32 AccelerationScale = 1000.0f;
-    f32 DT = GameState->DeltaTime;
+    return Movement;
+}
 
-    Vector2 P = Entity->Position;
-    Vector2 V = Entity->Velocity;
-    Vector2 A = MultiplyV2S(Entity->Acceleration, AccelerationScale);
-    V = AddV2(V, MultiplyV2S(A, 0.01f));
-    A = AddV2(A, AddV2S(MultiplyV2S(V, -4.0f), -1.0f)); /* friction */
-    V = ClampV2(V, -300.0f, 300.0f);
+internal void UpdateEntity(game_state *GameState, entity *Entity)
+{
+    entity_movement Movement = GetEntityMovement(GameState, Entity);
 
-    Vector2 NewVelocity = AddV2(MultiplyV2S(A, DT), V);
-    Vector2 NewPosition = AddV2(AddV2(MultiplyV2S(A, 0.5f * DT * DT),
-                                      MultiplyV2S(V, DT)),
-                                P);
-
-    Entity->Velocity = NewVelocity;
-    Entity->Position = NewPosition;
+    Entity->Velocity = AddV2(Entity->Velocity, Movement.Velocity);
+    Entity->Position = AddV2(Entity->Position, Movement.Position);
 }
 
 internal void UpdateEntities(game_state *GameState)
@@ -654,19 +663,6 @@ internal void UpdateEntities(game_state *GameState)
                 circle CircleB = TestEntity->CollisionArea->Circle;
 
                 CollisionResult = CollideCircleAndCircle(CircleA, CircleB);
-
-                if (CollisionResult.Count == 1)
-                {
-                    Vector2 CenterBetweenCircles = CollisionResult.Collisions[0];
-                }
-                else if (CollisionResult.Count == 1)
-                {
-                    Vector2 FirstCollision = CollisionResult.Collisions[0];
-                    Vector2 SecondCollision = CollisionResult.Collisions[1];
-                    Vector2 Offset = MultiplyV2S(SubtractV2(SecondCollision, FirstCollision), 0.5f);
-                    Vector2 CenterBetweenCircles = AddV2(FirstCollision, Offset);
-                }
-
             } break;
             case collision_type_Line:
             {
