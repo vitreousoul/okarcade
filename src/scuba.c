@@ -210,6 +210,7 @@ internal entity *AddEntity(game_state *GameState, sprite_type SpriteType)
     if (GameState->EntityCount < MAX_ENTITY_COUNT)
     {
         Entity = GameState->Entities + GameState->EntityCount;
+        *Entity = NullEntity;
         GameState->EntityCount += 1;
 
         switch (SpriteType)
@@ -223,7 +224,7 @@ internal entity *AddEntity(game_state *GameState, sprite_type SpriteType)
             Entity->Position = V2(0.0f, 0.0f);
             Entity->CollisionArea = AddCollisionArea(GameState);
             Entity->CollisionArea->Type = collision_type_Circle;
-            Entity->CollisionArea->Circle = (circle){0.0f, 0.0f, 32.0f};
+            Entity->CollisionArea->Circle = (circle){0.0f, -3.0f, 20.0f};
         } break;
         case sprite_type_Eel:
         {
@@ -234,7 +235,7 @@ internal entity *AddEntity(game_state *GameState, sprite_type SpriteType)
             Entity->Position = V2(0.0f, 0.0f);
             Entity->CollisionArea = AddCollisionArea(GameState);
             Entity->CollisionArea->Type = collision_type_Circle;
-            Entity->CollisionArea->Circle = (circle){0.0f, 0.0f, 32.0f};
+            Entity->CollisionArea->Circle = (circle){40.0f, 20.0f, 32.0f};
         } break;
         case sprite_type_Coral:
         {
@@ -266,7 +267,7 @@ internal entity *AddEntity(game_state *GameState, sprite_type SpriteType)
             Entity->Position = V2(0.0f, 0.0f);
             Entity->CollisionArea = AddCollisionArea(GameState);
             Entity->CollisionArea->Type = collision_type_Circle;
-            Entity->CollisionArea->Circle = (circle){0.0f, 0.0f, 32.0f};
+            Entity->CollisionArea->Circle = (circle){0.0f, 0.0f, 162.0f};
         } break;
         case sprite_type_Crab:
         {
@@ -379,216 +380,6 @@ internal void DrawSprite(game_state *GameState, entity *Entity, s32 DepthZ)
             break;
         }
     }
-}
-
-internal f32 CollideEntities(game_state *GameState, entity *EntityA, entity *EntityB)
-{
-    b32 Collides = 0;
-
-#if 1
-    circle FirstCircle;
-    circle SecondCircle;
-#else
-    sprite SpriteA = EntityA->Sprites[0];
-    sprite SpriteB = EntityB->Sprites[0];
-
-    if (SpriteA.Type == sprite_type_Coral || SpriteB.Type == sprite_type_Coral)
-    {
-        return 0;
-    }
-
-    /* TODO: handle multiple collision areas by traversing the collision_area list */
-
-    Rectangle A = EntityA->CollisionArea->Area;
-    A.x += EntityA->Position.x - (A.width / 2.0f);
-    A.y += EntityA->Position.y - (A.height / 2.0f);
-
-    Rectangle B = EntityB->CollisionArea->Area;
-    B.x += EntityB->Position.x - (B.width / 2.0f);
-    B.y += EntityB->Position.y - (B.height / 2.0f);
-
-    b32 CollidesInX = !(A.x + A.width < B.x || B.x + B.width < A.x);
-    b32 CollidesInY = !(A.y + A.height < B.y || B.y + B.height < A.y);
-
-    Collides = CollidesInX && CollidesInY;
-#endif
-
-    return Collides;
-}
-
-#define MAX_COLLISION_COUNT 16
-
-internal void UpdateEntity(game_state *GameState, entity *Entity)
-{
-    f32 AccelerationThreshold = 0.0001f;
-    f32 VelocityThreshold = 1.0f;
-
-    Entity->OldPosition = Entity->Position;
-    Entity->OldVelocity = Entity->Velocity;
-
-    if ((LengthSquaredV2(Entity->Acceleration) < AccelerationThreshold &&
-         LengthSquaredV2(Entity->Velocity) < VelocityThreshold))
-    {
-        Entity->Acceleration = V2(0.0f, 0.0f);
-        Entity->Velocity = V2(0.0f, 0.0f);
-        return;
-    }
-
-    f32 AccelerationScale = 1000.0f;
-    f32 DT = GameState->DeltaTime;
-
-    Vector2 P = Entity->Position;
-    Vector2 V = Entity->Velocity;
-    Vector2 A = MultiplyV2S(Entity->Acceleration, AccelerationScale);
-    V = AddV2(V, MultiplyV2S(A, 0.01f));
-    A = AddV2(A, AddV2S(MultiplyV2S(V, -4.0f), -1.0f)); /* friction */
-    V = ClampV2(V, -300.0f, 300.0f);
-
-    Vector2 NewVelocity = AddV2(MultiplyV2S(A, DT), V);
-    Vector2 NewPosition = AddV2(AddV2(MultiplyV2S(A, 0.5f * DT * DT),
-                                      MultiplyV2S(V, DT)),
-                                P);
-
-    Entity->Velocity = NewVelocity;
-    Entity->Position = NewPosition;
-}
-
-internal void UpdateEntities(game_state *GameState)
-{
-    /* TODO: Define new loop that:
-       finds soonest collision,
-       update entities using collision,
-       repeat until all entities are out of movement.
-    */
-    f32 LeastTimeTaken = INFINITY;
-
-    { /* find nearest collision */
-        for (s32 I = 0; I < GameState->EntityCount; ++I)
-        {
-            entity *Entity = GameState->Entities + I;
-
-            for (s32 J = I + 1; J < GameState->EntityCount; ++J)
-            {
-                entity *TestEntity = GameState->Entities + J;
-
-                f32 TimeTaken = CollideEntities(GameState, Entity, TestEntity);
-
-                if (TimeTaken < TimeTaken)
-                {
-                    LeastTimeTaken = TimeTaken;
-                }
-            }
-        }
-
-        if (LeastTimeTaken < INFINITY)
-        {
-            Assert(0);
-        }
-        else
-        {
-            /* no collisions, just update everybody */
-            for (s32 I = 0; I < GameState->EntityCount; ++I)
-            {
-                UpdateEntity(GameState, &GameState->Entities[I]);
-            }
-        }
-    }
-#if 0
-    for (s32 I = 0; I < GameState->EntityCount; ++I)
-    {
-        entity *Entity = GameState->Entities + I;
-        sprite_type CollisionTypes[MAX_COLLISION_COUNT];
-        s32 CollisionIndex = 0;
-
-        if (!Entity->Type)
-        {
-            break;
-        }
-
-        if (I == 0)
-        {
-            UpdateEntity(GameState, Entity);
-        }
-
-        for (s32 J = I + 1; J < GameState->EntityCount; ++J)
-        {
-            entity *TestEntity = GameState->Entities + J;
-
-            if (!TestEntity->Type)
-            {
-                break;
-            }
-
-            UpdateEntity(GameState, TestEntity);
-            b32 Collides = CollideEntities(GameState, Entity, TestEntity);
-
-            sprite_type SpriteType = Entity->Sprites[0].Type;
-            sprite_type TestSpriteType = TestEntity->Sprites[0].Type;
-            b32 PlayerAndEel = ((SpriteType == sprite_type_Fish && TestSpriteType == sprite_type_Eel) ||
-                                (SpriteType == sprite_type_Eel && TestSpriteType == sprite_type_Fish));
-
-            if (Collides && PlayerAndEel)
-            {
-                GameState->Mode = game_mode_GameOver;
-            }
-
-            if (Collides && CollisionIndex < MAX_COLLISION_COUNT)
-            {
-                CollisionTypes[CollisionIndex++] = TestEntity->Sprites[0].Type;
-            }
-        }
-    }
-#endif
-}
-
-internal Rectangle GetSpriteRectangle(entity *Entity)
-{
-    Rectangle SourceRectangle = Entity->Sprites[0].SourceRectangle;
-
-    Rectangle SpriteRectangle = (Rectangle){
-        Entity->Position.x,
-        Entity->Position.y,
-        TEXTURE_MAP_SCALE * SourceRectangle.width,
-        TEXTURE_MAP_SCALE * SourceRectangle.height
-    };
-
-    return SpriteRectangle;
-}
-
-internal void ResetGame(game_state *GameState)
-{
-    GameState->EntityCount = 0;
-
-    for (s32 I = 0; I < MAX_ENTITY_COUNT; ++I)
-    {
-        GameState->Entities[I] = NullEntity;
-    }
-
-    { /* init entities */
-        GameState->PlayerEntity = AddEntity(GameState, sprite_type_Fish);
-        entity *PlayerEntity = GameState->PlayerEntity;
-        PlayerEntity->Position = MultiplyV2S(V2(1.0f, 1.0f), TILE_SIZE * TEXTURE_MAP_SCALE);
-
-        GameState->EelEntity = AddEntity(GameState, sprite_type_Eel);
-        entity *EelEntity = GameState->EelEntity;
-        EelEntity->Position = MultiplyV2S(V2(0.25f, 4.0f), TILE_SIZE * TEXTURE_MAP_SCALE);
-
-        GameState->CrabEntity = AddEntity(GameState, sprite_type_Crab);
-        entity *CrabEntity = GameState->CrabEntity;
-        CrabEntity->Position = MultiplyV2S(V2(9.0f, 7.0f), TILE_SIZE * TEXTURE_MAP_SCALE);
-
-        GameState->CoralEntity = AddEntity(GameState, sprite_type_Coral);
-
-        GameState->WallEntity = AddEntity(GameState, sprite_type_Wall);
-
-        GameState->CageEntity = AddEntity(GameState, sprite_type_Cage);
-        entity *CageEntity = GameState->CageEntity;
-        CageEntity->Position = MultiplyV2S(V2(9.0f, 7.0f), TILE_SIZE * TEXTURE_MAP_SCALE);
-    }
-
-    GameState->CameraPosition = GameState->PlayerEntity->Position;
-    GameState->Mode = game_mode_Start;
-    GameState->LastTime = GetTime();
 }
 
 internal collision_result CollideLineAndLine(line FirstLine, line SecondLine)
@@ -734,7 +525,6 @@ internal collision_result CollideCircleAndLine(circle Circle, line Line)
     return Result;
 }
 
-
 internal collision_result CollideCircleAndCircle(circle FirstCircle, circle SecondCircle)
 {
     /*
@@ -790,6 +580,175 @@ internal collision_result CollideCircleAndCircle(circle FirstCircle, circle Seco
     }
 
     return Result;
+}
+
+internal void UpdateEntity(game_state *GameState, entity *Entity)
+{
+    f32 AccelerationThreshold = 0.0001f;
+    f32 VelocityThreshold = 1.0f;
+
+    Entity->OldPosition = Entity->Position;
+    Entity->OldVelocity = Entity->Velocity;
+
+    if ((LengthSquaredV2(Entity->Acceleration) < AccelerationThreshold &&
+         LengthSquaredV2(Entity->Velocity) < VelocityThreshold))
+    {
+        Entity->Acceleration = V2(0.0f, 0.0f);
+        Entity->Velocity = V2(0.0f, 0.0f);
+        return;
+    }
+
+    f32 AccelerationScale = 1000.0f;
+    f32 DT = GameState->DeltaTime;
+
+    Vector2 P = Entity->Position;
+    Vector2 V = Entity->Velocity;
+    Vector2 A = MultiplyV2S(Entity->Acceleration, AccelerationScale);
+    V = AddV2(V, MultiplyV2S(A, 0.01f));
+    A = AddV2(A, AddV2S(MultiplyV2S(V, -4.0f), -1.0f)); /* friction */
+    V = ClampV2(V, -300.0f, 300.0f);
+
+    Vector2 NewVelocity = AddV2(MultiplyV2S(A, DT), V);
+    Vector2 NewPosition = AddV2(AddV2(MultiplyV2S(A, 0.5f * DT * DT),
+                                      MultiplyV2S(V, DT)),
+                                P);
+
+    Entity->Velocity = NewVelocity;
+    Entity->Position = NewPosition;
+}
+
+internal void UpdateEntities(game_state *GameState)
+{
+    /* TODO: Define new loop that:
+       finds soonest collision,
+       update entities using collision,
+       repeat until all entities are out of movement.
+    */
+    /* find nearest collision */
+    for (s32 I = 0; I < GameState->EntityCount; ++I)
+    {
+        entity *Entity = GameState->Entities + I;
+
+        UpdateEntity(GameState, Entity);
+
+        for (s32 J = I + 1; J < GameState->EntityCount; ++J)
+        {
+            entity *TestEntity = GameState->Entities + J;
+
+            f32 TimeTaken = 0;
+
+            if (!(Entity->CollisionArea && TestEntity->CollisionArea))
+            {
+                continue;
+            }
+
+            u32 CollisionTypes = Entity->CollisionArea->Type | TestEntity->CollisionArea->Type;
+            collision_result CollisionResult = {0};
+
+            switch(CollisionTypes)
+            {
+            case collision_type_Circle:
+            {
+                Vector2 CenterBetweenCircles;
+                circle CircleA = Entity->CollisionArea->Circle;
+                circle CircleB = TestEntity->CollisionArea->Circle;
+
+                CollisionResult = CollideCircleAndCircle(CircleA, CircleB);
+
+                if (CollisionResult.Count == 1)
+                {
+                    Vector2 CenterBetweenCircles = CollisionResult.Collisions[0];
+                }
+                else if (CollisionResult.Count == 1)
+                {
+                    Vector2 FirstCollision = CollisionResult.Collisions[0];
+                    Vector2 SecondCollision = CollisionResult.Collisions[1];
+                    Vector2 Offset = MultiplyV2S(SubtractV2(SecondCollision, FirstCollision), 0.5f);
+                    Vector2 CenterBetweenCircles = AddV2(FirstCollision, Offset);
+                }
+
+            } break;
+            case collision_type_Line:
+            {
+                Assert(0);
+                line LineA = Entity->CollisionArea->Line;
+                line LineB = TestEntity->CollisionArea->Line;
+
+                CollisionResult = CollideLineAndLine(LineA, LineB);
+            } break;
+            case (collision_type_Circle | collision_type_Line):
+            {
+                Assert(0);
+                circle Circle;
+                line Line;
+
+                if (Entity->CollisionArea->Type == collision_type_Circle)
+                {
+                    Circle = Entity->CollisionArea->Circle;
+                    Line = TestEntity->CollisionArea->Line;
+                }
+                else
+                {
+                    Circle = TestEntity->CollisionArea->Circle;
+                    Line = Entity->CollisionArea->Line;
+                }
+
+                CollisionResult = CollideCircleAndLine(Circle, Line);
+            } break;
+            default: break;
+            }
+        }
+    }
+}
+
+internal Rectangle GetSpriteRectangle(entity *Entity)
+{
+    Rectangle SourceRectangle = Entity->Sprites[0].SourceRectangle;
+
+    Rectangle SpriteRectangle = (Rectangle){
+        Entity->Position.x,
+        Entity->Position.y,
+        TEXTURE_MAP_SCALE * SourceRectangle.width,
+        TEXTURE_MAP_SCALE * SourceRectangle.height
+    };
+
+    return SpriteRectangle;
+}
+
+internal void ResetGame(game_state *GameState)
+{
+    GameState->EntityCount = 0;
+
+    for (s32 I = 0; I < MAX_ENTITY_COUNT; ++I)
+    {
+        GameState->Entities[I] = NullEntity;
+    }
+
+    { /* init entities */
+        GameState->PlayerEntity = AddEntity(GameState, sprite_type_Fish);
+        entity *PlayerEntity = GameState->PlayerEntity;
+        PlayerEntity->Position = MultiplyV2S(V2(1.0f, 1.0f), TILE_SIZE * TEXTURE_MAP_SCALE);
+
+        GameState->EelEntity = AddEntity(GameState, sprite_type_Eel);
+        entity *EelEntity = GameState->EelEntity;
+        EelEntity->Position = MultiplyV2S(V2(0.25f, 4.0f), TILE_SIZE * TEXTURE_MAP_SCALE);
+
+        GameState->CrabEntity = AddEntity(GameState, sprite_type_Crab);
+        entity *CrabEntity = GameState->CrabEntity;
+        CrabEntity->Position = MultiplyV2S(V2(9.0f, 7.0f), TILE_SIZE * TEXTURE_MAP_SCALE);
+
+        GameState->CoralEntity = AddEntity(GameState, sprite_type_Coral);
+
+        GameState->WallEntity = AddEntity(GameState, sprite_type_Wall);
+
+        GameState->CageEntity = AddEntity(GameState, sprite_type_Cage);
+        entity *CageEntity = GameState->CageEntity;
+        CageEntity->Position = MultiplyV2S(V2(9.0f, 7.0f), TILE_SIZE * TEXTURE_MAP_SCALE);
+    }
+
+    GameState->CameraPosition = GameState->PlayerEntity->Position;
+    GameState->Mode = game_mode_Start;
+    GameState->LastTime = GetTime();
 }
 
 internal void UpdateAndRender(void *VoidGameState)
@@ -929,9 +888,17 @@ internal void UpdateAndRender(void *VoidGameState)
                 for (s32 I = 0; I < GameState->EntityCount; ++I)
                 {
                     entity *Entity = GameState->Entities + I;
-
                     Vector2 Position = WorldToScreenPosition(GameState, Entity->Position);
+
                     DrawRectangle(Position.x, Position.y, 4.0f, 4.0f, (Color){220,40,220,255});
+
+                    if (Entity->CollisionArea && Entity->CollisionArea->Type == collision_type_Circle)
+                    {
+                        circle Circle = Entity->CollisionArea->Circle;
+                        f32 Radius = Entity->CollisionArea->Circle.R;
+                        Vector2 OffsetPosition = AddV2(Position, V2(Circle.X, Circle.Y));
+                        DrawCircleLines(OffsetPosition.x, OffsetPosition.y, Circle.R, (Color){255,0,255,255});
+                    }
                 }
             }
 
