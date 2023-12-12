@@ -257,7 +257,7 @@ internal void RenderDebugDrawCommands(void)
         {
             line Line = Command.Shape.Line;
 
-            DrawLine(Line.Start.x, Line.Start.y, Line.End.x, Line.End.y, Command.Color);                // Draw a line
+            DrawLine(Line.Start.x, Line.Start.y, Line.End.x, Line.End.y, Command.Color);
         } break;
         case debug_draw_type_Rectangle:
         {
@@ -731,7 +731,7 @@ internal void UpdateEntities(game_state *GameState)
         entity *Entity = GameState->Entities + I;
 
         entity_movement EntityMovement = GetEntityMovement(GameState, Entity);
-        UpdateEntity(GameState, Entity);
+        UpdateEntity(GameState, Entity); /* TODO: don't update here, but after collision. That's when we know where the entity can go */
 
         for (s32 J = I + 1; J < GameState->EntityCount; ++J)
         {
@@ -749,8 +749,8 @@ internal void UpdateEntities(game_state *GameState)
             {
             case collision_type_Circle:
             {
-                circle CircleA = GetOffsetCircle(Entity->CollisionArea->Circle, Entity->Position);
-                circle CircleB = GetOffsetCircle(TestEntity->CollisionArea->Circle, TestEntity->Position);
+                circle CircleA = GetOffsetCircle(Entity->CollisionArea->Circle, WorldToScreenPosition(GameState, Entity->Position));
+                circle CircleB = GetOffsetCircle(TestEntity->CollisionArea->Circle, WorldToScreenPosition(GameState, TestEntity->Position));
 
                 CollisionResult = CollideCircleAndCircle(CircleA, CircleB);
 
@@ -763,6 +763,8 @@ internal void UpdateEntities(game_state *GameState)
                     if (Overlap > 0.0f)
                     {
                         /* TODO: move colliding entities */
+                        PushDebugCircle(CircleA, (Color){255,255,0,255});
+                        PushDebugCircle(CircleB, (Color){255,0,255,255});
                     }
                 }
             } break;
