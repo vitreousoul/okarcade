@@ -986,23 +986,6 @@ internal void UpdateAndRender(void *VoidGameState)
         }
 
         { /* debug graphics */
-            { /* draw entity dots */
-                for (s32 I = 0; I < GameState->EntityCount; ++I)
-                {
-                    entity *Entity = GameState->Entities + I;
-                    Vector2 Position = WorldToScreenPosition(GameState, Entity->Position);
-
-                    DrawRectangle(Position.x, Position.y, 4.0f, 4.0f, (Color){220,40,220,255});
-
-                    if (Entity->CollisionArea && Entity->CollisionArea->Type == collision_type_Circle)
-                    {
-                        circle Circle = Entity->CollisionArea->Circle;
-                        Vector2 OffsetPosition = AddV2(Position, V2(Circle.X, Circle.Y));
-                        DrawCircleLines(OffsetPosition.x, OffsetPosition.y, Circle.R, (Color){255,0,255,255});
-                    }
-                }
-            }
-
             { /* draw time */
                 Color BackgroundColor = (Color){0, 0, 0, 255};
                 Color ForegroundColor = (Color){255, 255, 255, 255};
@@ -1015,9 +998,9 @@ internal void UpdateAndRender(void *VoidGameState)
                 DrawTextEx(GameState->UI.Font, DebugTextBuffer, V2(11, 11), 14, Spacing, BackgroundColor);
                 DrawTextEx(GameState->UI.Font, DebugTextBuffer, V2(10, 10), 14, Spacing, ForegroundColor);
             }
-        }
 
-        RenderDebugDrawCommands();
+            RenderDebugDrawCommands();
+        }
 
         EndDrawing();
     } break;
