@@ -188,6 +188,88 @@ typedef struct
     Texture2D ScubaTexture;
 } game_state;
 
+/* BEGIN Debug Draw Commands */
+typedef enum
+{
+   debug_draw_type_Circle,
+   debug_draw_type_Line,
+   debug_draw_type_Rectangle,
+} debug_draw_type;
+
+typedef union
+{
+    circle Circle;
+    line Line;
+    Rectangle Rectangle;
+} debug_draw_shape;
+
+typedef struct
+{
+    debug_draw_type Type;
+    debug_draw_shape Shape;
+    Color Color;
+} debug_draw_command;
+
+#define DEBUG_DRAW_COMMAND_MAX 1024
+global_variable debug_draw_command DebugDrawCommands[DEBUG_DRAW_COMMAND_MAX] = {0};
+global_variable s32 DebugDrawCommandCount = 0;
+
+internal void ResetDebugDrawCommands(void)
+{
+    DebugDrawCommandCount = 0;
+}
+
+internal void PushDebugDrawCommand(debug_draw_command Command)
+{
+    if (DebugDrawCommandCount < DEBUG_DRAW_COMMAND_MAX)
+    {
+        DebugDrawCommands[DebugDrawCommandCount] = Command;
+        DebugDrawCommandCount += 1;
+    }
+}
+
+internal void PushDebugCircle(circle Circle, Color Color)
+{
+    debug_draw_command Command;
+
+    Command.Type = debug_draw_type_Circle;
+    Command.Shape.Circle = Circle;
+    Command.Color = Color;
+
+    PushDebugDrawCommand(Command);
+}
+
+internal void RenderDebugDrawCommands(void)
+{
+    for (s32 I = 0; I < DebugDrawCommandCount; ++I)
+    {
+        debug_draw_command Command = DebugDrawCommands[I];
+
+        switch(Command.Type)
+        {
+        case debug_draw_type_Circle:
+        {
+            circle Circle = Command.Shape.Circle;
+
+            DrawCircleLines(Circle.X, Circle.Y, Circle.R, Command.Color);
+        } break;
+        case debug_draw_type_Line:
+        {
+            line Line = Command.Shape.Line;
+
+            DrawLine(Line.Start.x, Line.Start.y, Line.End.x, Line.End.y, Command.Color);                // Draw a line
+        } break;
+        case debug_draw_type_Rectangle:
+        {
+            Rectangle Rectangle = Command.Shape.Rectangle;
+
+            DrawRectangleLinesEx(Rectangle, 2.0f, Command.Color);
+        } break;
+        }
+    }
+}
+/* END Debug Draw Commands */
+
 internal collision_area *AddCollisionArea(game_state *GameState)
 {
     collision_area *CollisionArea = 0;
@@ -772,6 +854,10 @@ internal void UpdateAndRender(void *VoidGameState)
     game_state *GameState = (game_state *)VoidGameState;
     ui *UI = &GameState->UI;
 
+    ResetDebugDrawCommands();
+
+    PushDebugCircle((circle){100, 200, 46}, (Color){0,255,255,255});
+
     HandleUserInput(GameState);
     BeginDrawing();
 
@@ -930,6 +1016,8 @@ internal void UpdateAndRender(void *VoidGameState)
                 DrawTextEx(GameState->UI.Font, DebugTextBuffer, V2(10, 10), 14, Spacing, ForegroundColor);
             }
         }
+
+        RenderDebugDrawCommands();
 
         EndDrawing();
     } break;
