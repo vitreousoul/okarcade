@@ -729,9 +729,9 @@ internal void UpdateEntities(game_state *GameState)
     for (s32 I = 0; I < GameState->EntityCount; ++I)
     {
         entity *Entity = GameState->Entities + I;
+        b32 EntityCollided = 0;
 
         entity_movement EntityMovement = GetEntityMovement(GameState, Entity);
-        UpdateEntity(GameState, Entity); /* TODO: don't update here, but after collision. That's when we know where the entity can go */
 
         for (s32 J = I + 1; J < GameState->EntityCount; ++J)
         {
@@ -749,22 +749,40 @@ internal void UpdateEntities(game_state *GameState)
             {
             case collision_type_Circle:
             {
-                circle CircleA = GetOffsetCircle(Entity->CollisionArea->Circle, WorldToScreenPosition(GameState, Entity->Position));
-                circle CircleB = GetOffsetCircle(TestEntity->CollisionArea->Circle, WorldToScreenPosition(GameState, TestEntity->Position));
+                Vector2 OffsetEntity = AddV2(Entity->Position, EntityMovement.Position);
+
+                circle CircleA = GetOffsetCircle(Entity->CollisionArea->Circle, OffsetEntity);
+                circle CircleB = GetOffsetCircle(TestEntity->CollisionArea->Circle, TestEntity->Position);
 
                 CollisionResult = CollideCircleAndCircle(CircleA, CircleB);
+
+                if (CollisionResult.Count)
+                {
+                    EntityCollided = 1;
+                }
 
                 if (Entity->Sprites[0].Type == sprite_type_Fish)
                 {
                     f32 DeltaX = CircleA.X - CircleB.X;
                     f32 DeltaY = CircleA.Y - CircleB.Y;
+
                     f32 Distance = sqrt(DeltaX*DeltaX + DeltaY*DeltaY);
                     f32 Overlap = (CircleA.R + CircleB.R) - Distance;
+
                     if (Overlap > 0.0f)
                     {
                         /* TODO: move colliding entities */
-                        PushDebugCircle(CircleA, (Color){255,255,0,255});
-                        PushDebugCircle(CircleB, (Color){255,0,255,255});
+
+                        { /* debug drawing */
+                            Vector2 ScreenCircleA = WorldToScreenPosition(GameState, V2(CircleA.X, CircleA.Y));
+                            Vector2 ScreenCircleB = WorldToScreenPosition(GameState, V2(CircleB.X, CircleB.Y));
+
+                            circle Circle = (circle){ScreenCircleA.x, ScreenCircleA.y, CircleA.R};
+                            circle TestCircle = (circle){ScreenCircleB.x, ScreenCircleB.y, CircleB.R};
+
+                            PushDebugCircle(Circle, (Color){255,255,0,255});
+                            PushDebugCircle(TestCircle, (Color){255,0,255,255});
+                        }
                     }
                 }
             } break;
@@ -797,6 +815,16 @@ internal void UpdateEntities(game_state *GameState)
             } break;
             default: { Assert(0); } break;
             }
+        }
+
+        if (EntityCollided)
+        {
+            Entity->Acceleration = V2(0, 0);
+            Entity->Velocity = V2(0, 0);
+        }
+        else
+        {
+            UpdateEntity(GameState, Entity);
         }
     }
 }
@@ -857,8 +885,6 @@ internal void UpdateAndRender(void *VoidGameState)
     ui *UI = &GameState->UI;
 
     ResetDebugDrawCommands();
-
-    PushDebugCircle((circle){100, 200, 46}, (Color){0,255,255,255});
 
     HandleUserInput(GameState);
     BeginDrawing();
