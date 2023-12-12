@@ -337,16 +337,6 @@ internal Vector2 WorldToScreenPosition(game_state *GameState, Vector2 P)
     return Result;
 }
 
-internal Rectangle WorldToScreenRectangle(game_state *GameState, Rectangle R)
-{
-    Vector2 HalfScreen = MultiplyV2S(V2(SCREEN_WIDTH, SCREEN_HEIGHT), 0.5f);
-    Vector2 RectPosition = V2(R.x, R.y);
-    Vector2 Position = AddV2(SubtractV2(RectPosition, GameState->CameraPosition), HalfScreen);
-    Rectangle Result = R2(Position.x, Position.y, R.width, R.height);
-
-    return Result;
-}
-
 internal Vector2 ScreenToWorldPosition(game_state *GameState, Vector2 P)
 {
     Vector2 HalfScreen = MultiplyV2S(V2(SCREEN_WIDTH, SCREEN_HEIGHT), 0.5f);
@@ -626,6 +616,26 @@ internal void UpdateEntity(game_state *GameState, entity *Entity)
     Entity->Position = AddV2(Entity->Position, Movement.Position);
 }
 
+internal circle GetOffsetCircle(circle Circle, Vector2 Offset)
+{
+    circle Result = Circle;
+    Result.X += Offset.x;
+    Result.Y += Offset.y;
+
+    return Result;
+}
+
+internal line GetOffsetLine(line Line, Vector2 Offset)
+{
+    line Result = Line;
+    Result.Start.x += Offset.x;
+    Result.Start.y += Offset.y;
+    Result.End.x += Offset.x;
+    Result.End.y += Offset.y;
+
+    return Result;
+}
+
 internal void UpdateEntities(game_state *GameState)
 {
     /* TODO: Define new loop that:
@@ -638,13 +648,12 @@ internal void UpdateEntities(game_state *GameState)
     {
         entity *Entity = GameState->Entities + I;
 
+        entity_movement EntityMovement = GetEntityMovement(GameState, Entity);
         UpdateEntity(GameState, Entity);
 
         for (s32 J = I + 1; J < GameState->EntityCount; ++J)
         {
             entity *TestEntity = GameState->Entities + J;
-
-            f32 TimeTaken = 0;
 
             if (!(Entity->CollisionArea && TestEntity->CollisionArea))
             {
@@ -658,11 +667,22 @@ internal void UpdateEntities(game_state *GameState)
             {
             case collision_type_Circle:
             {
-                Vector2 CenterBetweenCircles;
-                circle CircleA = Entity->CollisionArea->Circle;
-                circle CircleB = TestEntity->CollisionArea->Circle;
+                circle CircleA = GetOffsetCircle(Entity->CollisionArea->Circle, Entity->Position);
+                circle CircleB = GetOffsetCircle(TestEntity->CollisionArea->Circle, TestEntity->Position);
 
                 CollisionResult = CollideCircleAndCircle(CircleA, CircleB);
+
+                if (Entity->Sprites[0].Type == sprite_type_Fish)
+                {
+                    f32 DeltaX = CircleA.X - CircleB.X;
+                    f32 DeltaY = CircleA.Y - CircleB.Y;
+                    f32 Distance = sqrt(DeltaX*DeltaX + DeltaY*DeltaY);
+                    f32 Overlap = (CircleA.R + CircleB.R) - Distance;
+                    if (Overlap > 0.0f)
+                    {
+                        /* TODO: move colliding entities */
+                    }
+                }
             } break;
             case collision_type_Line:
             {
@@ -691,7 +711,7 @@ internal void UpdateEntities(game_state *GameState)
 
                 CollisionResult = CollideCircleAndLine(Circle, Line);
             } break;
-            default: break;
+            default: { Assert(0); } break;
             }
         }
     }
@@ -891,7 +911,6 @@ internal void UpdateAndRender(void *VoidGameState)
                     if (Entity->CollisionArea && Entity->CollisionArea->Type == collision_type_Circle)
                     {
                         circle Circle = Entity->CollisionArea->Circle;
-                        f32 Radius = Entity->CollisionArea->Circle.R;
                         Vector2 OffsetPosition = AddV2(Position, V2(Circle.X, Circle.Y));
                         DrawCircleLines(OffsetPosition.x, OffsetPosition.y, Circle.R, (Color){255,0,255,255});
                     }
