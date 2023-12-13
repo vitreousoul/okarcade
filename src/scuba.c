@@ -270,6 +270,45 @@ internal void RenderDebugDrawCommands(void)
 }
 /* END Debug Draw Commands */
 
+/* BEGIN Debug frame-rate historgram */
+#define FRAME_RATE_HISTORY_COUNT_LOG2 6
+#define FRAME_RATE_HISTORY_COUNT (1 << FRAME_RATE_HISTORY_COUNT_LOG2)
+#define FRAME_RATE_HISTORY_MASK (FRAME_RATE_HISTORY_COUNT - 1)
+
+global_variable f32 FrameRateHistory[FRAME_RATE_HISTORY_COUNT];
+global_variable u32 FrameRateHistoryIndex = 0;
+
+internal void RecordFrameRate(f32 FrameRate)
+{
+    FrameRateHistory[FrameRateHistoryIndex] = FrameRate;
+    FrameRateHistoryIndex = (FrameRateHistoryIndex + 1) & FRAME_RATE_HISTORY_MASK;
+    /* printf("%d\n", FrameRateHistoryIndex); */
+}
+
+internal void DrawFrameRateHistory(void)
+{
+    Color RectangleColor = (Color){255,255,255,100};
+
+    for (u32 I = 0; I < FRAME_RATE_HISTORY_COUNT; ++I)
+    {
+        s32 HistogramItemWidth = 2;
+        s32 HistogramFullWidth = HistogramItemWidth * FRAME_RATE_HISTORY_COUNT;
+
+        f32 HistogramHeight = 42.0f;
+        f32 FrameRate = 1000.0f * AbsF32(FrameRateHistory[I]);
+        f32 FrameRateScaled = FrameRate;
+        printf("%f\n", FrameRateScaled);
+
+        s32 FrameRateItemHeight = (s32)(FrameRateScaled);
+
+        s32 FrameRateItemX = SCREEN_WIDTH - 24 - HistogramFullWidth + I * HistogramItemWidth;
+        s32 FrameRateItemY = HistogramHeight + 24 - FrameRateItemHeight;
+
+        DrawRectangle(FrameRateItemX, FrameRateItemY, 2, FrameRateItemHeight, RectangleColor);
+    }
+}
+/* END Debug frame-rate historgram */
+
 internal collision_area *AddCollisionArea(game_state *GameState)
 {
     collision_area *CollisionArea = 0;
@@ -947,6 +986,7 @@ internal void UpdateAndRender(void *VoidGameState)
 
         { /* update timer */
             f32 DeltaTime = StartTime - GameState->LastTime;
+            RecordFrameRate(DeltaTime);
             GameState->DeltaTime = MinF32(MAX_DELTA_TIME, DeltaTime);
             GameState->LastTime = StartTime;
         }
@@ -1028,6 +1068,8 @@ internal void UpdateAndRender(void *VoidGameState)
             }
 
             RenderDebugDrawCommands();
+
+            DrawFrameRateHistory();
         }
 
         EndDrawing();
