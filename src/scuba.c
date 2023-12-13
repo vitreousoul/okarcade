@@ -282,7 +282,6 @@ internal void RecordFrameRate(f32 FrameRate)
 {
     FrameRateHistory[FrameRateHistoryIndex] = FrameRate;
     FrameRateHistoryIndex = (FrameRateHistoryIndex + 1) & FRAME_RATE_HISTORY_MASK;
-    /* printf("%d\n", FrameRateHistoryIndex); */
 }
 
 internal void DrawFrameRateHistory(void)
@@ -297,7 +296,6 @@ internal void DrawFrameRateHistory(void)
         f32 HistogramHeight = 42.0f;
         f32 FrameRate = 1000.0f * AbsF32(FrameRateHistory[I]);
         f32 FrameRateScaled = FrameRate;
-        printf("%f\n", FrameRateScaled);
 
         s32 FrameRateItemHeight = (s32)(FrameRateScaled);
 
