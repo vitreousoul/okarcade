@@ -171,19 +171,14 @@ typedef struct
 
     s32 EntityCount;
     entity Entities[MAX_ENTITY_COUNT];
+    s32 SortedEntityTable[MAX_ENTITY_COUNT];
 
     s32 CollisionAreaCount;
     collision_area CollisionAreas[MAX_COLLISION_AREA_COUNT];
 
     Vector2 CameraPosition;
 
-    /* TODO: don't store these entity pointers. Instead, loop through entities to update/render them */
     entity *PlayerEntity;
-    entity *EelEntity;
-    entity *CoralEntity;
-    entity *WallEntity;
-    entity *CageEntity;
-    entity *CrabEntity;
 
     Texture2D ScubaTexture;
 } game_state;
@@ -343,7 +338,7 @@ internal entity *AddEntity(game_state *GameState, sprite_type SpriteType)
             Entity->Type = entity_type_Base;
             Entity->Sprites[0].Type = SpriteType;
             Entity->Sprites[0].SourceRectangle = R2(5,3,12,9);
-            Entity->Sprites[0].DepthZ = 1;
+            Entity->Sprites[0].DepthZ = 2;
             Entity->Position = V2(0.0f, 0.0f);
             Entity->CollisionArea = AddCollisionArea(GameState);
             Entity->CollisionArea->Type = collision_type_Circle;
@@ -365,17 +360,14 @@ internal entity *AddEntity(game_state *GameState, sprite_type SpriteType)
             Entity->Type = entity_type_Base;
             Entity->Sprites[0].Type = SpriteType;
             Entity->Sprites[0].SourceRectangle = R2(13,118,TILE_SIZE,TILE_SIZE);
-            Entity->Sprites[0].DepthZ = 0;
+            Entity->Sprites[0].DepthZ = -1;
         } break;
         case sprite_type_Wall:
         {
             Entity->Type = entity_type_Base;
             Entity->Sprites[0].Type = SpriteType;
             Entity->Sprites[0].SourceRectangle = R2(13,147,TILE_SIZE,TILE_SIZE);
-            Entity->Sprites[0].DepthZ = 0;
-            Entity->CollisionArea = AddCollisionArea(GameState);
-            Entity->CollisionArea->Type = collision_type_Circle;
-            Entity->CollisionArea->Circle = (circle){0.0f, 0.0f, 32.0f};
+            Entity->Sprites[0].DepthZ = -1;
 
         } break;
         case sprite_type_Cage:
@@ -386,7 +378,7 @@ internal entity *AddEntity(game_state *GameState, sprite_type SpriteType)
             Entity->Sprites[0].DepthZ = 0;
             Entity->Sprites[1].Type = SpriteType;
             Entity->Sprites[1].SourceRectangle = R2(90,101,110,70);
-            Entity->Sprites[1].DepthZ = 1;
+            Entity->Sprites[1].DepthZ = 3;
             Entity->Position = V2(0.0f, 0.0f);
             Entity->CollisionArea = AddCollisionArea(GameState);
             Entity->CollisionArea->Type = collision_type_Circle;
@@ -479,14 +471,11 @@ internal void DrawSprite(game_state *GameState, entity *Entity, s32 DepthZ)
 
         if (Sprite.Type)
         {
-            if (Sprite.DepthZ == DepthZ)
-            {
-                Rectangle DestRectangle = R2(Position.x, Position.y, SpriteSize.x, SpriteSize.y);
-                Color Tint = (Color){255,255,255,255};
-                Vector2 Origin = (Vector2){0,0};
+            Rectangle DestRectangle = R2(Position.x, Position.y, SpriteSize.x, SpriteSize.y);
+            Color Tint = (Color){255,255,255,255};
+            Vector2 Origin = (Vector2){0,0};
 
-                DrawTexturePro(GameState->ScubaTexture, SourceRectangle, DestRectangle, Origin, 0.0f, Tint);
-            }
+            DrawTexturePro(GameState->ScubaTexture, SourceRectangle, DestRectangle, Origin, 0.0f, Tint);
         }
         else
         {
@@ -825,7 +814,6 @@ internal void UpdateEntities(game_state *GameState)
             } break;
             case collision_type_Line:
             {
-                Assert(0);
                 line LineA = Entity->CollisionArea->Line;
                 line LineB = TestEntity->CollisionArea->Line;
 
@@ -833,7 +821,6 @@ internal void UpdateEntities(game_state *GameState)
             } break;
             case (collision_type_Circle | collision_type_Line):
             {
-                Assert(0);
                 circle Circle;
                 line Line;
 
@@ -880,6 +867,56 @@ internal Rectangle GetSpriteRectangle(entity *Entity)
     return SpriteRectangle;
 }
 
+internal void GenerateSortedEntityTable(game_state *GameState)
+{
+    s32 SortedEntityIndex = 0;
+
+    for (s32 I = 0; I < GameState->EntityCount; ++I)
+    {
+        entity Entity = GameState->Entities[I];
+
+        if (SortedEntityIndex == 0)
+        {
+            GameState->SortedEntityTable[0] = I;
+            SortedEntityIndex += 1;
+        }
+        else
+        {
+            b32 Added = 0;
+
+            for (s32 J = 0; J < SortedEntityIndex; ++J)
+            {
+                s32 TestEntityIndex = GameState->SortedEntityTable[J];
+                entity TestEntity = GameState->Entities[TestEntityIndex];
+
+                if (Entity.Sprites[0].DepthZ < TestEntity.Sprites[0].DepthZ)
+                {
+                    Added = 1;
+                    s32 TempIndex = I;
+
+                    for (s32 K = J; K <= SortedEntityIndex + 1; ++K)
+                    {
+                        Assert(SortedEntityIndex + 1 < MAX_ENTITY_COUNT);
+                        s32 AnotherTemp = GameState->SortedEntityTable[K];
+                        GameState->SortedEntityTable[K] = TempIndex;
+                        TempIndex = AnotherTemp;
+                    }
+
+                    SortedEntityIndex += 1;
+                    break;
+                }
+            }
+
+            if (!Added)
+            {
+                Assert(SortedEntityIndex < MAX_ENTITY_COUNT);
+                GameState->SortedEntityTable[SortedEntityIndex] = I;
+                SortedEntityIndex += 1;
+            }
+        }
+    }
+}
+
 internal void ResetGame(game_state *GameState)
 {
     GameState->EntityCount = 0;
@@ -894,22 +931,44 @@ internal void ResetGame(game_state *GameState)
         entity *PlayerEntity = GameState->PlayerEntity;
         PlayerEntity->Position = MultiplyV2S(V2(1.0f, 1.0f), TILE_SIZE * TEXTURE_MAP_SCALE);
 
-        GameState->EelEntity = AddEntity(GameState, sprite_type_Eel);
-        entity *EelEntity = GameState->EelEntity;
+        entity *EelEntity = AddEntity(GameState, sprite_type_Eel);
         EelEntity->Position = MultiplyV2S(V2(0.25f, 4.0f), TILE_SIZE * TEXTURE_MAP_SCALE);
 
-        GameState->CrabEntity = AddEntity(GameState, sprite_type_Crab);
-        entity *CrabEntity = GameState->CrabEntity;
+        entity *CrabEntity = AddEntity(GameState, sprite_type_Crab);
         CrabEntity->Position = MultiplyV2S(V2(9.0f, 7.0f), TILE_SIZE * TEXTURE_MAP_SCALE);
 
-        GameState->CoralEntity = AddEntity(GameState, sprite_type_Coral);
-
-        GameState->WallEntity = AddEntity(GameState, sprite_type_Wall);
-
-        GameState->CageEntity = AddEntity(GameState, sprite_type_Cage);
-        entity *CageEntity = GameState->CageEntity;
+        /* TODO: Fix z-sorting, so that the front of the cage is in front of entities
+                 like the player and the crab. The easiest way is probably to split
+                 the cage into two entities, with their own individual depths.
+        */
+        entity *CageEntity = AddEntity(GameState, sprite_type_Cage);
         CageEntity->Position = MultiplyV2S(V2(9.0f, 7.0f), TILE_SIZE * TEXTURE_MAP_SCALE);
+
+        for (s32 J = 0; J < MAP_HEIGHT; ++J)
+        {
+            for (s32 I = 0; I < MAP_WIDTH; ++I)
+            {
+                switch(Map[J][I])
+                {
+                case 'w':
+                {
+                    Vector2 Start = V2(TILE_SIZE * I, TILE_SIZE * J);
+                    Vector2 End = V2(Start.x, Start.y + TILE_SIZE);
+
+                    entity *Entity = AddEntity(GameState, sprite_type_Wall);
+                    Entity->CollisionArea = AddCollisionArea(GameState);
+                    Entity->CollisionArea->Type = collision_type_Line;
+                    Entity->CollisionArea->Line.Start = Start;
+                    Entity->CollisionArea->Line.End = End;
+                } break;
+                default:
+                    break;
+                }
+            }
+        }
     }
+
+    GenerateSortedEntityTable(GameState);
 
     GameState->CameraPosition = GameState->PlayerEntity->Position;
     GameState->Mode = game_mode_Start;
@@ -996,59 +1055,14 @@ internal void UpdateAndRender(void *VoidGameState)
 
         ClearBackground(BackgroundColor);
 
-        { /* draw coral background */
-            entity *CoralEntity = GameState->CoralEntity;
-            entity *WallEntity = GameState->WallEntity;
-
-            Rectangle CoralRect = GetSpriteRectangle(CoralEntity);
-            Vector2 SpriteScale = MultiplyV2S(V2(CoralRect.width, CoralRect.height), 1);
-
-            Vector2 MinCorner = ScreenToWorldPosition(GameState, V2(0.0f, 0.0f));
-            Vector2 MaxCorner = ScreenToWorldPosition(GameState, V2(SCREEN_WIDTH, SCREEN_HEIGHT));
-
-            MinCorner = DivideV2(MinCorner, SpriteScale);
-            MaxCorner = DivideV2(MaxCorner, SpriteScale);
-
-            s32 Padding = 2;
-
-            s32 MinX = MaxS32(0, MinCorner.x - Padding);
-            s32 MaxX = MinS32(MAP_WIDTH, MaxCorner.x + Padding);
-            s32 MinY = MaxS32(0, MinCorner.y - Padding);
-            s32 MaxY = MinS32(MAP_HEIGHT, MaxCorner.y + Padding);
-
-            s32 SpriteCount = 0;
-
-            for (s32 Y = MinY; Y < MaxY; ++Y)
+        { /* draw entities */
+            for (s32 I = 0; I < GameState->EntityCount; ++I)
             {
-                for (s32 X = MinX; X < MaxX; ++X)
-                {
-                    entity *Entity = 0;
-
-                    switch (Map[Y][X])
-                    {
-                    case '\0': Entity = CoralEntity; break;
-                    case 'w': Entity = WallEntity; break;
-                    }
-
-                    if (Entity)
-                    {
-                        Entity->Position.x = X * CoralRect.width;
-                        Entity->Position.y = Y * CoralRect.height;
-
-                        ++SpriteCount;
-                        DrawSprite(GameState, Entity, 0);
-                    }
-                }
+                s32 EntityIndex = GameState->SortedEntityTable[I];
+                Assert(EntityIndex >= 0);
+                entity *Entity = GameState->Entities + EntityIndex;
+                DrawSprite(GameState, Entity, 0);
             }
-        }
-
-        /* TODO: loop through entities to do update/render (have to do z-sorting) */
-        { /* entities */
-            DrawSprite(GameState, GameState->CageEntity, 0);
-            DrawSprite(GameState, GameState->EelEntity, 1);
-            DrawSprite(GameState, GameState->CrabEntity, 1);
-            DrawSprite(GameState, GameState->PlayerEntity, 1);
-            DrawSprite(GameState, GameState->CageEntity, 1);
         }
 
         { /* debug graphics */
