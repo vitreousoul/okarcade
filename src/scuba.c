@@ -234,6 +234,17 @@ internal void PushDebugCircle(circle Circle, Color Color)
     PushDebugDrawCommand(Command);
 }
 
+internal void PushDebugLine(line Line, Color Color)
+{
+    debug_draw_command Command;
+
+    Command.Type = debug_draw_type_Line;
+    Command.Shape.Line = Line;
+    Command.Color = Color;
+
+    PushDebugDrawCommand(Command);
+}
+
 internal void RenderDebugDrawCommands(void)
 {
     for (s32 I = 0; I < DebugDrawCommandCount; ++I)
@@ -364,11 +375,16 @@ internal entity *AddEntity(game_state *GameState, sprite_type SpriteType)
         } break;
         case sprite_type_Wall:
         {
+            f32 TileScale = TILE_SIZE * TEXTURE_MAP_SCALE;
+            f32 TileHalfScale = TileScale / 2.0f;
             Entity->Type = entity_type_Base;
             Entity->Sprites[0].Type = SpriteType;
             Entity->Sprites[0].SourceRectangle = R2(13,147,TILE_SIZE,TILE_SIZE);
             Entity->Sprites[0].DepthZ = -1;
-
+            Entity->CollisionArea = AddCollisionArea(GameState);
+            Entity->CollisionArea->Type = collision_type_Line;
+            Entity->CollisionArea->Line.Start = V2(-TileHalfScale, -TileHalfScale);
+            Entity->CollisionArea->Line.End = V2(-TileHalfScale, TileHalfScale);
         } break;
         case sprite_type_Cage:
         {
@@ -826,13 +842,25 @@ internal void UpdateEntities(game_state *GameState)
 
                 if (Entity->CollisionArea->Type == collision_type_Circle)
                 {
-                    Circle = Entity->CollisionArea->Circle;
-                    Line = TestEntity->CollisionArea->Line;
+                    circle AreaCircle = Entity->CollisionArea->Circle;
+                    line AreaLine = TestEntity->CollisionArea->Line;
+
+                    Vector2 CircleOffset = AddV2(Entity->Position, V2(AreaCircle.X, AreaCircle.Y));
+
+                    Circle = (circle){CircleOffset.x, CircleOffset.y, AreaCircle.R};
+                    Line = (line){AddV2(AreaLine.Start, TestEntity->Position),
+                                  AddV2(AreaLine.End, TestEntity->Position)};
                 }
                 else
                 {
-                    Circle = TestEntity->CollisionArea->Circle;
-                    Line = Entity->CollisionArea->Line;
+                    circle AreaCircle = TestEntity->CollisionArea->Circle;
+                    line AreaLine = TestEntity->CollisionArea->Line;
+
+                    Vector2 CircleOffset = AddV2(TestEntity->Position, V2(AreaCircle.X, AreaCircle.Y));
+
+                    Circle = (circle){CircleOffset.x, CircleOffset.y, AreaCircle.R};
+                    Line = (line){AddV2(AreaLine.Start, Entity->Position),
+                                  AddV2(AreaLine.End, Entity->Position)};
                 }
 
                 CollisionResult = CollideCircleAndLine(Circle, Line);
@@ -952,14 +980,12 @@ internal void ResetGame(game_state *GameState)
                 {
                 case 'w':
                 {
-                    Vector2 Start = V2(TILE_SIZE * I, TILE_SIZE * J);
-                    Vector2 End = V2(Start.x, Start.y + TILE_SIZE);
+                    f32 Scale = TEXTURE_MAP_SCALE * TILE_SIZE;
+                    Vector2 Start = V2(Scale * I, Scale * J);
+                    Vector2 End = V2(Start.x, Start.y + Scale);
 
                     entity *Entity = AddEntity(GameState, sprite_type_Wall);
-                    Entity->CollisionArea = AddCollisionArea(GameState);
-                    Entity->CollisionArea->Type = collision_type_Line;
-                    Entity->CollisionArea->Line.Start = Start;
-                    Entity->CollisionArea->Line.End = End;
+                    Entity->Position = Start;
                 } break;
                 default:
                     break;
@@ -971,7 +997,7 @@ internal void ResetGame(game_state *GameState)
     GenerateSortedEntityTable(GameState);
 
     GameState->CameraPosition = GameState->PlayerEntity->Position;
-    GameState->Mode = game_mode_Start;
+    GameState->Mode = game_mode_Play;//game_mode_Start;
     GameState->LastTime = GetTime();
 }
 
@@ -1059,7 +1085,7 @@ internal void UpdateAndRender(void *VoidGameState)
             for (s32 I = 0; I < GameState->EntityCount; ++I)
             {
                 s32 EntityIndex = GameState->SortedEntityTable[I];
-                Assert(EntityIndex >= 0);
+                Assert(EntityIndex >= 0 && EntityIndex < MAX_ENTITY_COUNT);
                 entity *Entity = GameState->Entities + EntityIndex;
                 DrawSprite(GameState, Entity, 0);
             }
