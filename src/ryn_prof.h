@@ -1,9 +1,10 @@
 /*
-ryn_prof v0.03 - A simple, recursive profiler. https://github.com/vitreousoul/ryn
+ryn_prof v0.04 - A simple, recursive profiler. https://github.com/vitreousoul/ryn
 
 Written while following the "Performance-Aware Programming Series" at https://www.computerenhance.com/
 
 Version Log:
+    v0.04 Fix intrinsics header bug when profiler is turned off, fix names in example
     v0.03 Prepend exported names with "ryn_"
     v0.02 Add memory bandwidth measurement, remove numeric typedefs
     v0.01 Initial version
@@ -38,21 +39,21 @@ void Foo(int I)
     int J, K, X = 0;
     if (I < 50000)
     {
-        BEGIN_TIMED_BLOCK(TB_case_1);
+        ryn_BEGIN_TIMED_BLOCK(TB_case_1);
         for (J = 0; J < 10000; J++)
         {
             X += 1;
         }
-        END_TIMED_BLOCK(TB_case_1);
+        ryn_END_TIMED_BLOCK(TB_case_1);
     }
     else
     {
-        BEGIN_TIMED_BLOCK(TB_case_2);
+        ryn_BEGIN_TIMED_BLOCK(TB_case_2);
         for (K = 0; K < 10000; K++)
         {
             X += 1;
         }
-        END_TIMED_BLOCK(TB_case_2);
+        ryn_END_TIMED_BLOCK(TB_case_2);
     }
 }
 
@@ -60,12 +61,12 @@ int main(void)
 {
     int I;
     ryn_BeginProfile();
-    BEGIN_TIMED_BLOCK(TB_foo);
+    ryn_BEGIN_TIMED_BLOCK(TB_foo);
     for (I = 0; I < 80000; I++)
     {
         Foo(I);
     }
-    END_TIMED_BLOCK(TB_foo);
+    ryn_END_TIMED_BLOCK(TB_foo);
     ryn_EndAndPrintProfile();
     return 0;
 }
@@ -73,14 +74,15 @@ int main(void)
 */
 
 /* TODO: include windows code-paths */
-/* TODO: prefix external names with "ryn" */
-#include <stdio.h>
-#include <x86intrin.h>
-#include <sys/time.h>
 
 #ifndef ryn_PROFILER
 #define ryn_PROFILER 1
 #endif
+
+#if ryn_PROFILER
+#include <stdio.h>
+#include <x86intrin.h>
+#include <sys/time.h>
 
 #define ryn_ArrayCount(a) ((sizeof(a))/(sizeof((a)[0])))
 
@@ -131,8 +133,6 @@ static int ryn_EstimateCpuFrequency()
     }
     return CPUFreq;
 }
-
-#if ryn_PROFILER
 
 /* TODO: check that registered timer indices are between 0-MAX_TIMERS */
 #define ryn_MAX_TIMERS 1024
@@ -239,32 +239,11 @@ void ryn_EndAndPrintProfile(void)
 
 #else
 
-typedef struct
-{
-    uint64_t StartTime;
-    uint64_t EndTime;
-} ryn_profiler;
-static ryn_profiler ryn_GlobalProfiler;
-
 #define ryn_BEGIN_TIMED_BLOCK(...)
 #define ryn_END_TIMED_BLOCK(...)
 
-void ryn_BeginProfile(void)
-{
-    ryn_GlobalProfiler.StartTime = ryn_ReadCPUTimer();
-}
-
-void ryn_EndAndPrintProfile()
-{
-    ryn_GlobalProfiler.EndTime = ryn_ReadCPUTimer();
-    uint64_t CPUFreq = ryn_EstimateCpuFrequency();
-    uint64_t TotalElapsedTime = ryn_GlobalProfiler.EndTime - ryn_GlobalProfiler.StartTime;
-    if(CPUFreq)
-    {
-        float TotalElapsedTimeInMs = 1000.0 * (double)TotalElapsedTime / (double)CPUFreq;
-        printf("\nTotal time: %0.4fms (CPU freq %llu)\n", TotalElapsedTimeInMs, CPUFreq);
-    }
-}
+#define ryn_BeginProfile(...)
+#define ryn_EndProfile(...)
 
 #endif
 
