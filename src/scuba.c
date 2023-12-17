@@ -854,12 +854,7 @@ internal Rectangle GetSpriteRectangle(entity *Entity)
 internal void UpdateEntities(game_state *GameState)
 {
     ryn_BEGIN_TIMED_BLOCK(TB_UpdateEntities);
-    /* TODO: Define new loop that:
-       finds soonest collision,
-       update entities using collision,
-       repeat until all entities are out of movement.
-    */
-    /* find nearest collision */
+
     for (s32 I = 0; I < GameState->EntityCount; ++I)
     {
         entity *Entity = GameState->Entities + I;
