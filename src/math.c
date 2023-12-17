@@ -10,8 +10,11 @@ Vector2 RotateV2(Vector2 V, f32 Theta);
 Vector2 SubtractV2(Vector2 A, Vector2 B);
 Vector2 DivideV2(Vector2 A, Vector2 B);
 Vector2 DivideV2S(Vector2 A, f32 S);
+
 f32 DotV2(Vector2 A, Vector2 B);
 
+Vector2 SwapV2(Vector2 V);
+Vector2 AbsV2(Vector2 V);
 
 Vector2 AddV2S(Vector2 A, f32 S);
 Vector2 MultiplyV2S(Vector2 A, f32 S);
@@ -96,6 +99,18 @@ Vector2 DivideV2S(Vector2 A, f32 S)
 f32 DotV2(Vector2 A, Vector2 B)
 {
     f32 Result = A.x * B.x + A.y * B.y;
+    return Result;
+}
+
+Vector2 SwapV2(Vector2 V)
+{
+    Vector2 Result = (Vector2){V.y, V.x};
+    return Result;
+}
+
+Vector2 AbsV2(Vector2 V)
+{
+    Vector2 Result = (Vector2){AbsF32(V.x), AbsF32(V.y)};
     return Result;
 }
 

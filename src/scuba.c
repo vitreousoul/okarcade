@@ -25,6 +25,8 @@ int SCREEN_HEIGHT = 700;
 #include "raylib_helpers.h"
 #include "ui.c"
 
+#define DEBUG_DRAW_COLLISIONS 1
+
 #define TEXTURE_MAP_SCALE 5
 #define MAX_ENTITY_COUNT 256
 #define MAX_COLLISION_AREA_COUNT 512
@@ -870,9 +872,6 @@ internal void UpdateEntities(game_state *GameState)
         {
             entity *TestEntity = GameState->Entities + J;
 
-            /* TODO: Do a conservative overlapping-rectangle test _before_ doing
-               full collision test!!!!! (use GetSpriteRectangle)
-            */
             {
                 Rectangle SpriteRectangle = GetSpriteRectangle(Entity);
                 Rectangle TestSpriteRectangle = GetSpriteRectangle(TestEntity);
@@ -883,29 +882,12 @@ internal void UpdateEntities(game_state *GameState)
                 {
                     continue;
                 }
-                else
-                {
-#if 0
-                    PushDebugScreenRectangle(GameState, SpriteRectangle);
-                    PushDebugScreenRectangle(GameState, TestSpriteRectangle);
-#endif
-                }
             }
 
             for (collision_area *Area = Entity->CollisionArea; Area; Area = Area->Next)
             {
-                if (!Area)
-                {
-                    break;
-                }
-
                 for (collision_area *TestArea = TestEntity->CollisionArea; TestArea; TestArea = TestArea->Next)
                 {
-                    if (!TestArea)
-                    {
-                        break;
-                    }
-
                     u32 CollisionTypes = Area->Type | TestArea->Type;
                     collision_result CollisionResult = {0};
 
@@ -937,7 +919,7 @@ internal void UpdateEntities(game_state *GameState)
                             {
                                 /* TODO: move colliding entities */
 
-#if 0
+#if DEBUG_DRAW_COLLISIONS
                                 /* debug drawing */
                                 Vector2 ScreenCircleA = WorldToScreenPosition(GameState, V2(CircleA.X, CircleA.Y));
                                 Vector2 ScreenCircleB = WorldToScreenPosition(GameState, V2(CircleB.X, CircleB.Y));
@@ -960,9 +942,15 @@ internal void UpdateEntities(game_state *GameState)
                     } break;
                     case (collision_type_Circle | collision_type_Line):
                     {
+                        /* TODO: There's a bug where the player gets kicked around when gliding
+                           against a wall above themselves (the bottom of a horizontal wall). This
+                           suggests that there is inconsistancy in collisions depening on the direction
+                           of travel...
+                        */
                         circle Circle;
                         line Line;
 
+                        /* NOTE: Figure out which entity is a circle and which is a line. */
                         if (Area->Type == collision_type_Circle)
                         {
                             circle AreaCircle = Area->Circle;
@@ -991,42 +979,48 @@ internal void UpdateEntities(game_state *GameState)
                         if (CollisionResult.Count)
                         {
                             Vector2 CirclePosition = V2(Circle.X, Circle.Y);
-
                             Vector2 StartToEnd = SubtractV2(Line.End, Line.Start);
-                            Vector2 StartToCircle = SubtractV2(CirclePosition, Line.Start);
 
-                            f32 Projection = DotV2(StartToCircle, StartToEnd) / LengthV2(StartToEnd);
-                            Vector2 ProjectionPoint = AddV2(Line.Start, MultiplyV2S(NormalizeV2(StartToEnd), Projection));
+                            f32 SmallNumberThreshold = 2.0f;
+                            Vector2 TestPoint = Line.Start;
+                            Vector2 PointToCircle = SubtractV2(CirclePosition, TestPoint);
+
+                            f32 Projection = DotV2(PointToCircle, StartToEnd) / LengthV2(StartToEnd);
+                            Vector2 ProjectionPoint = AddV2(TestPoint, MultiplyV2S(NormalizeV2(StartToEnd), Projection));
 
                             Vector2 ProjectionPointToCircle = SubtractV2(CirclePosition, ProjectionPoint);
                             f32 DistanceFromCircleToProjectionPoint = LengthV2(ProjectionPointToCircle);
-                            f32 RepulsionAmount = Circle.R - DistanceFromCircleToProjectionPoint;
+                            f32 RepulsionAmount = MaxF32(0, Circle.R - DistanceFromCircleToProjectionPoint);
 
-                            if (RepulsionAmount < 0.0f)
+                            if (RepulsionAmount > 5.0f)
                             {
-                                RepulsionAmount = 0.0f;
+                                RepulsionAmount = 5.0f;
                             }
 
+                            f32 RepulsionConstant = 1.3f;
                             Vector2 RepulsionNormal = NormalizeV2(ProjectionPointToCircle);
-                            Vector2 Repulsion = MultiplyV2S(RepulsionNormal, RepulsionAmount*1.2f);
+                            Vector2 Repulsion = MultiplyV2S(RepulsionNormal, RepulsionAmount*RepulsionConstant);
+                            Vector2 VelocityMask = AbsV2(SwapV2(RepulsionNormal));
 
                             Entity->Position = AddV2(Entity->Position, Repulsion);
                             Entity->Acceleration = V2(0.0f, 0.0f);
-                            Entity->Velocity = V2(0.0f, 0.0f);
-#if 0
-                            /* debug drawing */
-                            ProjectionPoint = WorldToScreenPosition(GameState, ProjectionPoint);
-                            Vector2 ScreenCircle = WorldToScreenPosition(GameState, V2(Circle.X, Circle.Y));
-                            Vector2 LineStart = WorldToScreenPosition(GameState, Line.Start);
-                            Vector2 LineEnd = WorldToScreenPosition(GameState, Line.End);
+                            Entity->Velocity = MultiplyV2(Entity->Velocity, VelocityMask);
+#if DEBUG_DRAW_COLLISIONS
+                            {
+                                /* debug drawing */
+                                ProjectionPoint = WorldToScreenPosition(GameState, ProjectionPoint);
+                                Vector2 ScreenCircle = WorldToScreenPosition(GameState, V2(Circle.X, Circle.Y));
+                                Vector2 LineStart = WorldToScreenPosition(GameState, Line.Start);
+                                Vector2 LineEnd = WorldToScreenPosition(GameState, Line.End);
 
-                            circle DebugCircle = (circle){ScreenCircle.x, ScreenCircle.y, Circle.R};
+                                circle DebugCircle = (circle){ScreenCircle.x, ScreenCircle.y, Circle.R};
 
-                            PushDebugCircle(DebugCircle, (Color){255,255,0,255});
-                            PushDebugLine((line){LineStart,LineEnd}, (Color){255,0,255,255});
+                                PushDebugCircle(DebugCircle, (Color){255,255,0,255});
+                                PushDebugLine((line){LineStart,LineEnd}, (Color){255,0,255,255});
 
-                            Vector2 WorldCollisionPoint = WorldToScreenPosition(GameState, CollisionResult.Collisions[0]);
-                            PushDebugCircle((circle){ProjectionPoint.x, ProjectionPoint.y, 2.0f}, (Color){255,255,255,255});
+                                Vector2 WorldCollisionPoint = WorldToScreenPosition(GameState, CollisionResult.Collisions[0]);
+                                PushDebugCircle((circle){ProjectionPoint.x, ProjectionPoint.y, 2.0f}, (Color){255,255,255,255});
+                            }
 #endif
                         }
                     } break;
@@ -1041,16 +1035,7 @@ internal void UpdateEntities(game_state *GameState)
             }
         }
 
-        if (EntityCollided)
-        {
-            /* Entity->Acceleration = V2(0, 0); */
-            /* Entity->Velocity = V2(0, 0); */
-            UpdateEntity(GameState, Entity);
-        }
-        else
-        {
-            UpdateEntity(GameState, Entity);
-        }
+        UpdateEntity(GameState, Entity);
     }
     ryn_END_TIMED_BLOCK(TB_UpdateEntities);
 }
@@ -1119,8 +1104,8 @@ internal void ResetGame(game_state *GameState)
         entity *PlayerEntity = GameState->PlayerEntity;
         PlayerEntity->Position = MultiplyV2S(V2(1.0f, 1.0f), TILE_SIZE * TEXTURE_MAP_SCALE);
 
-        entity *EelEntity = AddEntity(GameState, sprite_type_Eel);
-        EelEntity->Position = MultiplyV2S(V2(0.25f, 4.0f), TILE_SIZE * TEXTURE_MAP_SCALE);
+        /* entity *EelEntity = AddEntity(GameState, sprite_type_Eel); */
+        /* EelEntity->Position = MultiplyV2S(V2(0.25f, 4.0f), TILE_SIZE * TEXTURE_MAP_SCALE); */
 
         entity *CrabEntity = AddEntity(GameState, sprite_type_Crab);
         CrabEntity->Position = MultiplyV2S(V2(9.0f, 7.0f), TILE_SIZE * TEXTURE_MAP_SCALE);
