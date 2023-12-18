@@ -25,6 +25,8 @@ int SCREEN_HEIGHT = 700;
 #include "raylib_helpers.h"
 #include "ui.c"
 
+#define PI_OVER_2 (PI/2.0f)
+
 #define DEBUG_DRAW_COLLISIONS 1
 
 #define TEXTURE_MAP_SCALE 5
@@ -146,6 +148,34 @@ typedef struct
     Vector2 Position;
     Vector2 Velocity;
 } entity_movement;
+
+typedef enum
+{
+    minkowski_shape_CircleAndRectangle,
+    minkowski_shape_CircleAndLine,
+} minkowski_shape_type;
+
+typedef struct
+{
+    circle Circles[4];
+    line Lines[4];
+} minkowski_circle_and_rectangle;
+
+typedef struct
+{
+    circle Circles[2];
+    line Lines[2];
+} minkowski_circle_and_line;
+
+typedef struct
+{
+    minkowski_shape_type Type;
+    union
+    {
+        minkowski_circle_and_rectangle CircleAndRectangle;
+        minkowski_circle_and_line CircleAndLine;
+    };
+} minkowski_shape;
 
 typedef struct
 {
@@ -531,14 +561,6 @@ internal void HandleUserInput(game_state *GameState)
     *Acceleration = NormalizeV2(*Acceleration);
 }
 
-internal Vector2 ScreenToWorldPosition(game_state *GameState, Vector2 P)
-{
-    Vector2 HalfScreen = MultiplyV2S(V2(SCREEN_WIDTH, SCREEN_HEIGHT), 0.5f);
-    Vector2 Result = SubtractV2(AddV2(P, GameState->CameraPosition), HalfScreen);
-
-    return Result;
-}
-
 internal void DrawSprite(game_state *GameState, entity *Entity)
 {
     for (s32 I = 0; I < ENTITY_SPRITE_COUNT; ++I)
@@ -565,6 +587,49 @@ internal void DrawSprite(game_state *GameState, entity *Entity)
             break;
         }
     }
+}
+
+internal minkowski_circle_and_rectangle MinkowskiSumCircleAndRectangle(circle Circle, Rectangle Rectangle)
+{
+    minkowski_circle_and_rectangle Shape;
+
+    f32 CR = Circle.R;
+
+    f32 RX = Rectangle.x;
+    f32 RY = Rectangle.y;
+    f32 RW = Rectangle.width;
+    f32 RH = Rectangle.height;
+
+    Shape.Circles[0] = (circle){RX,      RY,      Circle.R};
+    Shape.Circles[1] = (circle){RX + RW, RY,      Circle.R};
+    Shape.Circles[2] = (circle){RX + RW, RY + RH, Circle.R};
+    Shape.Circles[2] = (circle){RX,      RY + RH, Circle.R};
+
+    Shape.Lines[0] = (line){{RX - CR,      RY     }, {RX - CR,      RY + RH}};
+    Shape.Lines[1] = (line){{RX,           RY - CR}, {RX + RW,      RY - CR}};
+    Shape.Lines[2] = (line){{RX + RW + CR, RY     }, {RX + RW + CR, RY + RH}};
+    Shape.Lines[2] = (line){{RX,           RY + CR}, {RX + RW,      RY + CR}};
+
+    return Shape;
+}
+
+internal minkowski_circle_and_line MinkowskiSumCircleAndLine(circle Circle, line Line)
+{
+    minkowski_circle_and_line CircleAndLine;
+
+    Vector2 OrthogonalLine = NormalizeV2(RotateV2(SubtractV2(Line.End, Line.Start), PI_OVER_2));
+    Vector2 LineOffsetPlus = MultiplyV2S(OrthogonalLine, Circle.R);
+    Vector2 LineOffsetMinus = MultiplyV2S(OrthogonalLine, -Circle.R);
+
+    CircleAndLine.Circles[0] = (circle){Line.Start.x, Line.Start.y, Circle.R};
+    CircleAndLine.Circles[1] = (circle){Line.End.x, Line.End.y, Circle.R};
+
+    CircleAndLine.Lines[0] = (line){AddV2(Line.Start, LineOffsetPlus),
+                                    AddV2(Line.End, LineOffsetPlus)};
+    CircleAndLine.Lines[1] = (line){AddV2(Line.Start, LineOffsetMinus),
+                                    AddV2(Line.End, LineOffsetMinus)};
+
+    return CircleAndLine;
 }
 
 internal collision_result CollideLineAndLine(line FirstLine, line SecondLine)
@@ -824,15 +889,6 @@ internal void UpdateEntity(game_state *GameState, entity *Entity)
     ryn_END_TIMED_BLOCK(TB_UpdateEntity);
 }
 
-internal circle GetOffsetCircle(circle Circle, Vector2 Offset)
-{
-    circle Result = Circle;
-    Result.X += Offset.x;
-    Result.Y += Offset.y;
-
-    return Result;
-}
-
 internal Rectangle GetSpriteRectangle(entity *Entity)
 {
     Rectangle SourceRectangle = Entity->Sprites[0].SourceRectangle;
@@ -891,6 +947,9 @@ internal void UpdateEntities(game_state *GameState)
             EntityCollided = 0;
 
             {
+                /* Assume that the entity's sprite rectangle contains all collision geometry.
+                   If the rectangles do _not_ intersect, then skip collision detection.
+                */
                 Rectangle SpriteRectangle = GetSpriteRectangle(Entity);
                 Rectangle TestSpriteRectangle = GetSpriteRectangle(TestEntity);
 
@@ -958,6 +1017,7 @@ internal void UpdateEntities(game_state *GameState)
                                           AddV2(AreaLine.End, Entity->Position)};
                         }
 
+                        minkowski_circle_and_line CircleAndLine = MinkowskiSumCircleAndLine(Circle, Line);
                         collision_result PotentialCollisionResult = CollideCircleAndLine(Circle, Line);
 
                         b32 IsCloser = (PotentialCollisionResult.Count &&
