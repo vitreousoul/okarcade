@@ -291,7 +291,6 @@ internal void PushDebugScreenRectangle(game_state *GameState, Rectangle Rect)
         WorldToScreenPosition(GameState, V2(Rect.x+Rect.width,Rect.y+Rect.height)),
     };
 
-
     PushDebugLine(Left, (Color){255,0,255,255});
     PushDebugLine(Top, (Color){255,0,255,255});
     PushDebugLine(Right, (Color){255,0,255,255});
@@ -851,6 +850,29 @@ internal Rectangle GetSpriteRectangle(entity *Entity)
     return SpriteRectangle;
 }
 
+internal b32 IsCollisionCloser(Vector2 Position, collision_result KnownMinimum, collision_result TestCollision)
+{
+    b32 TestCollisionIsCloser = 0;
+
+    for (s32 I = 0; I < KnownMinimum.Count; ++I)
+    {
+        f32 DistanceA = LengthSquaredV2(SubtractV2(Position, KnownMinimum.Collisions[I]));
+
+        for (s32 J = 0; J < TestCollision.Count; ++J)
+        {
+            f32 DistanceB = LengthSquaredV2(SubtractV2(Position, TestCollision.Collisions[I]));
+
+            if (DistanceB < DistanceA)
+            {
+                TestCollisionIsCloser = 1;
+                break;
+            }
+        }
+    }
+
+    return TestCollisionIsCloser;
+}
+
 internal void UpdateEntities(game_state *GameState)
 {
     ryn_BEGIN_TIMED_BLOCK(TB_UpdateEntities);
@@ -858,14 +880,15 @@ internal void UpdateEntities(game_state *GameState)
     for (s32 I = 0; I < GameState->EntityCount; ++I)
     {
         entity *Entity = GameState->Entities + I;
-
         b32 EntityCollided = 0;
-
         entity_movement EntityMovement = GetEntityMovement(GameState, Entity);
 
         for (s32 J = I + 1; J < GameState->EntityCount; ++J)
         {
             entity *TestEntity = GameState->Entities + J;
+            collision_area *NearestTestArea = 0;
+            collision_result CollisionResult = {0};
+            EntityCollided = 0;
 
             {
                 Rectangle SpriteRectangle = GetSpriteRectangle(Entity);
@@ -884,56 +907,21 @@ internal void UpdateEntities(game_state *GameState)
                 for (collision_area *TestArea = TestEntity->CollisionArea; TestArea; TestArea = TestArea->Next)
                 {
                     u32 CollisionTypes = Area->Type | TestArea->Type;
-                    collision_result CollisionResult = {0};
 
                     switch(CollisionTypes)
                     {
                     case collision_type_Circle:
                     {
-                        Vector2 OffsetEntity = AddV2(Entity->Position, EntityMovement.Position);
+                        /* Vector2 OffsetEntity = AddV2(Entity->Position, EntityMovement.Position); */
 
-                        circle CircleA = GetOffsetCircle(Area->Circle, OffsetEntity);
-                        circle CircleB = GetOffsetCircle(TestArea->Circle, TestEntity->Position);
-
-                        CollisionResult = CollideCircleAndCircle(CircleA, CircleB);
-
-                        if (CollisionResult.Count)
-                        {
-                            EntityCollided = 1;
-                        }
-
-                        if (Entity->Sprites[0].Type == sprite_type_Fish)
-                        {
-                            f32 DeltaX = CircleA.X - CircleB.X;
-                            f32 DeltaY = CircleA.Y - CircleB.Y;
-
-                            f32 Distance = sqrt(DeltaX*DeltaX + DeltaY*DeltaY);
-                            f32 Overlap = (CircleA.R + CircleB.R) - Distance;
-
-                            if (Overlap > 0.0f)
-                            {
-                                /* TODO: move colliding entities */
-
-#if DEBUG_DRAW_COLLISIONS
-                                /* debug drawing */
-                                Vector2 ScreenCircleA = WorldToScreenPosition(GameState, V2(CircleA.X, CircleA.Y));
-                                Vector2 ScreenCircleB = WorldToScreenPosition(GameState, V2(CircleB.X, CircleB.Y));
-
-                                circle Circle = (circle){ScreenCircleA.x, ScreenCircleA.y, CircleA.R};
-                                circle TestCircle = (circle){ScreenCircleB.x, ScreenCircleB.y, CircleB.R};
-
-                                PushDebugCircle(Circle, (Color){255,255,0,255});
-                                PushDebugCircle(TestCircle, (Color){255,0,255,255});
-#endif
-                            }
-                        }
+                        /* circle CircleA = GetOffsetCircle(Area->Circle, OffsetEntity); */
+                        /* circle CircleB = GetOffsetCircle(TestArea->Circle, TestEntity->Position); */
                     } break;
                     case collision_type_Line:
                     {
-                        line LineA = Area->Line;
-                        line LineB = TestArea->Line;
+                        /* line LineA = Area->Line; */
+                        /* line LineB = TestArea->Line; */
 
-                        CollisionResult = CollideLineAndLine(LineA, LineB);
                     } break;
                     case (collision_type_Circle | collision_type_Line):
                     {
@@ -951,7 +939,8 @@ internal void UpdateEntities(game_state *GameState)
                             circle AreaCircle = Area->Circle;
                             line AreaLine = TestArea->Line;
 
-                            Vector2 CircleOffset = AddV2(Entity->Position, V2(AreaCircle.X, AreaCircle.Y));
+                            Vector2 PositionWithMovement = AddV2(Entity->Position, EntityMovement.Position);
+                            Vector2 CircleOffset = AddV2(PositionWithMovement, V2(AreaCircle.X, AreaCircle.Y));
 
                             Circle = (circle){CircleOffset.x, CircleOffset.y, AreaCircle.R};
                             Line = (line){AddV2(AreaLine.Start, TestEntity->Position),
@@ -969,64 +958,75 @@ internal void UpdateEntities(game_state *GameState)
                                           AddV2(AreaLine.End, Entity->Position)};
                         }
 
-                        CollisionResult = CollideCircleAndLine(Circle, Line);
+                        collision_result PotentialCollisionResult = CollideCircleAndLine(Circle, Line);
 
-                        if (CollisionResult.Count)
+                        b32 IsCloser = (PotentialCollisionResult.Count &&
+                                        (!EntityCollided ||
+                                         IsCollisionCloser(Entity->Position, CollisionResult, PotentialCollisionResult)));
+
+                        if (IsCloser)
                         {
-                            Vector2 CirclePosition = V2(Circle.X, Circle.Y);
-                            Vector2 StartToEnd = SubtractV2(Line.End, Line.Start);
-
-                            f32 SmallNumberThreshold = 2.0f;
-                            Vector2 TestPoint = Line.Start;
-                            Vector2 PointToCircle = SubtractV2(CirclePosition, TestPoint);
-
-                            f32 Projection = DotV2(PointToCircle, StartToEnd) / LengthV2(StartToEnd);
-                            Vector2 ProjectionPoint = AddV2(TestPoint, MultiplyV2S(NormalizeV2(StartToEnd), Projection));
-
-                            Vector2 ProjectionPointToCircle = SubtractV2(CirclePosition, ProjectionPoint);
-                            f32 DistanceFromCircleToProjectionPoint = LengthV2(ProjectionPointToCircle);
-                            f32 RepulsionAmount = MaxF32(0, Circle.R - DistanceFromCircleToProjectionPoint);
-
-                            if (RepulsionAmount > 5.0f)
-                            {
-                                RepulsionAmount = 5.0f;
-                            }
-
-                            f32 RepulsionConstant = 1.3f;
-                            Vector2 RepulsionNormal = NormalizeV2(ProjectionPointToCircle);
-                            Vector2 Repulsion = MultiplyV2S(RepulsionNormal, RepulsionAmount*RepulsionConstant);
-                            Vector2 VelocityMask = AbsV2(SwapV2(RepulsionNormal));
-
-                            Entity->Position = AddV2(Entity->Position, Repulsion);
-                            Entity->Acceleration = V2(0.0f, 0.0f);
-                            Entity->Velocity = MultiplyV2(Entity->Velocity, VelocityMask);
-#if DEBUG_DRAW_COLLISIONS
-                            {
-                                /* debug drawing */
-                                ProjectionPoint = WorldToScreenPosition(GameState, ProjectionPoint);
-                                Vector2 ScreenCircle = WorldToScreenPosition(GameState, V2(Circle.X, Circle.Y));
-                                Vector2 LineStart = WorldToScreenPosition(GameState, Line.Start);
-                                Vector2 LineEnd = WorldToScreenPosition(GameState, Line.End);
-
-                                circle DebugCircle = (circle){ScreenCircle.x, ScreenCircle.y, Circle.R};
-
-                                PushDebugCircle(DebugCircle, (Color){255,255,0,255});
-                                PushDebugLine((line){LineStart,LineEnd}, (Color){255,0,255,255});
-
-                                Vector2 WorldCollisionPoint = WorldToScreenPosition(GameState, CollisionResult.Collisions[0]);
-                                PushDebugCircle((circle){ProjectionPoint.x, ProjectionPoint.y, 2.0f}, (Color){255,255,255,255});
-                            }
-#endif
+                            CollisionResult = PotentialCollisionResult;
+                            EntityCollided = 1;
+                            NearestTestArea = TestArea;
                         }
                     } break;
                     default: { Assert(0); } break;
                     }
-
-                    if (CollisionResult.Count)
-                    {
-                        EntityCollided = 1;
-                    }
                 }
+            }
+
+            if (CollisionResult.Count && Entity->Sprites[0].Type == sprite_type_Fish && TestEntity->CollisionArea->Type == collision_type_Line)
+            {
+                circle Circle;
+                line Line;
+
+                circle AreaCircle = Entity->CollisionArea->Circle;
+                line AreaLine = NearestTestArea->Line;
+
+                Vector2 CircleOffset = AddV2(Entity->Position, V2(AreaCircle.X, AreaCircle.Y));
+
+                Circle = (circle){CircleOffset.x, CircleOffset.y, AreaCircle.R};
+                Line = (line){AddV2(AreaLine.Start, TestEntity->Position),
+                              AddV2(AreaLine.End, TestEntity->Position)};
+
+                Vector2 CirclePosition = V2(Circle.X, Circle.Y);
+                Vector2 StartToEnd = SubtractV2(Line.End, Line.Start);
+
+                Vector2 TestPoint = Line.Start;
+                Vector2 PointToCircle = SubtractV2(CirclePosition, TestPoint);
+
+                f32 Projection = DotV2(PointToCircle, StartToEnd) / LengthV2(StartToEnd);
+                Vector2 ProjectionPoint = AddV2(TestPoint, MultiplyV2S(NormalizeV2(StartToEnd), Projection));
+
+                Vector2 ProjectionPointToCircle = SubtractV2(CirclePosition, ProjectionPoint);
+                f32 DistanceFromCircleToProjectionPoint = LengthV2(ProjectionPointToCircle);
+                f32 RepulsionAmount = MaxF32(0, Circle.R - DistanceFromCircleToProjectionPoint);
+
+                f32 RepulsionConstant = 1.3f;
+                Vector2 RepulsionNormal = NormalizeV2(ProjectionPointToCircle);
+                Vector2 Repulsion = MultiplyV2S(RepulsionNormal, RepulsionAmount*RepulsionConstant);
+                Vector2 VelocityMask = AbsV2(SwapV2(RepulsionNormal));
+
+                Entity->Position = AddV2(Entity->Position, Repulsion);
+                Entity->Acceleration = V2(0.0f, 0.0f);
+                Entity->Velocity = MultiplyV2(Entity->Velocity, VelocityMask);
+#if DEBUG_DRAW_COLLISIONS
+                {
+                    /* debug drawing */
+                    ProjectionPoint = WorldToScreenPosition(GameState, ProjectionPoint);
+                    Vector2 ScreenCircle = WorldToScreenPosition(GameState, V2(Circle.X, Circle.Y));
+                    Vector2 LineStart = WorldToScreenPosition(GameState, Line.Start);
+                    Vector2 LineEnd = WorldToScreenPosition(GameState, Line.End);
+
+                    circle DebugCircle = (circle){ScreenCircle.x, ScreenCircle.y, Circle.R};
+
+                    PushDebugCircle(DebugCircle, (Color){255,255,0,255});
+                    PushDebugLine((line){LineStart,LineEnd}, (Color){255,0,255,255});
+
+                    PushDebugCircle((circle){ProjectionPoint.x, ProjectionPoint.y, 2.0f}, (Color){255,255,255,255});
+                }
+#endif
             }
         }
 
