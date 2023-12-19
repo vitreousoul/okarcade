@@ -29,7 +29,7 @@ int SCREEN_HEIGHT = 700;
 
 #define DEBUG_DRAW_COLLISIONS 1
 
-#define TEXTURE_MAP_SCALE 5
+#define TEXTURE_MAP_SCALE 4
 #define MAX_ENTITY_COUNT 256
 #define MAX_COLLISION_AREA_COUNT 512
 #define MAX_DELTA_TIME (1.0f/50.0f)
@@ -437,7 +437,7 @@ internal entity *AddEntity(game_state *GameState, sprite_type SpriteType)
             Entity->Position = V2(0.0f, 0.0f);
             Entity->CollisionArea = AddCollisionArea(GameState);
             Entity->CollisionArea->Type = collision_type_Circle;
-            Entity->CollisionArea->Circle = (circle){0.0f, -3.0f, 20.0f};
+            Entity->CollisionArea->Circle = (circle){0.0f, -3.0f, 15.0f};
         } break;
         case sprite_type_Eel:
         {
