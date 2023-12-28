@@ -143,6 +143,12 @@ typedef enum
     entity_type_Base,
 } entity_type;
 
+typedef enum
+{
+    entity_movement_type_None,
+    entity_movement_type_Moveable,
+} entity_movement_type;
+
 typedef struct
 {
     Vector2 Position;
@@ -180,6 +186,7 @@ typedef struct
 typedef struct
 {
     entity_type Type;
+    entity_movement_type MovementType;
 
     Vector2 Position;
     Vector2 Velocity;
@@ -431,6 +438,7 @@ internal entity *AddEntity(game_state *GameState, sprite_type SpriteType)
         case sprite_type_Fish:
         {
             Entity->Type = entity_type_Base;
+            Entity->MovementType = entity_movement_type_Moveable;
             Entity->Sprites[0].Type = SpriteType;
             Entity->Sprites[0].SourceRectangle = R2(5,3,12,9);
             Entity->Sprites[0].DepthZ = 2;
@@ -442,6 +450,7 @@ internal entity *AddEntity(game_state *GameState, sprite_type SpriteType)
         case sprite_type_Eel:
         {
             Entity->Type = entity_type_Base;
+            Entity->MovementType = entity_movement_type_Moveable;
             Entity->Sprites[0].Type = SpriteType;
             Entity->Sprites[0].SourceRectangle = R2(1,27,34,20);
             Entity->Sprites[0].DepthZ = 1;
@@ -453,6 +462,7 @@ internal entity *AddEntity(game_state *GameState, sprite_type SpriteType)
         case sprite_type_Coral:
         {
             Entity->Type = entity_type_Base;
+            Entity->MovementType = entity_movement_type_None;
             Entity->Sprites[0].Type = SpriteType;
             Entity->Sprites[0].SourceRectangle = R2(13,118,TILE_SIZE,TILE_SIZE);
             Entity->Sprites[0].DepthZ = -1;
@@ -462,6 +472,7 @@ internal entity *AddEntity(game_state *GameState, sprite_type SpriteType)
             f32 TileScale = TILE_SIZE * TEXTURE_MAP_SCALE;
             f32 TileHalfScale = TileScale / 2.0f;
             Entity->Type = entity_type_Base;
+            Entity->MovementType = entity_movement_type_None;
             Entity->Sprites[0].Type = SpriteType;
             Entity->Sprites[0].SourceRectangle = R2(13,147,TILE_SIZE,TILE_SIZE);
             Entity->Sprites[0].DepthZ = -1;
@@ -494,6 +505,7 @@ internal entity *AddEntity(game_state *GameState, sprite_type SpriteType)
         case sprite_type_Cage:
         {
             Entity->Type = entity_type_Base;
+            Entity->MovementType = entity_movement_type_None;
             Entity->Sprites[0].Type = SpriteType;
             Entity->Sprites[0].SourceRectangle = R2(90,6,110,70);
             Entity->Sprites[0].DepthZ = 0;
@@ -508,6 +520,7 @@ internal entity *AddEntity(game_state *GameState, sprite_type SpriteType)
         case sprite_type_Crab:
         {
             Entity->Type = entity_type_Base;
+            Entity->MovementType = entity_movement_type_Moveable;
             Entity->Sprites[0].Type = SpriteType;
             Entity->Sprites[0].SourceRectangle = R2(14,69,39,20);
             Entity->Sprites[0].DepthZ = 1;
@@ -967,7 +980,12 @@ internal void UpdateEntities(game_state *GameState)
         entity *Entity = GameState->Entities + I;
         entity_movement EntityMovement = GetEntityMovement(GameState, Entity);
 
-        for (s32 J = I + 1; J < GameState->EntityCount; ++J)
+        if (Entity->MovementType != entity_movement_type_Moveable)
+        {
+            continue;
+        }
+
+        for (s32 J = 0; J < GameState->EntityCount; ++J)
         {
             entity *TestEntity = GameState->Entities + J;
 
@@ -979,8 +997,9 @@ internal void UpdateEntities(game_state *GameState)
                 Rectangle TestSpriteRectangle = GetSpriteRectangle(TestEntity);
 
                 b32 RectanglesCollide = CollideRectangles(SpriteRectangle, TestSpriteRectangle);
+                b32 BothEntitiesAreTheSame = I == J;
 
-                if (!RectanglesCollide)
+                if (!RectanglesCollide || BothEntitiesAreTheSame)
                 {
                     continue;
                 }
@@ -1116,6 +1135,10 @@ internal void UpdateEntities(game_state *GameState)
                             }
 #endif
                         }
+                    }
+                    else if (Area->Type == collision_type_Line && TestArea->Type == collision_type_Circle)
+                    {
+                        /* TODO: Handle line-circle collision */
                     }
                     else
                     {
