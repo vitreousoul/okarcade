@@ -7,11 +7,14 @@ s32 MinS32(s32 A, s32 B);
 s32 MaxS32(s32 A, s32 B);
 
 Vector2 RotateV2(Vector2 V, f32 Theta);
+Vector2 AddV2(Vector2 A, Vector2 B);
 Vector2 SubtractV2(Vector2 A, Vector2 B);
+Vector2 MultiplyV2(Vector2 A, Vector2 B);
 Vector2 DivideV2(Vector2 A, Vector2 B);
 Vector2 DivideV2S(Vector2 A, f32 S);
 
 f32 DotV2(Vector2 A, Vector2 B);
+Vector2 ProjectV2(Vector2 Base, Vector2 PointA, Vector2 PointB);
 
 Vector2 SwapV2(Vector2 V);
 Vector2 AbsV2(Vector2 V);
@@ -78,9 +81,21 @@ Vector2 RotateV2(Vector2 V, f32 Theta)
     return (Vector2){X, Y};
 }
 
+Vector2 AddV2(Vector2 A, Vector2 B)
+{
+    Vector2 Result = (Vector2){ A.x + B.x, A.y + B.y };
+    return Result;
+}
+
 Vector2 SubtractV2(Vector2 A, Vector2 B)
 {
     Vector2 Result = (Vector2){ A.x - B.x, A.y - B.y };
+    return Result;
+}
+
+Vector2 MultiplyV2(Vector2 A, Vector2 B)
+{
+    Vector2 Result = (Vector2){ A.x * B.x, A.y * B.y };
     return Result;
 }
 
@@ -100,6 +115,19 @@ f32 DotV2(Vector2 A, Vector2 B)
 {
     f32 Result = A.x * B.x + A.y * B.y;
     return Result;
+}
+
+Vector2 ProjectV2(Vector2 Base, Vector2 PointA, Vector2 PointB)
+{
+    Vector2 A = SubtractV2(PointA, Base);
+    Vector2 B = SubtractV2(PointB, Base);
+
+    Vector2 NormalB = NormalizeV2(B);
+
+    Vector2 Projection = MultiplyV2S(NormalB, DotV2(A, NormalB));
+    Projection = AddV2(Projection, Base);
+
+    return Projection;
 }
 
 Vector2 SwapV2(Vector2 V)
