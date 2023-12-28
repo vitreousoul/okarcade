@@ -1013,7 +1013,9 @@ internal void UpdateEntities(game_state *GameState)
                         line MovementLine = (line){Entity->Position, AddV2(Entity->Position, EntityMovement.Position)};
                         line MovementScreenLine = (line){WorldToScreenPosition(GameState, MovementLine.Start), WorldToScreenPosition(GameState, MovementLine.End)};
 
+#if DEBUG_DRAW_COLLISIONS
                         PushDebugLine(MovementScreenLine, (Color){255,255,255,255});
+#endif
 
                         circle Circle0 = CircleAndLine.Circles[0];
                         circle Circle1 = CircleAndLine.Circles[1];
@@ -1062,6 +1064,7 @@ internal void UpdateEntities(game_state *GameState)
                             Entity->Velocity = V2(0.0f, 0.0f);
                             Entity->Acceleration = V2(0.0f, 0.0f);
 
+#if DEBUG_DRAW_COLLISIONS
                             {
                                 Vector2 ScreenProjection0 = WorldToScreenPosition(GameState, Projection0);
                                 Vector2 ScreenProjection1 = WorldToScreenPosition(GameState, Projection1);
@@ -1075,6 +1078,7 @@ internal void UpdateEntities(game_state *GameState)
                                 PushDebugLine(ScreenLine0, (Color){255,255,255,255});
                                 PushDebugLine(ScreenLine1, (Color){255,255,255,255});
                             }
+#endif
                         }
                         else if (InsideCircle0 < 0.0f)
                         {
@@ -1085,12 +1089,14 @@ internal void UpdateEntities(game_state *GameState)
                             Entity->Velocity = V2(0.0f, 0.0f);
                             Entity->Acceleration = V2(0.0f, 0.0f);
 
+#if DEBUG_DRAW_COLLISIONS
                             {
                                 Vector2 EntityScreenPosition = WorldToScreenPosition(GameState, Entity->Position);
                                 Vector2 CirclePosition = WorldToScreenPosition(GameState, V2(Circle0.X, Circle0.Y));
                                 PushDebugCircle((circle){CirclePosition.x, CirclePosition.y, Circle0.R}, (Color){255,255,255,255});
                                 PushDebugCircle((circle){EntityScreenPosition.x-1, EntityScreenPosition.y-1, 2}, (Color){255,255,255,255});
                             }
+#endif
                         }
                         else if (InsideCircle1 < 0.0f)
                         {
@@ -1101,12 +1107,14 @@ internal void UpdateEntities(game_state *GameState)
                             Entity->Velocity = V2(0.0f, 0.0f);
                             Entity->Acceleration = V2(0.0f, 0.0f);
 
+#if DEBUG_DRAW_COLLISIONS
                             {
                                 Vector2 EntityScreenPosition = WorldToScreenPosition(GameState, Entity->Position);
                                 Vector2 CirclePosition = WorldToScreenPosition(GameState, V2(Circle1.X, Circle1.Y));
                                 PushDebugCircle((circle){CirclePosition.x, CirclePosition.y, Circle1.R}, (Color){255,255,255,255});
                                 PushDebugCircle((circle){EntityScreenPosition.x-1, EntityScreenPosition.y-1, 2}, (Color){255,255,255,255});
                             }
+#endif
                         }
                     }
                     else
