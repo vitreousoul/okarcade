@@ -310,6 +310,12 @@ internal Vector2 WorldToScreenPosition(game_state *GameState, Vector2 P)
     return Result;
 }
 
+internal line WorldToScreenLine(game_state *GameState, line Line)
+{
+    line Result = (line){WorldToScreenPosition(GameState, Line.Start), WorldToScreenPosition(GameState, Line.End)};
+    return Result;
+}
+
 internal void PushDebugScreenRectangle(game_state *GameState, Rectangle Rect)
 {
     line Left = (line){
@@ -1043,7 +1049,7 @@ internal void UpdateEntities(game_state *GameState)
 
 #if DEBUG_DRAW_COLLISIONS
                         {
-                            line MovementScreenLine = (line){WorldToScreenPosition(GameState, MovementLine.Start), WorldToScreenPosition(GameState, MovementLine.End)};
+                            line MovementScreenLine = WorldToScreenLine(GameState, MovementLine);
                             PushDebugLine(MovementScreenLine, (Color){255,255,255,255});
                         }
 #endif
@@ -1080,28 +1086,34 @@ internal void UpdateEntities(game_state *GameState)
                             f32 ProjectionDistance0 = LengthSquaredV2(SubtractV2(MovementLine.End, Projection0));
                             f32 ProjectionDistance1 = LengthSquaredV2(SubtractV2(MovementLine.End, Projection1));
 
+                            Vector2 BeginningProjection;
                             Vector2 Projection;
 
                             if (ProjectionDistance0 < ProjectionDistance1)
                             {
                                 Projection = Projection0;
+                                BeginningProjection = ProjectV2(Line0.Start, MovementLine.Start, Line0.End);
                             }
                             else
                             {
                                 Projection = Projection1;
+                                BeginningProjection = ProjectV2(Line1.Start, MovementLine.Start, Line1.End);
                             }
 
-                            Entity->Position = Projection;
-                            Entity->Velocity = V2(0.0f, 0.0f);
-                            Entity->Acceleration = V2(0.0f, 0.0f);
+                            Vector2 DirectionOfCollisionLine = SubtractV2(Projection, BeginningProjection);
+                            Vector2 VelocityProjection = ProjectV2(V2(0.0f, 0.0f), Entity->Velocity, DirectionOfCollisionLine);
+                            Vector2 AccelerationProjection = ProjectV2(V2(0.0f, 0.0f), Entity->Acceleration, DirectionOfCollisionLine);
+
+                            Entity->Velocity = VelocityProjection;
+                            Entity->Acceleration = AccelerationProjection;
 
 #if DEBUG_DRAW_COLLISIONS
                             {
                                 Vector2 ScreenProjection0 = WorldToScreenPosition(GameState, Projection0);
                                 Vector2 ScreenProjection1 = WorldToScreenPosition(GameState, Projection1);
 
-                                line ScreenLine0 = (line){WorldToScreenPosition(GameState, Line0.Start), WorldToScreenPosition(GameState, Line0.End)};
-                                line ScreenLine1 = (line){WorldToScreenPosition(GameState, Line1.Start), WorldToScreenPosition(GameState, Line1.End)};
+                                line ScreenLine0 = WorldToScreenLine(GameState, Line0);
+                                line ScreenLine1 = WorldToScreenLine(GameState, Line1);
 
                                 PushDebugCircle((circle){ScreenProjection0.x-1, ScreenProjection0.y-1, 2}, (Color){255,255,255,255});
                                 PushDebugCircle((circle){ScreenProjection1.x-1, ScreenProjection1.y-1, 2}, (Color){255,255,255,255});
