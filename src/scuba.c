@@ -1079,20 +1079,16 @@ internal void UpdateEntities(game_state *GameState)
                             f32 ProjectionDistance0 = LengthSquaredV2(SubtractV2(MovementLine.End, Projection0));
                             f32 ProjectionDistance1 = LengthSquaredV2(SubtractV2(MovementLine.End, Projection1));
 
-                            Vector2 StartProjection;
                             Vector2 Projection;
 
                             if (ProjectionDistance0 < ProjectionDistance1)
                             {
-                                StartProjection = ProjectV2(Line0.Start, MovementLine.Start, Line0.End);
                                 Projection = Projection0;
                             }
                             else
                             {
-                                StartProjection = ProjectV2(Line1.Start, MovementLine.Start, Line1.End);
                                 Projection = Projection1;
                             }
-
 
                             Entity->Position = Projection;
                             Entity->Velocity = V2(0.0f, 0.0f);
