@@ -19,8 +19,8 @@ int SCREEN_HEIGHT = 700;
 #endif
 
 #include "core.c"
-#include "raylib_helpers.h"
 #include "math.c"
+#include "raylib_helpers.h"
 #include "ui.c"
 
 #define EXPANSION_BUFFER_SIZE (1 << 12)
