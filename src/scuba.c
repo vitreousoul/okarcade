@@ -20,6 +20,7 @@ int SCREEN_HEIGHT = 700;
 #endif
 
 #include "../gen/scuba.h"
+#include "../gen/roboto_regular.h"
 #include "core.c"
 #include "math.c"
 #include "raylib_helpers.h"
@@ -1512,7 +1513,7 @@ int main(void)
     s32 FontSize = 32;
     s32 *Chars = 0;
     s32 GlyphCount = 0;
-    Font LoadedFont = LoadFontEx("../assets/Roboto-Regular.ttf", FontSize, Chars, GlyphCount);
+    Font LoadedFont = LoadFontFromMemory(".ttf", RobotoRegularData, ArrayCount(RobotoRegularData), FontSize, Chars, GlyphCount);
 
     Texture2D ScubaTexture = {0};
     b32 TextureError = LoadScubaTexture(&ScubaTexture);

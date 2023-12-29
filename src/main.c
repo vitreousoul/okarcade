@@ -78,6 +78,42 @@ internal command_line_arg_type ParseCommandLineArgs(s32 ArgCount, char **Args)
     return CommandLineArgs;
 }
 
+internal void GenerateFontData(linear_allocator TempString)
+{
+    /* TODO: compress the font data!!!!! */
+    u8 HexData[16] = {};
+    u64 BeginningOffset = TempString.Offset;
+
+    u8 *RobotoRegularFilePath = (u8 *)"../assets/Roboto-Regular.ttf";
+    u8 *RobotoRegularDataPath = (u8 *)"../gen/roboto_regular.h";
+
+    u8 *DataOutput = GetLinearAllocatorWriteLocation(&TempString);
+    buffer *Buffer = ReadFileIntoBuffer(RobotoRegularFilePath);
+
+    PushString(&TempString, (u8 *)"u8 RobotoRegularData[] = {");
+
+    for (s32 I = 0; I < Buffer->Size; ++I)
+    {
+        b32 IsLastByte = I == Buffer->Size - 1;
+
+        char *FormatString = IsLastByte ? "0x%02x" : "0x%02x,";
+
+        sprintf((char *)HexData, FormatString, Buffer->Data[I]);
+        PushString(&TempString, HexData);
+
+        if (I != 0 && I % 15 == 0)
+        {
+            PushString(&TempString, (u8 *)"\n");
+        }
+    }
+    PushString(&TempString, (u8 *)"};\0");
+
+    u64 FileSize = TempString.Offset - BeginningOffset;
+    WriteFile(RobotoRegularDataPath, DataOutput, FileSize);
+
+    TempString.Offset = BeginningOffset;
+}
+
 internal void GenerateGameAssets(linear_allocator TempString)
 {
     /* NOTE: for now GenerateGameAssets just generates assets for scuba. */
@@ -109,7 +145,6 @@ internal void GenerateGameAssets(linear_allocator TempString)
             PushString(&TempString, HexData);
         }
 
-
         for (s32 Y = 0; Y < TextureHeight * 4; ++Y)
         {
             for (s32 X = 0; X < TextureWidth; X += 4)
@@ -137,6 +172,8 @@ internal void GenerateGameAssets(linear_allocator TempString)
         u64 FileSize = TempString.Offset - BeginningOffset;
         WriteFile(ScubaDataPath, ScubaOutput, FileSize);
     }
+
+    GenerateFontData(TempString);
 }
 
 int main(s32 ArgCount, char **Args)
