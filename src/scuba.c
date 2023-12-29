@@ -602,6 +602,18 @@ internal void DrawSprite(game_state *GameState, entity *Entity)
     }
 }
 
+internal inline circle GetOffsetCircle(circle Circle, Vector2 Offset)
+{
+    circle Result = (circle){ Circle.X + Offset.x, Circle.Y + Offset.y, Circle.R };
+    return Result;
+}
+
+internal inline line GetOffsetLine(line Line, Vector2 Offset)
+{
+    line Result = (line){AddV2(Line.Start, Offset), AddV2(Line.End, Offset)};
+    return Result;
+}
+
 internal minkowski_circle_and_rectangle MinkowskiSumCircleAndRectangle(circle Circle, Rectangle Rectangle)
 {
     minkowski_circle_and_rectangle Shape;
@@ -1022,18 +1034,17 @@ internal void UpdateEntities(game_state *GameState)
                         circle AreaCircle = Area->Circle;
                         line AreaLine = TestArea->Line;
 
-                        Vector2 PositionWithMovement = AddV2(Entity->Position, EntityMovement.Position);
-                        Vector2 CircleOffset = AddV2(PositionWithMovement, V2(AreaCircle.X, AreaCircle.Y));
-
-                        circle Circle = (circle){CircleOffset.x, CircleOffset.y, AreaCircle.R};
-                        line Line = (line){AddV2(AreaLine.Start, TestEntity->Position), AddV2(AreaLine.End, TestEntity->Position)};
+                        line MovementLine = (line){Entity->Position, AddV2(Entity->Position, EntityMovement.Position)};
+                        circle Circle = GetOffsetCircle(AreaCircle, MovementLine.End);
+                        line Line = GetOffsetLine(AreaLine, TestEntity->Position);
 
                         minkowski_circle_and_line CircleAndLine = MinkowskiSumCircleAndLine(Circle, Line);
-                        line MovementLine = (line){Entity->Position, AddV2(Entity->Position, EntityMovement.Position)};
-                        line MovementScreenLine = (line){WorldToScreenPosition(GameState, MovementLine.Start), WorldToScreenPosition(GameState, MovementLine.End)};
 
 #if DEBUG_DRAW_COLLISIONS
-                        PushDebugLine(MovementScreenLine, (Color){255,255,255,255});
+                        {
+                            line MovementScreenLine = (line){WorldToScreenPosition(GameState, MovementLine.Start), WorldToScreenPosition(GameState, MovementLine.End)};
+                            PushDebugLine(MovementScreenLine, (Color){255,255,255,255});
+                        }
 #endif
 
                         circle Circle0 = CircleAndLine.Circles[0];
@@ -1068,16 +1079,20 @@ internal void UpdateEntities(game_state *GameState)
                             f32 ProjectionDistance0 = LengthSquaredV2(SubtractV2(MovementLine.End, Projection0));
                             f32 ProjectionDistance1 = LengthSquaredV2(SubtractV2(MovementLine.End, Projection1));
 
+                            Vector2 StartProjection;
                             Vector2 Projection;
 
                             if (ProjectionDistance0 < ProjectionDistance1)
                             {
+                                StartProjection = ProjectV2(Line0.Start, MovementLine.Start, Line0.End);
                                 Projection = Projection0;
                             }
                             else
                             {
+                                StartProjection = ProjectV2(Line1.Start, MovementLine.Start, Line1.End);
                                 Projection = Projection1;
                             }
+
 
                             Entity->Position = Projection;
                             Entity->Velocity = V2(0.0f, 0.0f);
