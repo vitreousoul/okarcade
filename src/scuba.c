@@ -208,11 +208,17 @@ typedef enum
 
 typedef struct
 {
+    b32 KeyboardEnter;
+} user_input;
+
+typedef struct
+{
     f32 DeltaTime;
     f32 LastTime;
 
     game_mode Mode;
     ui UI;
+    user_input Input;
 
     s32 EntityCount;
     entity Entities[MAX_ENTITY_COUNT];
@@ -577,6 +583,8 @@ internal void HandleUserInput(game_state *GameState)
     {
         Acceleration->y -= 1.0f;
     }
+
+    GameState->Input.KeyboardEnter = IsKeyDown(KEY_ENTER);
 
     *Acceleration = NormalizeV2(*Acceleration);
 }
@@ -1363,7 +1371,7 @@ internal void UpdateAndRender(void *VoidGameState)
         alignment Alignment = alignment_CenterCenter;
         b32 Pressed = DoButtonWith(UI, ui_id_PlayButton, (u8 *)"Play", V2(CenterX, StartY), Alignment);
 
-        if (Pressed)
+        if (Pressed || GameState->Input.KeyboardEnter)
         {
             GameState->Mode = game_mode_Play;
         }
