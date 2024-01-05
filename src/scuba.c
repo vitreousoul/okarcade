@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include <float.h>
 
 #include "../lib/raylib.h"
 
@@ -28,7 +29,7 @@ int SCREEN_HEIGHT = 700;
 
 #define PI_OVER_2 (PI/2.0f)
 
-#define DEBUG_DRAW_COLLISIONS 1
+#define DEBUG_DRAW_COLLISIONS 0
 
 #define TEXTURE_MAP_SCALE 4
 #define MAX_ENTITY_COUNT 256
@@ -107,6 +108,20 @@ typedef struct
     s32 Count;
     Vector2 Collisions[2];
 } collision_result;
+
+typedef struct
+{
+    b32 Collides;
+    f32 TimeTaken;
+
+    Vector2 EntityPosition;
+    Vector2 EntityVelocity;
+    Vector2 EntityAcceleration;
+
+    Vector2 TestEntityPosition;
+    Vector2 TestEntityVelocity;
+    Vector2 TestEntityAcceleration;
+} minkowski_collision_result; /* TODO: rename this to collision_result once the other collision_result stuff is moved out of this file or deleted. */
 
 typedef enum
 {
@@ -322,6 +337,13 @@ internal line WorldToScreenLine(game_state *GameState, line Line)
     return Result;
 }
 
+internal circle WorldToScreenCircle(game_state *GameState, circle Circle)
+{
+    Vector2 CirclePosition = WorldToScreenPosition(GameState, V2(Circle.X, Circle.Y));
+    circle Result = (circle){CirclePosition.x, CirclePosition.y, Circle.R};
+    return Result;
+}
+
 internal void PushDebugScreenRectangle(game_state *GameState, Rectangle Rect)
 {
     line Left = (line){
@@ -435,7 +457,6 @@ internal collision_area *AddCollisionArea(game_state *GameState)
 
 global_variable entity NullEntity;
 
-
 internal entity *AddEntity(game_state *GameState, sprite_type SpriteType)
 {
     entity *Entity = 0;
@@ -533,7 +554,7 @@ internal entity *AddEntity(game_state *GameState, sprite_type SpriteType)
         case sprite_type_Crab:
         {
             Entity->Type = entity_type_Base;
-            Entity->MovementType = entity_movement_type_Moveable;
+            Entity->MovementType = entity_movement_type_None;
             Entity->Sprites[0].Type = SpriteType;
             Entity->Sprites[0].SourceRectangle = R2(14,69,39,20);
             Entity->Sprites[0].DepthZ = 1;
@@ -916,7 +937,7 @@ internal f32 GetWhichSideOfALine(Vector2 Point, line Line)
     return WhichSide;
 }
 
-internal entity_movement GetEntityMovement(game_state *GameState, entity *Entity)
+internal entity_movement GetEntityMovement(entity *Entity, f32 DeltaTime)
 {
     entity_movement Movement = {0};
 
@@ -927,7 +948,7 @@ internal entity_movement GetEntityMovement(game_state *GameState, entity *Entity
          LengthSquaredV2(Entity->Velocity) > VelocityThreshold))
     {
         f32 AccelerationScale = 1000.0f;
-        f32 DT = GameState->DeltaTime;
+        f32 DT = DeltaTime;
 
         Vector2 P = Entity->Position;
         Vector2 V = Entity->Velocity;
@@ -951,7 +972,7 @@ internal entity_movement GetEntityMovement(game_state *GameState, entity *Entity
 internal void UpdateEntity(game_state *GameState, entity *Entity)
 {
     ryn_BEGIN_TIMED_BLOCK(TB_UpdateEntity);
-    entity_movement Movement = GetEntityMovement(GameState, Entity);
+    entity_movement Movement = GetEntityMovement(Entity, GameState->DeltaTime);
 
     Entity->Velocity = AddV2(Entity->Velocity, Movement.Velocity);
     Entity->Position = AddV2(Entity->Position, Movement.Position);
@@ -975,48 +996,183 @@ internal Rectangle GetSpriteRectangle(entity *Entity)
     return SpriteRectangle;
 }
 
-internal b32 IsCollisionCloser(Vector2 Position, collision_result KnownMinimum, collision_result TestCollision)
+internal minkowski_collision_result CollideMinkowskiCircleAndLine(entity *Entity, entity *TestEntity, f32 DeltaTime)
 {
-    b32 TestCollisionIsCloser = 0;
+    minkowski_collision_result Result = {0};
+    f32 MaxCollisionDistance = 9999999999999.0f;
+    f32 NearestCollisionDistance = MaxCollisionDistance;
+    f32 EntityMovementLength = 0.0f;
 
-    for (s32 I = 0; I < KnownMinimum.Count; ++I)
+    for (collision_area *Area = Entity->CollisionArea; Area; Area = Area->Next)
     {
-        f32 DistanceA = LengthSquaredV2(SubtractV2(Position, KnownMinimum.Collisions[I]));
-
-        for (s32 J = 0; J < TestCollision.Count; ++J)
+        for (collision_area *TestArea = TestEntity->CollisionArea; TestArea; TestArea = TestArea->Next)
         {
-            f32 DistanceB = LengthSquaredV2(SubtractV2(Position, TestCollision.Collisions[I]));
-
-            if (DistanceB < DistanceA)
+            if (Area->Type == collision_type_Circle && TestArea->Type == collision_type_Line)
             {
-                TestCollisionIsCloser = 1;
-                break;
+                entity_movement EntityMovement = GetEntityMovement(Entity, DeltaTime);
+                EntityMovementLength = LengthV2(SubtractV2(Entity->Position, EntityMovement.Position));
+
+                circle AreaCircle = Area->Circle;
+                line AreaLine = TestArea->Line;
+
+                line MovementLine = (line){Entity->Position, AddV2(Entity->Position, EntityMovement.Position)};
+                circle Circle = GetOffsetCircle(AreaCircle, MovementLine.End);
+                line Line = GetOffsetLine(AreaLine, TestEntity->Position);
+
+                minkowski_circle_and_line CircleAndLine = MinkowskiSumCircleAndLine(Circle, Line);
+
+                circle Circle0 = CircleAndLine.Circles[0];
+                circle Circle1 = CircleAndLine.Circles[1];
+
+                Vector2 CirclePosition0 = V2(Circle0.X, Circle0.Y);
+                Vector2 CirclePosition1 = V2(Circle1.X, Circle1.Y);
+
+                line Line0 = CircleAndLine.Lines[0];
+                line Line1 = CircleAndLine.Lines[1];
+
+                Vector2 CircleDelta0 = SubtractV2(MovementLine.End, CirclePosition0);
+                Vector2 CircleDelta1 = SubtractV2(MovementLine.End, CirclePosition1);
+
+                f32 CircleDistance0 = LengthV2(CircleDelta0);
+                f32 CircleDistance1 = LengthV2(CircleDelta1);
+
+                f32 InsideCircle0 = CircleDistance0 - Circle0.R;
+                f32 InsideCircle1 = CircleDistance1 - Circle1.R;
+
+                f32 WhichSide0 = GetWhichSideOfALine(MovementLine.End, Line0);
+                f32 WhichSide1 = GetWhichSideOfALine(MovementLine.End, Line1);
+                f32 WhichSide2 = GetWhichSideOfALine(MovementLine.End, (line){Line0.Start, Line1.Start});
+                f32 WhichSide3 = GetWhichSideOfALine(MovementLine.End, (line){Line0.End, Line1.End});
+
+                if (((WhichSide0 < 0.0f && WhichSide1 > 0.0f) || (WhichSide0 > 0.0f && WhichSide1 < 0.0f)) &&
+                    ((WhichSide2 < 0.0f && WhichSide3 > 0.0f) || (WhichSide2 > 0.0f && WhichSide3 < 0.0f)))
+                {
+                    Vector2 Projection = {0};
+                    Vector2 BeginningProjection = {0};
+
+                    Vector2 Projection0 = ProjectV2(Line0.Start, MovementLine.End, Line0.End);
+                    Vector2 Projection1 = ProjectV2(Line1.Start, MovementLine.End, Line1.End);
+
+                    f32 ProjectionDistance0 = LengthV2(SubtractV2(MovementLine.End, Projection0));
+                    f32 ProjectionDistance1 = LengthV2(SubtractV2(MovementLine.End, Projection1));
+
+                    if (ProjectionDistance0 < ProjectionDistance1)
+                    {
+                        Projection = Projection0;
+                        BeginningProjection = ProjectV2(Line0.Start, MovementLine.Start, Line0.End);
+
+                        if (ProjectionDistance0 < NearestCollisionDistance)
+                        {
+                            NearestCollisionDistance = ProjectionDistance0;
+                        }
+                    }
+                    else
+                    {
+                        Projection = Projection1;
+                        BeginningProjection = ProjectV2(Line1.Start, MovementLine.Start, Line1.End);
+
+                        if (ProjectionDistance1 < NearestCollisionDistance)
+                        {
+                            NearestCollisionDistance = ProjectionDistance1;
+                        }
+                    }
+
+                    Vector2 DirectionOfCollisionLine = SubtractV2(Projection, BeginningProjection);
+                    Vector2 VelocityProjection = ProjectV2(V2(0.0f, 0.0f), Entity->Velocity, DirectionOfCollisionLine);
+                    Vector2 AccelerationProjection = ProjectV2(V2(0.0f, 0.0f), Entity->Acceleration, DirectionOfCollisionLine);
+
+                    /* TODO: handle updating test-entity P/V/A... this doesn't matter yet since only the player moves */
+                    Result.Collides = 1;
+#if 0
+                    Result.EntityPosition = Projection;
+                    Result.EntityVelocity = VelocityProjection;
+                    Result.EntityAcceleration = AccelerationProjection;
+#else
+                    Result.EntityPosition = Projection;
+                    Result.EntityVelocity = V2(0, 0);
+                    Result.EntityAcceleration = V2(0, 0);
+#endif
+                }
+                else if (InsideCircle0 < 0.0f)
+                {
+                    Vector2 CircleDeltaNormal = NormalizeV2(CircleDelta0);
+                    Vector2 CirclePositionOffset = MultiplyV2S(CircleDeltaNormal, Circle0.R);
+
+                    if (AbsF32(InsideCircle0) < NearestCollisionDistance)
+                    {
+                        NearestCollisionDistance = CircleDistance0;
+                    }
+
+                    /* TODO: handle updating test-entity P/V/A... this doesn't matter yet since only the player moves */
+                    Result.Collides = 1;
+                    Result.EntityPosition = AddV2(CirclePosition0, CirclePositionOffset);
+                    Result.EntityVelocity = V2(0.0f, 0.0f);
+                    Result.EntityAcceleration = V2(0.0f, 0.0f);
+                }
+                else if (InsideCircle1 < 0.0f)
+                {
+                    Vector2 CircleDeltaNormal = NormalizeV2(CircleDelta1);
+                    Vector2 CirclePositionOffset = MultiplyV2S(CircleDeltaNormal, Circle1.R);
+
+                    /* TODO: handle updating test-entity P/V/A... this doesn't matter yet since only the player moves */
+                    Result.Collides = 1;
+                    Result.EntityPosition = AddV2(CirclePosition1, CirclePositionOffset);
+                    Result.EntityVelocity = V2(0.0f, 0.0f);
+                    Result.EntityAcceleration = V2(0.0f, 0.0f);
+
+                    if (AbsF32(InsideCircle1) < NearestCollisionDistance)
+                    {
+                        NearestCollisionDistance = CircleDistance1;
+                    }
+                }
+            }
+            else
+            {
+                /* TODO: handle other kinds of collisions at some point...... */
             }
         }
     }
 
-    return TestCollisionIsCloser;
+    if (NearestCollisionDistance < MaxCollisionDistance && EntityMovementLength > 0.0f)
+    {
+        Assert(NearestCollisionDistance <= EntityMovementLength);
+        f32 PercentOfEntityMovementTaken = NearestCollisionDistance / EntityMovementLength;
+        Result.TimeTaken = PercentOfEntityMovementTaken * DeltaTime;
+    }
+
+    return Result;
 }
 
 internal void UpdateEntities(game_state *GameState)
 {
-    ryn_BEGIN_TIMED_BLOCK(TB_UpdateEntities);
+    f32 RemainingTime = GameState->DeltaTime;
 
-    for (s32 I = 0; I < GameState->EntityCount; ++I)
+    while (RemainingTime > 0.0f)
     {
-        entity *Entity = GameState->Entities + I;
-        entity_movement EntityMovement = GetEntityMovement(GameState, Entity);
+        f32 SoonestCollision = FLT_MAX;
+        minkowski_collision_result SoonestCollisionResult = {0};
+        s32 SoonestEntity = -1;
+        s32 SoonestTestEntity = -1;
+        s32 I, J;
 
-        if (Entity->MovementType != entity_movement_type_Moveable)
+        for (I = 0; I < GameState->EntityCount; ++I)
         {
-            continue;
-        }
+            entity *Entity = GameState->Entities + I;
 
-        for (s32 J = 0; J < GameState->EntityCount; ++J)
-        {
-            entity *TestEntity = GameState->Entities + J;
-
+            if (!Entity->Sprites[0].Type || Entity->MovementType != entity_movement_type_Moveable)
             {
+                continue;
+            }
+
+            for (J = 0; J < GameState->EntityCount; ++J)
+            {
+                entity *TestEntity = GameState->Entities + J;
+
+                if (!TestEntity->Sprites[0].Type)
+                {
+                    continue;
+                }
+
                 /* Assume that the entity's sprite rectangle contains all collision geometry.
                    If the rectangles do _not_ intersect, then skip collision detection.
                 */
@@ -1024,165 +1180,51 @@ internal void UpdateEntities(game_state *GameState)
                 Rectangle TestSpriteRectangle = GetSpriteRectangle(TestEntity);
 
                 b32 RectanglesCollide = CollideRectangles(SpriteRectangle, TestSpriteRectangle);
-                b32 BothEntitiesAreTheSame = I == J;
+                b32 EntitiesAreNotTheSame = I != J;
 
-                if (!RectanglesCollide || BothEntitiesAreTheSame)
+                if (RectanglesCollide && EntitiesAreNotTheSame)
                 {
-                    continue;
-                }
-            }
+                    minkowski_collision_result CollisionResult = CollideMinkowskiCircleAndLine(Entity, TestEntity, GameState->DeltaTime);
 
-            for (collision_area *Area = Entity->CollisionArea; Area; Area = Area->Next)
-            {
-                for (collision_area *TestArea = TestEntity->CollisionArea; TestArea; TestArea = TestArea->Next)
-                {
-                    if (Area->Type == collision_type_Circle && TestArea->Type == collision_type_Circle)
+                    if (CollisionResult.TimeTaken < SoonestCollision)
                     {
-                        /* TODO: handle circle-circle collision */
-                    }
-                    else if (Area->Type == collision_type_Line && TestArea->Type == collision_type_Line)
-                    {
-                        /* TODO: handle line-line collision */
-                    }
-                    else if (Area->Type == collision_type_Circle && TestArea->Type == collision_type_Line)
-                    {
-                        circle AreaCircle = Area->Circle;
-                        line AreaLine = TestArea->Line;
-
-                        line MovementLine = (line){Entity->Position, AddV2(Entity->Position, EntityMovement.Position)};
-                        circle Circle = GetOffsetCircle(AreaCircle, MovementLine.End);
-                        line Line = GetOffsetLine(AreaLine, TestEntity->Position);
-
-                        minkowski_circle_and_line CircleAndLine = MinkowskiSumCircleAndLine(Circle, Line);
-
-#if DEBUG_DRAW_COLLISIONS
-                        {
-                            line MovementScreenLine = WorldToScreenLine(GameState, MovementLine);
-                            PushDebugLine(MovementScreenLine, (Color){255,255,255,255});
-                        }
-#endif
-
-                        circle Circle0 = CircleAndLine.Circles[0];
-                        circle Circle1 = CircleAndLine.Circles[1];
-
-                        Vector2 CirclePosition0 = V2(Circle0.X, Circle0.Y);
-                        Vector2 CirclePosition1 = V2(Circle1.X, Circle1.Y);
-
-                        line Line0 = CircleAndLine.Lines[0];
-                        line Line1 = CircleAndLine.Lines[1];
-
-                        Vector2 CircleDelta0 = SubtractV2(MovementLine.End, CirclePosition0);
-                        Vector2 CircleDelta1 = SubtractV2(MovementLine.End, CirclePosition1);
-
-                        f32 CircleDistance0 = LengthV2(CircleDelta0);
-                        f32 CircleDistance1 = LengthV2(CircleDelta1);
-
-                        f32 InsideCircle0 = CircleDistance0 - Circle0.R;
-                        f32 InsideCircle1 = CircleDistance1 - Circle1.R;
-
-                        f32 WhichSide0 = GetWhichSideOfALine(MovementLine.End, Line0);
-                        f32 WhichSide1 = GetWhichSideOfALine(MovementLine.End, Line1);
-                        f32 WhichSide2 = GetWhichSideOfALine(MovementLine.End, (line){Line0.Start, Line1.Start});
-                        f32 WhichSide3 = GetWhichSideOfALine(MovementLine.End, (line){Line0.End, Line1.End});
-
-                        if (((WhichSide0 < 0.0f && WhichSide1 > 0.0f) || (WhichSide0 > 0.0f && WhichSide1 < 0.0f)) &&
-                            ((WhichSide2 < 0.0f && WhichSide3 > 0.0f) || (WhichSide2 > 0.0f && WhichSide3 < 0.0f)))
-                        {
-                            Vector2 Projection0 = ProjectV2(Line0.Start, MovementLine.End, Line0.End);
-                            Vector2 Projection1 = ProjectV2(Line1.Start, MovementLine.End, Line1.End);
-
-                            f32 ProjectionDistance0 = LengthSquaredV2(SubtractV2(MovementLine.End, Projection0));
-                            f32 ProjectionDistance1 = LengthSquaredV2(SubtractV2(MovementLine.End, Projection1));
-
-                            Vector2 BeginningProjection;
-                            Vector2 Projection;
-
-                            if (ProjectionDistance0 < ProjectionDistance1)
-                            {
-                                Projection = Projection0;
-                                BeginningProjection = ProjectV2(Line0.Start, MovementLine.Start, Line0.End);
-                            }
-                            else
-                            {
-                                Projection = Projection1;
-                                BeginningProjection = ProjectV2(Line1.Start, MovementLine.Start, Line1.End);
-                            }
-
-                            Vector2 DirectionOfCollisionLine = SubtractV2(Projection, BeginningProjection);
-                            Vector2 VelocityProjection = ProjectV2(V2(0.0f, 0.0f), Entity->Velocity, DirectionOfCollisionLine);
-                            Vector2 AccelerationProjection = ProjectV2(V2(0.0f, 0.0f), Entity->Acceleration, DirectionOfCollisionLine);
-
-                            Entity->Velocity = VelocityProjection;
-                            Entity->Acceleration = AccelerationProjection;
-
-#if DEBUG_DRAW_COLLISIONS
-                            {
-                                Vector2 ScreenProjection0 = WorldToScreenPosition(GameState, Projection0);
-                                Vector2 ScreenProjection1 = WorldToScreenPosition(GameState, Projection1);
-
-                                line ScreenLine0 = WorldToScreenLine(GameState, Line0);
-                                line ScreenLine1 = WorldToScreenLine(GameState, Line1);
-
-                                PushDebugCircle((circle){ScreenProjection0.x-1, ScreenProjection0.y-1, 2}, (Color){255,255,255,255});
-                                PushDebugCircle((circle){ScreenProjection1.x-1, ScreenProjection1.y-1, 2}, (Color){255,255,255,255});
-
-                                PushDebugLine(ScreenLine0, (Color){255,255,255,255});
-                                PushDebugLine(ScreenLine1, (Color){255,255,255,255});
-                            }
-#endif
-                        }
-                        else if (InsideCircle0 < 0.0f)
-                        {
-                            Vector2 CircleDeltaNormal = NormalizeV2(CircleDelta0);
-                            Vector2 CirclePositionOffset = MultiplyV2S(CircleDeltaNormal, Circle0.R);
-
-                            Entity->Position = AddV2(CirclePosition0, CirclePositionOffset);
-                            Entity->Velocity = V2(0.0f, 0.0f);
-                            Entity->Acceleration = V2(0.0f, 0.0f);
-
-#if DEBUG_DRAW_COLLISIONS
-                            {
-                                Vector2 EntityScreenPosition = WorldToScreenPosition(GameState, Entity->Position);
-                                Vector2 CirclePosition = WorldToScreenPosition(GameState, V2(Circle0.X, Circle0.Y));
-                                PushDebugCircle((circle){CirclePosition.x, CirclePosition.y, Circle0.R}, (Color){255,255,255,255});
-                                PushDebugCircle((circle){EntityScreenPosition.x-1, EntityScreenPosition.y-1, 2}, (Color){255,255,255,255});
-                            }
-#endif
-                        }
-                        else if (InsideCircle1 < 0.0f)
-                        {
-                            Vector2 CircleDeltaNormal = NormalizeV2(CircleDelta1);
-                            Vector2 CirclePositionOffset = MultiplyV2S(CircleDeltaNormal, Circle1.R);
-
-                            Entity->Position = AddV2(CirclePosition1, CirclePositionOffset);
-                            Entity->Velocity = V2(0.0f, 0.0f);
-                            Entity->Acceleration = V2(0.0f, 0.0f);
-
-#if DEBUG_DRAW_COLLISIONS
-                            {
-                                Vector2 EntityScreenPosition = WorldToScreenPosition(GameState, Entity->Position);
-                                Vector2 CirclePosition = WorldToScreenPosition(GameState, V2(Circle1.X, Circle1.Y));
-                                PushDebugCircle((circle){CirclePosition.x, CirclePosition.y, Circle1.R}, (Color){255,255,255,255});
-                                PushDebugCircle((circle){EntityScreenPosition.x-1, EntityScreenPosition.y-1, 2}, (Color){255,255,255,255});
-                            }
-#endif
-                        }
-                    }
-                    else if (Area->Type == collision_type_Line && TestArea->Type == collision_type_Circle)
-                    {
-                        /* TODO: Handle line-circle collision */
-                    }
-                    else
-                    {
-                        Assert(0);
+                        SoonestCollisionResult = CollisionResult;
+                        SoonestCollision = CollisionResult.TimeTaken;
+                        SoonestEntity = I;
+                        SoonestTestEntity = J;
+                        RemainingTime = RemainingTime - CollisionResult.TimeTaken;
                     }
                 }
             }
         }
 
-        UpdateEntity(GameState, Entity);
+        if (SoonestCollisionResult.Collides && SoonestEntity >= 0 && SoonestTestEntity >= 0)
+        {
+            /* TODO: apply velocity/acceleration changes to colliding entities */
+            entity *Entity = GameState->Entities + SoonestEntity;
+            entity *TestEntity = GameState->Entities + SoonestTestEntity;
+
+#if 1
+            Entity->Position = SoonestCollisionResult.EntityPosition;
+            Entity->Velocity = SoonestCollisionResult.EntityVelocity;
+            Entity->Acceleration = SoonestCollisionResult.EntityAcceleration;
+#endif
+        }
+
+        /* loop through all entities and update movement with the soonest delta time */
+        for (I = 0; I < GameState->EntityCount; ++I)
+        {
+            entity *Entity = GameState->Entities + I;
+            b32 HadCollision = SoonestCollisionResult.Collides;
+            b32 IsNotACollisionEntity = I != SoonestEntity && I != SoonestTestEntity;
+
+            if (!HadCollision || (HadCollision && IsNotACollisionEntity))
+            {
+                UpdateEntity(GameState, Entity);
+            }
+        }
+        /* TODO: delete this */RemainingTime = -1.0f;
     }
-    ryn_END_TIMED_BLOCK(TB_UpdateEntities);
 }
 
 internal void GenerateSortedEntityTable(game_state *GameState)
