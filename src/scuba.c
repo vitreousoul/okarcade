@@ -113,20 +113,6 @@ typedef struct
     Vector2 CollisionNormal;
 } collision_result;
 
-typedef struct
-{
-    b32 Collides;
-    f32 TimeTaken;
-
-    Vector2 EntityPosition;
-    Vector2 EntityVelocity;
-    Vector2 EntityAcceleration;
-
-    Vector2 TestEntityPosition;
-    Vector2 TestEntityVelocity;
-    Vector2 TestEntityAcceleration;
-} minkowski_collision_result; /* TODO: rename this to collision_result once the other collision_result stuff is moved out of this file or deleted. */
-
 typedef enum
 {
     collision_type_Circle = 0x1,
@@ -169,7 +155,7 @@ typedef enum
 {
     entity_movement_type_None,
     entity_movement_type_Moveable,
-} entity_movement_type;
+} entity_movement_type; /* TODO: maybe these should be flags? */
 
 typedef struct
 {
@@ -539,33 +525,8 @@ internal entity *AddEntity(game_state *GameState, sprite_type SpriteType)
             /* TODO: Clean up the way we do collision area definition */
             Entity->CollisionArea = AddCollisionArea(GameState);
             collision_area *Area = Entity->CollisionArea;
-#if 0
-            /* left line */
-            Area->Type = collision_type_Line;
-            Area->Line.Start = V2(-TileHalfScale, -TileHalfScale);
-            Area->Line.End = V2(-TileHalfScale, TileHalfScale);
-            /* top line */
-            Area->Next = AddCollisionArea(GameState);
-            Area = Area->Next;
-            Area->Type = collision_type_Line;
-            Area->Line.Start = V2(-TileHalfScale, -TileHalfScale);
-            Area->Line.End = V2(TileHalfScale, -TileHalfScale);
-            /* right line */
-            Area->Next = AddCollisionArea(GameState);
-            Area = Area->Next;
-            Area->Type = collision_type_Line;
-            Area->Line.Start = V2(TileHalfScale, -TileHalfScale);
-            Area->Line.End = V2(TileHalfScale, TileHalfScale);
-            /* bottom line */
-            Area->Next = AddCollisionArea(GameState);
-            Area = Area->Next;
-            Area->Type = collision_type_Line;
-            Area->Line.Start = V2(-TileHalfScale, TileHalfScale);
-            Area->Line.End = V2(TileHalfScale, TileHalfScale);
-#else
             Area->Type = collision_type_Rectangle;
             Area->Rectangle = R2(-TileHalfScale, -TileHalfScale, TileScale, TileScale);
-#endif
         } break;
         case sprite_type_Cage:
         {
@@ -704,13 +665,13 @@ internal minkowski_circle_and_rectangle MinkowskiSumCircleAndRectangle(circle Ci
     Shape.Circles[2] = (circle){RX + RW, RY + RH, CR};
     Shape.Circles[3] = (circle){RX,      RY + RH, CR};
 
-    Shape.Lines[0] = (line){RX - CR, RY, RX - CR, RY + RH};
-    Shape.Lines[1] = (line){RX + RW + CR, RY, RX + RW + CR, RY + RH};
-    Shape.Lines[2] = (line){RX, RY - CR, RX + RW, RY - CR};
-    Shape.Lines[2] = (line){RX, RY + RH + CR, RX + RW, RY + RH + CR};
+    Shape.Lines[0] = (line){RX - CR,      RY,           RX - CR,      RY + RH};
+    Shape.Lines[1] = (line){RX + RW + CR, RY,           RX + RW + CR, RY + RH};
+    Shape.Lines[2] = (line){RX,           RY - CR,      RX + RW,      RY - CR};
+    Shape.Lines[2] = (line){RX,           RY + RH + CR, RX + RW,      RY + RH + CR};
 
-    Shape.Rectangles[0] = R2(RX - CR, RY, RW + CD, RH);
-    Shape.Rectangles[1] = R2(RX, RY - CR, RW, RH + CD);
+    Shape.Rectangles[0] = R2(RX - CR, RY,      RW + CD, RH);
+    Shape.Rectangles[1] = R2(RX,      RY - CR, RW,      RH + CD);
 
     return Shape;
 }
@@ -955,8 +916,6 @@ internal collision_result CollideLineAndRectangle(line Line, Rectangle R)
 
     if (1 || IsPointInsideRectangle(Line.Start, R) && IsPointInsideRectangle(Line.End, R))
     {
-        /* printf("%.04f inside\n", Line.Start.x); */
-
         for (s32 I = 0; I < 4; ++I)
         {
             collision_result Collision = CollideLineAndLine(Line, Lines[I]);
@@ -1129,6 +1088,18 @@ internal void UpdateEntity(game_state *GameState, entity *Entity, f32 DeltaTime)
     ryn_BEGIN_TIMED_BLOCK(TB_UpdateEntity);
     entity_movement Movement = GetEntityMovement(Entity, DeltaTime);
 
+    f32 Threshold = 0.8f;
+
+    if(LengthSquaredV2(Movement.Position) < Threshold)
+    {
+        Movement.Position = V2(0.0f, 0.0f);
+    }
+
+    if(LengthSquaredV2(Movement.Velocity) < Threshold)
+    {
+        Movement.Velocity = V2(0.0f, 0.0f);
+    }
+
     Entity->Velocity = AddV2(Entity->Velocity, Movement.Velocity);
     Entity->Position = AddV2(Entity->Position, Movement.Position);
     ryn_END_TIMED_BLOCK(TB_UpdateEntity);
@@ -1151,7 +1122,7 @@ internal Rectangle GetSpriteRectangle(entity *Entity)
     return SpriteRectangle;
 }
 
-internal collision_result CollideEntities(game_state *GameState, entity *Entity, entity *TestEntity, f32 DeltaTime)
+internal collision_result CollideEntities(game_state *GameState, entity *Entity, entity *TestEntity, f32 DeltaTime, b32 ShouldUpdateEntities)
 {
     collision_result Result = {0};
     f32 NearestCollisionDistance = 999999999999.0f;
@@ -1184,11 +1155,6 @@ internal collision_result CollideEntities(game_state *GameState, entity *Entity,
 
         collision_result LineCollision = CollideLineAndLine(MovementLine, MinkowskiRectangle.Lines[0]);
 
-        if (0 && LineCollision.Count)
-        {
-            Result = LineCollision;
-        }
-
         b32 EntityPositionInRectangle0 = IsPointInsideRectangle(Entity->Position, R0);
         b32 EntityEndPositionInRectangle0 = IsPointInsideRectangle(EntityEndPosition, R0);
 
@@ -1207,36 +1173,30 @@ internal collision_result CollideEntities(game_state *GameState, entity *Entity,
         b32 EntityInCircle3 = IsPointInsideCircle(Entity->Position, C3);
         b32 EntityEndInCircle3 = IsPointInsideCircle(EntityEndPosition, C3);
 
-        if (!EntityPositionInRectangle0 && EntityEndPositionInRectangle0)
+        b32 CollisionOccured = ((!EntityPositionInRectangle0 && EntityEndPositionInRectangle0) ||
+                                (!EntityPositionInRectangle1 && EntityEndPositionInRectangle1) ||
+                                (!EntityInCircle0 && EntityEndInCircle0) ||
+                                (!EntityInCircle1 && EntityEndInCircle1) ||
+                                (!EntityInCircle2 && EntityEndInCircle2) ||
+                                (!EntityInCircle3 && EntityEndInCircle3));
+
+        if (CollisionOccured)
         {
             Result = LineCollision;
-            PushDebugRectangle(WorldToScreenRectangle(GameState, R0), DebugColor);
+
+            if (ShouldUpdateEntities)
+            {
+                if (Entity->Sprites[0].Type == sprite_type_Fish)
+                {
+                    Entity->Velocity = V2(0.0f, 0.0f);
+                    Entity->Acceleration = V2(0.0f, 0.0f);
+                }
+            }
         }
-        else if (!EntityPositionInRectangle1 && EntityEndPositionInRectangle1)
-        {
-            Result = LineCollision;
-            PushDebugRectangle(WorldToScreenRectangle(GameState, R1), DebugColor);
-        }
-        else if (!EntityInCircle0 && EntityEndInCircle0)
-        {
-            Result = LineCollision;
-            PushDebugCircle(WorldToScreenCircle(GameState, C0), DebugColor);
-        }
-        else if (!EntityInCircle1 && EntityEndInCircle1)
-        {
-            Result = LineCollision;
-            PushDebugCircle(WorldToScreenCircle(GameState, C1), DebugColor);
-        }
-        else if (!EntityInCircle2 && EntityEndInCircle2)
-        {
-            Result = LineCollision;
-            PushDebugCircle(WorldToScreenCircle(GameState, C2), DebugColor);
-        }
-        else if (!EntityInCircle3 && EntityEndInCircle3)
-        {
-            Result = LineCollision;
-            PushDebugCircle(WorldToScreenCircle(GameState, C3), DebugColor);
-        }
+    }
+    else if (Area->Type == collision_type_Circle && TestArea->Type == collision_type_Circle)
+    {
+
     }
 
     return Result;
@@ -1248,8 +1208,8 @@ internal void UpdateEntities(game_state *GameState)
 
     while (RemainingTime > 0.0f)
     {
-        f32 SoonestCollision = FLT_MAX;
-        collision_result SoonestCollisionResult = {0};
+        f32 SoonestCollisionDistance = FLT_MAX;
+        collision_result SoonestCollision = {0};
         s32 SoonestEntity = -1;
         s32 SoonestTestEntity = -1;
         s32 I, J;
@@ -1296,16 +1256,16 @@ internal void UpdateEntities(game_state *GameState)
 
                 if ((StartRectanglesCollide || EndRectanglesCollide) && EntitiesAreNotTheSame)
                 {
-                    collision_result Collision = CollideEntities(GameState, Entity, TestEntity, RemainingTime);
+                    collision_result Collision = CollideEntities(GameState, Entity, TestEntity, RemainingTime, 0);
 
                     if (Collision.Count)
                     {
                         f32 CollisionDistance = LengthV2(SubtractV2(Entity->Position, Collision.Collisions[0]));
 
-                        if (CollisionDistance < SoonestCollision)
+                        if (CollisionDistance < SoonestCollisionDistance)
                         {
-                            SoonestCollision = CollisionDistance;
-                            SoonestCollisionResult = Collision;
+                            SoonestCollisionDistance = CollisionDistance;
+                            SoonestCollision = Collision;
                             SoonestEntity = I;
                             SoonestTestEntity = J;
                         }
@@ -1314,12 +1274,12 @@ internal void UpdateEntities(game_state *GameState)
             }
         }
 
-        if (SoonestCollisionResult.Count)
+        if (SoonestCollision.Count)
         {
             entity *Entity = GameState->Entities + SoonestEntity;
-            /* Entity->Position = SoonestCollisionResult.Collisions[0]; */
-            Entity->Velocity = V2(0.0f, 0.0f);
-            Entity->Acceleration = V2(0.0f, 0.0f);
+            entity *TestEntity = GameState->Entities + SoonestTestEntity;
+
+            CollideEntities(GameState, Entity, TestEntity, RemainingTime, 1);
         }
 
         /* update colliding entities */
@@ -1328,23 +1288,7 @@ internal void UpdateEntities(game_state *GameState)
             entity *Entity = GameState->Entities + I;
             b32 IsACollisionEntity = SoonestEntity == I || SoonestTestEntity == I;
 
-            if (SoonestCollisionResult.Count && IsACollisionEntity)
-            {
-                Entity->Velocity = V2(0.0f, 0.0f);
-                Entity->Acceleration = V2(0.0f, 0.0f);
-
-                if(0){
-                    entity_movement EntityMovement = GetEntityMovement(Entity, RemainingTime);
-                    Rectangle EntitySourceRectangle = GetSpriteRectangle(Entity);
-                    Vector2 EntityRectanglePosition = V2(EntitySourceRectangle.x, EntitySourceRectangle.y);
-                    Rectangle EntityRectangleStart = (Rectangle){EntityRectanglePosition.x, EntityRectanglePosition.y, EntitySourceRectangle.width, EntitySourceRectangle.height};
-                    EntityRectanglePosition = AddV2(EntityRectanglePosition, EntityMovement.Position);
-                    Rectangle EntityRectangleEnd = (Rectangle){EntityRectanglePosition.x, EntityRectanglePosition.y, EntitySourceRectangle.width, EntitySourceRectangle.height};
-                    PushDebugRectangle(WorldToScreenRectangle(GameState, EntityRectangleStart), (Color){255,0,255,255});
-                    PushDebugRectangle(WorldToScreenRectangle(GameState, EntityRectangleEnd), (Color){255,255,0,255});
-                }
-            }
-            else if (!(SoonestCollisionResult.Count && IsACollisionEntity))
+            if (!(SoonestCollision.Count && IsACollisionEntity))
             {
                 UpdateEntity(GameState, Entity, RemainingTime);
             }
@@ -1418,18 +1362,18 @@ internal void ResetGame(game_state *GameState)
         entity *PlayerEntity = GameState->PlayerEntity;
         PlayerEntity->Position = MultiplyV2S(V2(1.0f, 1.0f), TILE_SIZE * TEXTURE_MAP_SCALE);
 
-        /* entity *EelEntity = AddEntity(GameState, sprite_type_Eel); */
-        /* EelEntity->Position = MultiplyV2S(V2(0.25f, 4.0f), TILE_SIZE * TEXTURE_MAP_SCALE); */
+        entity *EelEntity = AddEntity(GameState, sprite_type_Eel);
+        EelEntity->Position = MultiplyV2S(V2(0.25f, 4.0f), TILE_SIZE * TEXTURE_MAP_SCALE);
 
-        /* entity *CrabEntity = AddEntity(GameState, sprite_type_Crab); */
-        /* CrabEntity->Position = MultiplyV2S(V2(9.0f, 7.0f), TILE_SIZE * TEXTURE_MAP_SCALE); */
+        entity *CrabEntity = AddEntity(GameState, sprite_type_Crab);
+        CrabEntity->Position = MultiplyV2S(V2(9.0f, 7.0f), TILE_SIZE * TEXTURE_MAP_SCALE);
 
         /* TODO: Fix z-sorting, so that the front of the cage is in front of entities
                  like the player and the crab. The easiest way is probably to split
                  the cage into two entities, with their own individual depths.
         */
-        /* entity *CageEntity = AddEntity(GameState, sprite_type_Cage); */
-        /* CageEntity->Position = MultiplyV2S(V2(9.0f, 7.0f), TILE_SIZE * TEXTURE_MAP_SCALE); */
+        entity *CageEntity = AddEntity(GameState, sprite_type_Cage);
+        CageEntity->Position = MultiplyV2S(V2(9.0f, 7.0f), TILE_SIZE * TEXTURE_MAP_SCALE);
 
         for (s32 J = 0; J < MAP_HEIGHT; ++J)
         {
