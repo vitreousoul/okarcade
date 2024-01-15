@@ -1,5 +1,6 @@
 #define internal static
 #define global_variable static
+#define debug_variable static
 
 typedef uint8_t u8;
 typedef uint32_t u32;
