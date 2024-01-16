@@ -957,9 +957,9 @@ internal collision_result GetCollisionPointForRectangle(Vector2 P, Rectangle R)
     };
 
     Vector2 Normals[4] = {
-        NormalizeV2(RotateV2(SubtractV2(Lines[0].End, Lines[0].Start), PI_OVER_2)),
+        NormalizeV2(RotateV2(SubtractV2(Lines[0].Start, Lines[0].End), PI_OVER_2)),
         NormalizeV2(RotateV2(SubtractV2(Lines[1].Start, Lines[1].End), PI_OVER_2)),
-        NormalizeV2(RotateV2(SubtractV2(Lines[2].End, Lines[2].Start), PI_OVER_2)),
+        NormalizeV2(RotateV2(SubtractV2(Lines[2].Start, Lines[2].End), PI_OVER_2)),
         NormalizeV2(RotateV2(SubtractV2(Lines[3].Start, Lines[3].End), PI_OVER_2)),
     };
 
@@ -1267,15 +1267,6 @@ internal collision_result CollideEntities(game_state *GameState, entity *Entity,
 
         if (Entity->Sprites[0].Type == sprite_type_Fish)
         {
-            /* f32 MovementLineLength = LengthV2(SubtractV2(EntityEndPosition, Entity->Position)); */
-            /* printf("%f\n", MovementLineLength); */
-            /* printf("x %d %d\n", Collision.Count, ShouldUpdateEntities); */
-            /* printf("r %d %d\n", EntityPositionInRectangle0, EntityEndPositionInRectangle0); */
-            /* printf("r %d %d\n", EntityPositionInRectangle1, EntityEndPositionInRectangle1); */
-            /* printf("c %d %d\n", EntityInCircle0, EntityEndInCircle0); */
-            /* printf("c %d %d\n", EntityInCircle1, EntityEndInCircle1); */
-            /* printf("c %d %d\n", EntityInCircle2, EntityEndInCircle2); */
-            /* printf("c %d %d\n", EntityInCircle3, EntityEndInCircle3); */
         }
 
         if (Collision.Count && Collision.Bounded/* CollisionOccured */)
@@ -1285,23 +1276,30 @@ internal collision_result CollideEntities(game_state *GameState, entity *Entity,
             if (ShouldUpdateEntities)
             {
                 Assert(LengthV2(Collision.Normal) > 0.00001f);
-                Vector2 Blahblah = AddV2(MultiplyV2S(Collision.Normal, 10.0f), EntityEndPosition);
-                Vector2 Something = ProjectV2(EntityEndPosition, Entity->Position, Blahblah);
-                Vector2 Direction = SubtractV2(Something, Entity->Position);
+                Vector2 AccelerationNormal = NormalizeV2(Entity->Acceleration);
+                Vector2 OffsetNormal = AddV2(Collision.Normal, EntityEndPosition);
+                Vector2 Projection = ProjectV2(EntityEndPosition, Entity->Position, OffsetNormal);
+                Vector2 Direction = SubtractV2(Projection, Entity->Position);
+                Vector2 NormalizedDirection = NormalizeV2(Direction);
 
-                /* printf("%f %f\n", Collision.Normal.x, Collision.Normal.y); */
-                /* printf("%f %f\n", EntityEndPosition.x, EntityEndPosition.y); */
-                /* printf("%f %f\n", Entity->Position.x, Entity->Position.y); */
-                /* printf("%f %f\n\n", Direction.x, Direction.y); */
+                f32 VelocityMagnitude = LengthV2(Entity->Velocity);
+                f32 AccelerationMagnitude = LengthV2(Entity->Acceleration);
 
-                /* PushDebugCircle(WorldToScreenCircle(GameState, (circle){Entity->Position.x, Entity->Position.y, 1}), (Color){0,255,255,255}); */
-                /* PushDebugCircle(WorldToScreenCircle(GameState, (circle){Something.x, Something.y, 1}), (Color){255,0,255,255}); */
-                /* printf("%f %f\n", Something.x, Something.y); */
+                Vector2 Deflection = AddV2(AccelerationNormal, Collision.Normal);
+                f32 DeflectionAmount = LengthV2(Deflection);
 
                 if (Entity->Sprites[0].Type == sprite_type_Fish)
                 {
-                    Entity->Velocity = V2(0.0f, 0.0f);
-                    Entity->Acceleration = V2(0.0f, 0.0f);
+                    if (DeflectionAmount > 0.01f)
+                    {
+                        Entity->Velocity = MultiplyV2S(NormalizedDirection, VelocityMagnitude);
+                        Entity->Acceleration = MultiplyV2S(NormalizedDirection, AccelerationMagnitude);
+                    }
+                    else
+                    {
+                        Entity->Velocity = V2(0.0f, 0.0f);
+                        Entity->Acceleration = V2(0.0f, 0.0f);
+                    }
                 }
             }
         }
@@ -1404,7 +1402,7 @@ internal void UpdateEntities(game_state *GameState)
             entity *Entity = GameState->Entities + I;
             b32 IsACollisionEntity = SoonestEntity == I || SoonestTestEntity == I;
 
-            if (!(SoonestCollision.Count && IsACollisionEntity))
+            /* if (!(SoonestCollision.Count && IsACollisionEntity)) */
             {
                 UpdateEntity(GameState, Entity, RemainingTime);
             }
