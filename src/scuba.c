@@ -29,7 +29,7 @@ int SCREEN_HEIGHT = 700;
 
 #define PI_OVER_2 (PI/2.0f)
 
-#define DEBUG_DRAW_COLLISIONS 0
+#define DEBUG_DRAW_COLLISIONS 1
 
 #define TEXTURE_MAP_SCALE 4
 #define MAX_ENTITY_COUNT 256
@@ -206,6 +206,8 @@ typedef struct
 
     collision_area *CollisionArea;
 } entity;
+
+#define ENTITY_IS_PLAYER(e) ((e)->Sprites[0].Type == sprite_type_Fish)
 
 typedef enum
 {
@@ -1239,28 +1241,31 @@ internal collision_result CollideEntities(game_state *GameState, entity *Entity,
 
         if (CollideR0)
         {
-            /* Collision = CollideLineAndRectangle(MovementLine, R0); */
             Collision = GetCollisionPointForRectangle(EntityEndPosition, R0);
-
+#if DEBUG_DRAW_COLLISIONS
+            PushDebugRectangle(WorldToScreenRectangle(GameState, R0), (Color){255,0,255,255});
+#endif
         }
         else if (CollideR1)
         {
-            /* Collision = CollideLineAndRectangle(MovementLine, R1); */
             Collision = GetCollisionPointForRectangle(EntityEndPosition, R1);
+#if DEBUG_DRAW_COLLISIONS
+            PushDebugRectangle(WorldToScreenRectangle(GameState, R1), (Color){255,0,255,255});
+#endif
         }
-        else if (CollideC0)
+        else if (0&&CollideC0)
         {
             Collision = CollideLineAndCircle(MovementLine, C0);
         }
-        else if (CollideC1)
+        else if (0&&CollideC1)
         {
             Collision = CollideLineAndCircle(MovementLine, C1);
         }
-        else if (CollideC2)
+        else if (0&&CollideC2)
         {
             Collision = CollideLineAndCircle(MovementLine, C2);
         }
-        else if (CollideC3)
+        else if (0&&CollideC3)
         {
             Collision = CollideLineAndCircle(MovementLine, C3);
         }
@@ -1288,6 +1293,11 @@ internal collision_result CollideEntities(game_state *GameState, entity *Entity,
                 Vector2 Deflection = AddV2(AccelerationNormal, Collision.Normal);
                 f32 DeflectionAmount = LengthV2(Deflection);
 
+                f32 MovementDistance = LengthV2(SubtractV2(EntityEndPosition, Entity->Position));
+                f32 CollisionDistance = LengthV2(SubtractV2(Collision.Collisions[0], Entity->Position));
+                f32 PercentOfTimeTaken = ClampF32(CollisionDistance / MovementDistance, 0, 1);
+                Result.TimeTaken = DeltaTime * PercentOfTimeTaken;
+
                 if (Entity->Sprites[0].Type == sprite_type_Fish)
                 {
                     if (DeflectionAmount > 0.01f)
@@ -1303,6 +1313,10 @@ internal collision_result CollideEntities(game_state *GameState, entity *Entity,
                 }
             }
         }
+        else
+        {
+            Result.TimeTaken = DeltaTime + 0.1f;
+        }
     }
     else if (Area->Type == collision_type_Circle && TestArea->Type == collision_type_Circle)
     {
@@ -1315,9 +1329,11 @@ internal collision_result CollideEntities(game_state *GameState, entity *Entity,
 internal void UpdateEntities(game_state *GameState)
 {
     f32 RemainingTime = GameState->DeltaTime;
+    s32 UpdateIterationCount = 0;
 
-    while (RemainingTime > 0.0f)
+    while (RemainingTime > 0.0f && UpdateIterationCount < 8)
     {
+        UpdateIterationCount += 1;
         f32 SoonestCollisionDistance = FLT_MAX;
         collision_result SoonestCollision = {0};
         s32 SoonestEntity = -1;
@@ -1328,8 +1344,6 @@ internal void UpdateEntities(game_state *GameState)
         {
             entity *Entity = GameState->Entities + I;
             b32 EntityIsMoveable = Entity->MovementType == entity_movement_type_Moveable;
-
-            /* if (Entity->Sprites[0].Type == sprite_type_Fish) printf("\n\ns"); */
 
             if (!Entity->Sprites[0].Type)
             {
@@ -1368,10 +1382,8 @@ internal void UpdateEntities(game_state *GameState)
 
                 if ((StartRectanglesCollide || EndRectanglesCollide) && EntitiesAreNotTheSame)
                 {
-                    /* if (Entity->Sprites[0].Type == sprite_type_Fish) printf("%d %d %d %d\n", StartRectanglesCollide, EndRectanglesCollide, I, J); */
                     collision_result Collision = CollideEntities(GameState, Entity, TestEntity, RemainingTime, 0);
 
-                    /* if (Entity->Sprites[0].Type == sprite_type_Fish) printf("x# %d\n", Collision.Count); */
                     if (Collision.Count)
                     {
                         f32 CollisionDistance = LengthV2(SubtractV2(Entity->Position, Collision.Collisions[0]));
@@ -1388,12 +1400,16 @@ internal void UpdateEntities(game_state *GameState)
             }
         }
 
+        f32 NewRemainingTime;
+
         if (SoonestCollision.Count)
         {
             entity *Entity = GameState->Entities + SoonestEntity;
             entity *TestEntity = GameState->Entities + SoonestTestEntity;
 
-            CollideEntities(GameState, Entity, TestEntity, RemainingTime, 1);
+            collision_result Collision = CollideEntities(GameState, Entity, TestEntity, RemainingTime, 1);
+
+            NewRemainingTime = RemainingTime - Collision.TimeTaken;
         }
 
         /* update colliding entities */
@@ -1402,13 +1418,21 @@ internal void UpdateEntities(game_state *GameState)
             entity *Entity = GameState->Entities + I;
             b32 IsACollisionEntity = SoonestEntity == I || SoonestTestEntity == I;
 
-            /* if (!(SoonestCollision.Count && IsACollisionEntity)) */
+            if (!(SoonestCollision.Count && IsACollisionEntity))
             {
                 UpdateEntity(GameState, Entity, RemainingTime);
             }
         }
 
-        RemainingTime = -1.0f;
+        if (NewRemainingTime > 0.0001f)
+        {
+            /* RemainingTime = -1.0f; */
+            RemainingTime = NewRemainingTime;
+        }
+        else
+        {
+            RemainingTime = -1.0f;
+        }
     }
 }
 
@@ -1505,9 +1529,7 @@ internal void ResetGame(game_state *GameState)
                 default:
                     break;
                 }
-                /* break; /\* TODO: delete this..... *\/ */
             }
-            /* break; /\* TODO: delete this..... *\/ */
         }
     }
 
@@ -1576,19 +1598,6 @@ internal void ResetProfilerTimers(void)
 
 internal void UpdateAndRender(void *VoidGameState)
 {
-    /* BeginDrawing(); */
-    /* ClearBackground((Color){0,0,0,255}); */
-    /* Rectangle R = {100, 100, 200, 80}; */
-    /* DrawRectangleLines(R.x, R.y, R.width, R.height, (Color){255,255,0,255}); */
-    /* Vector2 MousePosition = GetMousePosition(); */
-    /* collision_result Collision = GetCollisionPointForRectangle(MousePosition, R); */
-    /* if (Collision.Count) */
-    /* { */
-    /*     DrawCircle(Collision.Collisions[0].x, Collision.Collisions[0].y, 2, (Color){255,0,255,255}); */
-    /* } */
-    /* EndDrawing(); */
-    /* return; */
-
 #if ryn_PROFILER
     ryn_BeginProfile();
 #endif
