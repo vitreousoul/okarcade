@@ -1288,10 +1288,6 @@ internal collision_result CollideEntities(game_state *GameState, entity *Entity,
                 f32 VelocityMagnitude = LengthV2(Entity->Velocity);
                 f32 AccelerationMagnitude = LengthV2(Entity->Acceleration);
 
-                /* Vector2 Deflection = AddV2(Entity->Acceleration, Collision.Normal); */
-                /* if (ENTITY_IS_PLAYER(Entity)) printf("deflection %f %f\n", Deflection.x, Deflection.y); */
-                /* f32 DeflectionAmount = LengthV2(Deflection); */
-
                 f32 MovementDistance = LengthV2(SubtractV2(EntityEndPosition, Entity->Position));
                 f32 CollisionDistance = LengthV2(SubtractV2(Collision.Collisions[0], Entity->Position));
                 f32 PercentOfTimeTaken = ClampF32(CollisionDistance / MovementDistance, 0, 1);
@@ -1301,9 +1297,8 @@ internal collision_result CollideEntities(game_state *GameState, entity *Entity,
                 {
                     if (DirectionLength > 0.01f)
                     {
-                        /* if (ENTITY_IS_PLAYER(Entity)) printf("Direction %f %f\n", Direction.x, Direction.y); */
-                        Entity->Velocity = V2(0.0f, 0.0f);//MultiplyV2S(NormalizedDirection, VelocityMagnitude);
-                        Entity->Acceleration = Direction;//V2(0.0f, 0.0f);//NormalizedDirection;
+                        Entity->Velocity = V2(0.0f, 0.0f);
+                        Entity->Acceleration  = V2(0.0f, 0.0f);
                     }
                     else
                     {
@@ -1416,7 +1411,7 @@ internal void UpdateEntities(game_state *GameState)
         for (I = 0; I < GameState->EntityCount; ++I)
         {
             entity *Entity = GameState->Entities + I;
-            b32 IsACollisionEntity = SoonestEntity == I || SoonestTestEntity == I;
+            /* b32 IsACollisionEntity = SoonestEntity == I || SoonestTestEntity == I; */
 
             /* if (!(SoonestCollision.Count && IsACollisionEntity)) */
             {
