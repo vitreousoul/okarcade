@@ -781,6 +781,7 @@ internal collision_result CollideLineAndCircle(line Line, circle Circle)
         Result.Collides = 1;
         Result.Count = 1;
         Result.Collisions[0] = CollisionPoint;
+        Result.Bounded = 1;
         /* Result.Collisions[1] = CollisionPoint1; */
     }
     else
@@ -863,6 +864,8 @@ internal collision_result CollideLineAndCircle(line Line, circle Circle)
                 CollisionYMinus >= MinY && CollisionYMinus <= MaxY)
             {
                 Result.Collisions[Result.Count++] = V2(CollisionXMinus, CollisionYMinus);
+                Result.Count = 1;
+                Result.Bounded = 1;
             }
         }
     }
@@ -1225,19 +1228,19 @@ internal collision_result CollideEntities(game_state *GameState, entity *Entity,
         b32 EntityInCircle3 = IsPointInsideCircle(Entity->Position, C3);
         b32 EntityEndInCircle3 = IsPointInsideCircle(EntityEndPosition, C3);
 
-        b32 CollideR0 = EntityPositionInRectangle0 || EntityEndPositionInRectangle0;
-        b32 CollideR1 = EntityPositionInRectangle1 || EntityEndPositionInRectangle1;
-        /* b32 CollideR0 = !EntityPositionInRectangle0 && EntityEndPositionInRectangle0; */
-        /* b32 CollideR1 = !EntityPositionInRectangle1 && EntityEndPositionInRectangle1; */
+        /* b32 CollideR0 = EntityPositionInRectangle0 || EntityEndPositionInRectangle0; */
+        /* b32 CollideR1 = EntityPositionInRectangle1 || EntityEndPositionInRectangle1; */
+        b32 CollideR0 = !EntityPositionInRectangle0 && EntityEndPositionInRectangle0;
+        b32 CollideR1 = !EntityPositionInRectangle1 && EntityEndPositionInRectangle1;
 
-        b32 CollideC0 = EntityInCircle0 || EntityEndInCircle0;
-        b32 CollideC1 = EntityInCircle1 || EntityEndInCircle1;
-        b32 CollideC2 = EntityInCircle2 || EntityEndInCircle2;
-        b32 CollideC3 = EntityInCircle3 || EntityEndInCircle3;
-        /* b32 CollideC0 = !EntityInCircle0 && EntityEndInCircle0; */
-        /* b32 CollideC1 = !EntityInCircle1 && EntityEndInCircle1; */
-        /* b32 CollideC2 = !EntityInCircle2 && EntityEndInCircle2; */
-        /* b32 CollideC3 = !EntityInCircle3 && EntityEndInCircle3; */
+        /* b32 CollideC0 = EntityInCircle0 || EntityEndInCircle0; */
+        /* b32 CollideC1 = EntityInCircle1 || EntityEndInCircle1; */
+        /* b32 CollideC2 = EntityInCircle2 || EntityEndInCircle2; */
+        /* b32 CollideC3 = EntityInCircle3 || EntityEndInCircle3; */
+        b32 CollideC0 = !EntityInCircle0 && EntityEndInCircle0;
+        b32 CollideC1 = !EntityInCircle1 && EntityEndInCircle1;
+        b32 CollideC2 = !EntityInCircle2 && EntityEndInCircle2;
+        b32 CollideC3 = !EntityInCircle3 && EntityEndInCircle3;
 
         if (CollideR0)
         {
