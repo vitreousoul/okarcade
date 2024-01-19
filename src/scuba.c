@@ -1108,8 +1108,10 @@ internal entity_movement GetEntityMovement(entity *Entity, f32 DeltaTime)
     f32 AccelerationThreshold = 0.0001f;
     f32 VelocityThreshold = 1.0f;
 
-    if ((LengthSquaredV2(Entity->Acceleration) > AccelerationThreshold ||
-         LengthSquaredV2(Entity->Velocity) > VelocityThreshold))
+    b32 HasSufficientVelocity = LengthSquaredV2(Entity->Velocity) > VelocityThreshold;
+    b32 HasSufficientAcceleration = LengthSquaredV2(Entity->Acceleration) > AccelerationThreshold;
+
+    if (HasSufficientVelocity || HasSufficientAcceleration)
     {
         f32 AccelerationScale = 1000.0f;
         f32 DT = DeltaTime;
@@ -1285,6 +1287,9 @@ internal collision_result CollideEntities(game_state *GameState, entity *Entity,
                 Vector2 NormalizedDirection = NormalizeV2(Direction);
                 f32 DirectionLength = LengthV2(Direction);
 
+                Vector2 CollisionToOldPosition = SubtractV2(Entity->Position, Collision.Collisions[0]);
+                Vector2 FudgeFactor = MultiplyV2S(NormalizeV2(CollisionToOldPosition), 1.0f);
+
                 f32 VelocityMagnitude = LengthV2(Entity->Velocity);
                 f32 AccelerationMagnitude = LengthV2(Entity->Acceleration);
 
@@ -1297,8 +1302,9 @@ internal collision_result CollideEntities(game_state *GameState, entity *Entity,
                 {
                     if (DirectionLength > 0.01f)
                     {
-                        Entity->Velocity = V2(0.0f, 0.0f);
-                        Entity->Acceleration  = V2(0.0f, 0.0f);
+                        Entity->Position = AddV2(Collision.Collisions[0], FudgeFactor);
+                        Entity->Velocity = V2(0.0f, 0.0f);//MultiplyV2S(NormalizedDirection, VelocityMagnitude);
+                        Entity->Acceleration = V2(0.0f, 0.0f);//MultiplyV2S(NormalizedDirection, AccelerationMagnitude);
                     }
                     else
                     {
