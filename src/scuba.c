@@ -1140,23 +1140,40 @@ internal entity_movement GetEntityMovement(entity *Entity, f32 DeltaTime)
 
 internal void UpdateEntity(game_state *GameState, entity *Entity, f32 DeltaTime)
 {
+    /* TODO: Fix bug where entity (really only the player-entity for now) still has velocity even though it has stopped moving. This is due to the way we only add entity-movement to the entity velocity/acceleration. */
     ryn_BEGIN_TIMED_BLOCK(TB_UpdateEntity);
     entity_movement Movement = GetEntityMovement(Entity, DeltaTime);
 
-    f32 Threshold = 0.8f;
+    Vector2 OldVelocity = Entity->Velocity;
 
-    if(LengthSquaredV2(Movement.Position) < Threshold)
+    f32 Threshold = 1.8f;
+
+    f32 MovementPositionDelta = LengthSquaredV2(Movement.Position);
+    f32 MovementVelocityDelta = LengthSquaredV2(Movement.Velocity);
+
+    b32 MovementPositionIsSmall = MovementPositionDelta < Threshold;
+    b32 MovementVelocityIsSmall = MovementVelocityDelta < Threshold;
+
+    if (MovementPositionIsSmall && MovementVelocityIsSmall)
     {
-        Movement.Position = V2(0.0f, 0.0f);
+        Entity->Velocity = V2(0.0f, 0.0f);
+    }
+    else
+    {
+        if (MovementPositionIsSmall)
+        {
+            Movement.Position = V2(0.0f, 0.0f);
+        }
+
+        if (MovementVelocityIsSmall)
+        {
+            Movement.Velocity = V2(0.0f, 0.0f);
+        }
+
+        Entity->Velocity = AddV2(Entity->Velocity, Movement.Velocity);
+        Entity->Position = AddV2(Entity->Position, Movement.Position);
     }
 
-    if(LengthSquaredV2(Movement.Velocity) < Threshold)
-    {
-        Movement.Velocity = V2(0.0f, 0.0f);
-    }
-
-    Entity->Velocity = AddV2(Entity->Velocity, Movement.Velocity);
-    Entity->Position = AddV2(Entity->Position, Movement.Position);
     ryn_END_TIMED_BLOCK(TB_UpdateEntity);
 }
 
@@ -1228,19 +1245,28 @@ internal collision_result CollideEntities(game_state *GameState, entity *Entity,
         b32 EntityInCircle3 = IsPointInsideCircle(Entity->Position, C3);
         b32 EntityEndInCircle3 = IsPointInsideCircle(EntityEndPosition, C3);
 
-        /* b32 CollideR0 = EntityPositionInRectangle0 || EntityEndPositionInRectangle0; */
-        /* b32 CollideR1 = EntityPositionInRectangle1 || EntityEndPositionInRectangle1; */
+#if 0
+        b32 CollideR0 = EntityPositionInRectangle0 || EntityEndPositionInRectangle0;
+        b32 CollideR1 = EntityPositionInRectangle1 || EntityEndPositionInRectangle1;
+        b32 CollideC0 = EntityInCircle0 || EntityEndInCircle0;
+        b32 CollideC1 = EntityInCircle1 || EntityEndInCircle1;
+        b32 CollideC2 = EntityInCircle2 || EntityEndInCircle2;
+        b32 CollideC3 = EntityInCircle3 || EntityEndInCircle3;
+#elif 1
+        b32 CollideR0 = EntityEndPositionInRectangle0;
+        b32 CollideR1 = EntityEndPositionInRectangle1;
+        b32 CollideC0 = EntityEndInCircle0;
+        b32 CollideC1 = EntityEndInCircle1;
+        b32 CollideC2 = EntityEndInCircle2;
+        b32 CollideC3 = EntityEndInCircle3;
+#else
         b32 CollideR0 = !EntityPositionInRectangle0 && EntityEndPositionInRectangle0;
         b32 CollideR1 = !EntityPositionInRectangle1 && EntityEndPositionInRectangle1;
-
-        /* b32 CollideC0 = EntityInCircle0 || EntityEndInCircle0; */
-        /* b32 CollideC1 = EntityInCircle1 || EntityEndInCircle1; */
-        /* b32 CollideC2 = EntityInCircle2 || EntityEndInCircle2; */
-        /* b32 CollideC3 = EntityInCircle3 || EntityEndInCircle3; */
         b32 CollideC0 = !EntityInCircle0 && EntityEndInCircle0;
         b32 CollideC1 = !EntityInCircle1 && EntityEndInCircle1;
         b32 CollideC2 = !EntityInCircle2 && EntityEndInCircle2;
         b32 CollideC3 = !EntityInCircle3 && EntityEndInCircle3;
+#endif
 
         if (CollideR0)
         {
@@ -1305,7 +1331,7 @@ internal collision_result CollideEntities(game_state *GameState, entity *Entity,
                 {
                     if (DirectionLength > 0.01f)
                     {
-                        Entity->Position = AddV2(Collision.Collisions[0], FudgeFactor);
+                        /* Entity->Position = AddV2(Collision.Collisions[0], FudgeFactor); */
                         Entity->Velocity = V2(0.0f, 0.0f);//MultiplyV2S(NormalizedDirection, VelocityMagnitude);
                         Entity->Acceleration = V2(0.0f, 0.0f);//MultiplyV2S(NormalizedDirection, AccelerationMagnitude);
                     }
@@ -1404,7 +1430,7 @@ internal void UpdateEntities(game_state *GameState)
             }
         }
 
-        f32 NewRemainingTime;
+        f32 NewRemainingTime = -1.0f;
 
         if (SoonestCollision.Count)
         {
