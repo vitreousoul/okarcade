@@ -667,10 +667,10 @@ internal minkowski_circle_and_rectangle MinkowskiSumCircleAndRectangle(circle Ci
     Shape.Circles[2] = (circle){RX + RW, RY + RH, CR};
     Shape.Circles[3] = (circle){RX,      RY + RH, CR};
 
-    Shape.Lines[0] = (line){RX - CR,      RY,           RX - CR,      RY + RH};
-    Shape.Lines[1] = (line){RX + RW + CR, RY,           RX + RW + CR, RY + RH};
-    Shape.Lines[2] = (line){RX,           RY - CR,      RX + RW,      RY - CR};
-    Shape.Lines[2] = (line){RX,           RY + RH + CR, RX + RW,      RY + RH + CR};
+    Shape.Lines[0] = (line){{RX - CR,      RY},           {RX - CR,      RY + RH}};
+    Shape.Lines[1] = (line){{RX + RW + CR, RY},           {RX + RW + CR, RY + RH}};
+    Shape.Lines[2] = (line){{RX,           RY - CR},      {RX + RW,      RY - CR}};
+    Shape.Lines[2] = (line){{RX,           RY + RH + CR}, {RX + RW,      RY + RH + CR}};
 
     Shape.Rectangles[0] = R2(RX - CR, RY,      RW + CD, RH);
     Shape.Rectangles[1] = R2(RX,      RY - CR, RW,      RH + CD);
@@ -1144,8 +1144,6 @@ internal void UpdateEntity(game_state *GameState, entity *Entity, f32 DeltaTime)
     ryn_BEGIN_TIMED_BLOCK(TB_UpdateEntity);
     entity_movement Movement = GetEntityMovement(Entity, DeltaTime);
 
-    Vector2 OldVelocity = Entity->Velocity;
-
     f32 Threshold = 1.8f;
 
     f32 MovementPositionDelta = LengthSquaredV2(Movement.Position);
@@ -1197,15 +1195,12 @@ internal Rectangle GetSpriteRectangle(entity *Entity)
 internal collision_result CollideEntities(game_state *GameState, entity *Entity, entity *TestEntity, f32 DeltaTime, b32 ShouldUpdateEntities)
 {
     collision_result Result = {0};
-    f32 NearestCollisionDistance = 999999999999.0f;
-
-    Color DebugColor = (Color){255,255,0,255};
 
     collision_area *Area = Entity->CollisionArea;
     collision_area *TestArea = TestEntity->CollisionArea;
 
     entity_movement EntityMovement = GetEntityMovement(Entity, DeltaTime);
-    entity_movement TestEntityMovement = GetEntityMovement(TestEntity, DeltaTime);
+    /* entity_movement TestEntityMovement = GetEntityMovement(TestEntity, DeltaTime); */
 
     Vector2 EntityEndPosition = AddV2(Entity->Position, EntityMovement.Position);
 
@@ -1227,22 +1222,22 @@ internal collision_result CollideEntities(game_state *GameState, entity *Entity,
 
         collision_result Collision = {0};
 
-        b32 EntityPositionInRectangle0 = IsPointInsideRectangle(Entity->Position, R0);
+        /* b32 EntityPositionInRectangle0 = IsPointInsideRectangle(Entity->Position, R0); */
         b32 EntityEndPositionInRectangle0 = IsPointInsideRectangle(EntityEndPosition, R0);
 
-        b32 EntityPositionInRectangle1 = IsPointInsideRectangle(Entity->Position, R1);
+        /* b32 EntityPositionInRectangle1 = IsPointInsideRectangle(Entity->Position, R1); */
         b32 EntityEndPositionInRectangle1 = IsPointInsideRectangle(EntityEndPosition, R1);
 
-        b32 EntityInCircle0 = IsPointInsideCircle(Entity->Position, C0);
+        /* b32 EntityInCircle0 = IsPointInsideCircle(Entity->Position, C0); */
         b32 EntityEndInCircle0 = IsPointInsideCircle(EntityEndPosition, C0);
 
-        b32 EntityInCircle1 = IsPointInsideCircle(Entity->Position, C1);
+        /* b32 EntityInCircle1 = IsPointInsideCircle(Entity->Position, C1); */
         b32 EntityEndInCircle1 = IsPointInsideCircle(EntityEndPosition, C1);
 
-        b32 EntityInCircle2 = IsPointInsideCircle(Entity->Position, C2);
+        /* b32 EntityInCircle2 = IsPointInsideCircle(Entity->Position, C2); */
         b32 EntityEndInCircle2 = IsPointInsideCircle(EntityEndPosition, C2);
 
-        b32 EntityInCircle3 = IsPointInsideCircle(Entity->Position, C3);
+        /* b32 EntityInCircle3 = IsPointInsideCircle(Entity->Position, C3); */
         b32 EntityEndInCircle3 = IsPointInsideCircle(EntityEndPosition, C3);
 
 #if 0
@@ -1313,14 +1308,20 @@ internal collision_result CollideEntities(game_state *GameState, entity *Entity,
                 Vector2 OffsetNormal = AddV2(Collision.Normal, EntityEndPosition);
                 Vector2 Projection = ProjectV2(EntityEndPosition, Entity->Position, OffsetNormal);
                 Vector2 Direction = SubtractV2(Projection, Entity->Position);
+
+                f32 DirectionThreshold = 0.1f;
+                if (Direction.x < DirectionThreshold && Direction.x > -DirectionThreshold)
+                {
+                    Direction.x = 0.0f;
+                }
+
+                if (Direction.y < DirectionThreshold && Direction.y > -DirectionThreshold)
+                {
+                    Direction.y = 0.0f;
+                }
+
                 Vector2 NormalizedDirection = NormalizeV2(Direction);
                 f32 DirectionLength = LengthV2(Direction);
-
-                Vector2 CollisionToOldPosition = SubtractV2(Entity->Position, Collision.Collisions[0]);
-                Vector2 FudgeFactor = MultiplyV2S(NormalizeV2(CollisionToOldPosition), 1.0f);
-
-                f32 VelocityMagnitude = LengthV2(Entity->Velocity);
-                f32 AccelerationMagnitude = LengthV2(Entity->Acceleration);
 
                 f32 MovementDistance = LengthV2(SubtractV2(EntityEndPosition, Entity->Position));
                 f32 CollisionDistance = LengthV2(SubtractV2(Collision.Collisions[0], Entity->Position));
@@ -1331,9 +1332,12 @@ internal collision_result CollideEntities(game_state *GameState, entity *Entity,
                 {
                     if (DirectionLength > 0.01f)
                     {
-                        /* Entity->Position = AddV2(Collision.Collisions[0], FudgeFactor); */
-                        Entity->Velocity = V2(0.0f, 0.0f);//MultiplyV2S(NormalizedDirection, VelocityMagnitude);
-                        Entity->Acceleration = V2(0.0f, 0.0f);//MultiplyV2S(NormalizedDirection, AccelerationMagnitude);
+                        Vector2 AbsNormalDirection = AbsV2(NormalizedDirection);
+                        Vector2 DivertedAcceleration = MultiplyV2(AbsNormalDirection, Entity->Acceleration);
+                        Vector2 DivertedVelocity = MultiplyV2(AbsNormalDirection, Entity->Velocity);
+
+                        Entity->Velocity = DivertedVelocity;
+                        Entity->Acceleration = DivertedAcceleration;
                     }
                     else
                     {
@@ -1345,7 +1349,8 @@ internal collision_result CollideEntities(game_state *GameState, entity *Entity,
         }
         else
         {
-            Result.TimeTaken = DeltaTime + 0.1f;
+            /* Result.TimeTaken = DeltaTime + 0.1f; */
+            Result.TimeTaken = DeltaTime;
         }
     }
     else if (Area->Type == collision_type_Circle && TestArea->Type == collision_type_Circle)
