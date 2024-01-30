@@ -29,11 +29,12 @@ int SCREEN_HEIGHT = 700;
 
 #define PI_OVER_2 (PI/2.0f)
 
-#define DEBUG_DRAW_COLLISIONS 1
+#define DEBUG_DRAW_COLLISIONS 0
 
 #define TEXTURE_MAP_SCALE 4
 #define MAX_ENTITY_COUNT 256
 #define MAX_COLLISION_AREA_COUNT 512
+#define MAX_COLLISION_GEOMETRY_COUNT 128
 #define MAX_DELTA_TIME (1.0f/50.0f)
 
 global_variable Color BackgroundColor = (Color){22, 102, 92, 255};
@@ -204,7 +205,7 @@ typedef struct
 
     sprite Sprites[ENTITY_SPRITE_COUNT];
 
-    collision_area *CollisionArea;
+    s32 CollisionAreaIndex;
 } entity;
 
 #define ENTITY_IS_PLAYER(e) ((e)->Sprites[0].Type == sprite_type_Fish)
@@ -237,9 +238,9 @@ typedef struct
 
     s32 CollisionAreaCount;
     collision_area CollisionAreas[MAX_COLLISION_AREA_COUNT];
+    collision_area CollisionGeometry[MAX_COLLISION_GEOMETRY_COUNT];
 
     Vector2 CameraPosition;
-
     entity *PlayerEntity;
 
     Texture2D ScubaTexture;
@@ -451,21 +452,22 @@ internal void DrawFrameRateHistory(void)
 }
 /* END Debug frame-rate historgram */
 
-internal collision_area *AddCollisionArea(game_state *GameState)
+internal s32 AddCollisionArea(game_state *GameState)
 {
     collision_area *CollisionArea = 0;
     collision_area NullArea = {0};
 
-    Assert(GameState->CollisionAreaCount < MAX_COLLISION_AREA_COUNT);
+    s32 Index = GameState->CollisionAreaCount;
+    Assert(Index < MAX_COLLISION_AREA_COUNT);
 
-    if (GameState->CollisionAreaCount < MAX_COLLISION_AREA_COUNT)
+    if (Index < MAX_COLLISION_AREA_COUNT)
     {
-        CollisionArea = GameState->CollisionAreas + GameState->CollisionAreaCount;
-        *CollisionArea = NullArea;
+        collision_area *Area = GameState->CollisionAreas + Index;
+        *(Area) = NullArea;
         GameState->CollisionAreaCount += 1;
     }
 
-    return CollisionArea;
+    return Index;
 }
 
 
@@ -491,9 +493,9 @@ internal entity *AddEntity(game_state *GameState, sprite_type SpriteType)
             Entity->Sprites[0].SourceRectangle = R2(5,3,12,9);
             Entity->Sprites[0].DepthZ = 2;
             Entity->Position = V2(0.0f, 0.0f);
-            Entity->CollisionArea = AddCollisionArea(GameState);
-            Entity->CollisionArea->Type = collision_type_Circle;
-            Entity->CollisionArea->Circle = (circle){0.0f, -3.0f, 15.0f};
+            Entity->CollisionAreaIndex = AddCollisionArea(GameState);
+            GameState->CollisionAreas[Entity->CollisionAreaIndex].Type = collision_type_Circle;
+            GameState->CollisionAreas[Entity->CollisionAreaIndex].Circle = (circle){0.0f, -3.0f, 15.0f};
         } break;
         case sprite_type_Eel:
         {
@@ -503,9 +505,9 @@ internal entity *AddEntity(game_state *GameState, sprite_type SpriteType)
             Entity->Sprites[0].SourceRectangle = R2(1,27,34,20);
             Entity->Sprites[0].DepthZ = 1;
             Entity->Position = V2(0.0f, 0.0f);
-            Entity->CollisionArea = AddCollisionArea(GameState);
-            Entity->CollisionArea->Type = collision_type_Circle;
-            Entity->CollisionArea->Circle = (circle){40.0f, 20.0f, 32.0f};
+            Entity->CollisionAreaIndex = AddCollisionArea(GameState);
+            GameState->CollisionAreas[Entity->CollisionAreaIndex].Type = collision_type_Circle;
+            GameState->CollisionAreas[Entity->CollisionAreaIndex].Circle = (circle){40.0f, 20.0f, 32.0f};
         } break;
         case sprite_type_Coral:
         {
@@ -525,8 +527,8 @@ internal entity *AddEntity(game_state *GameState, sprite_type SpriteType)
             Entity->Sprites[0].SourceRectangle = R2(13,147,TILE_SIZE,TILE_SIZE);
             Entity->Sprites[0].DepthZ = -1;
             /* TODO: Clean up the way we do collision area definition */
-            Entity->CollisionArea = AddCollisionArea(GameState);
-            collision_area *Area = Entity->CollisionArea;
+            Entity->CollisionAreaIndex = AddCollisionArea(GameState);
+            collision_area *Area = GameState->CollisionAreas + Entity->CollisionAreaIndex;
             Area->Type = collision_type_Rectangle;
             Area->Rectangle = R2(-TileHalfScale, -TileHalfScale, TileScale, TileScale);
         } break;
@@ -541,9 +543,9 @@ internal entity *AddEntity(game_state *GameState, sprite_type SpriteType)
             Entity->Sprites[1].SourceRectangle = R2(90,101,110,70);
             Entity->Sprites[1].DepthZ = 3;
             Entity->Position = V2(0.0f, 0.0f);
-            Entity->CollisionArea = AddCollisionArea(GameState);
-            Entity->CollisionArea->Type = collision_type_Circle;
-            Entity->CollisionArea->Circle = (circle){0.0f, 0.0f, 162.0f};
+            Entity->CollisionAreaIndex = AddCollisionArea(GameState);
+            GameState->CollisionAreas[Entity->CollisionAreaIndex].Type = collision_type_Circle;
+            GameState->CollisionAreas[Entity->CollisionAreaIndex].Circle = (circle){0.0f, 0.0f, 162.0f};
         } break;
         case sprite_type_Crab:
         {
@@ -553,9 +555,9 @@ internal entity *AddEntity(game_state *GameState, sprite_type SpriteType)
             Entity->Sprites[0].SourceRectangle = R2(14,69,39,20);
             Entity->Sprites[0].DepthZ = 1;
             Entity->Position = MultiplyV2S(V2(9.0f, 7.0f), TILE_SIZE * TEXTURE_MAP_SCALE);
-            Entity->CollisionArea = AddCollisionArea(GameState);
-            Entity->CollisionArea->Type = collision_type_Circle;
-            Entity->CollisionArea->Circle = (circle){0.0f, 0.0f, 32.0f};
+            Entity->CollisionAreaIndex = AddCollisionArea(GameState);
+            GameState->CollisionAreas[Entity->CollisionAreaIndex].Type = collision_type_Circle;
+            GameState->CollisionAreas[Entity->CollisionAreaIndex].Circle = (circle){0.0f, 0.0f, 32.0f};
         } break;
         default: break;
         }
@@ -647,6 +649,26 @@ internal inline line GetOffsetLine(line Line, Vector2 Offset)
 internal inline Rectangle GetOffsetRectangle(Rectangle R, Vector2 Offset)
 {
     Rectangle Result = (Rectangle){R.x + Offset.x, R.y + Offset.y, R.width, R.height};
+    return Result;
+}
+
+internal inline collision_area GetOffsetCollisionArea(collision_area Area, Vector2 Offset)
+{
+    collision_area Result = Area;
+
+    switch (Area.Type)
+    {
+    case collision_type_Circle:
+        Result.Circle = GetOffsetCircle(Area.Circle, Offset);
+        break;
+    case collision_type_Line:
+        Result.Line = GetOffsetLine(Area.Line, Offset);
+        break;
+    case collision_type_Rectangle:
+        Result.Rectangle = GetOffsetRectangle(Area.Rectangle, Offset);
+        break;
+    }
+
     return Result;
 }
 
@@ -970,6 +992,8 @@ internal collision_result GetCollisionPointForRectangle(Vector2 P, Rectangle R)
 
     f32 MinimumDistance = 99999999999.0f;
 
+    s32 CollisionI;
+
     for (s32 I = 0; I < 4; ++I)
     {
         collision_result Collision = CollideLineAndLine(Line, Lines[I]);
@@ -983,6 +1007,7 @@ internal collision_result GetCollisionPointForRectangle(Vector2 P, Rectangle R)
                 MinimumDistance = Distance;
                 Result = Collision;
                 Result.Normal = Normals[I];
+                CollisionI = I;
             }
         }
     }
@@ -1196,10 +1221,10 @@ internal collision_result CollideEntities(game_state *GameState, entity *Entity,
 {
     collision_result Result = {0};
 
-    collision_area *Area = Entity->CollisionArea;
-    collision_area *TestArea = TestEntity->CollisionArea;
+    collision_area *Area = GameState->CollisionAreas + Entity->CollisionAreaIndex;
+    collision_area *TestArea = GameState->CollisionAreas + TestEntity->CollisionAreaIndex;
 
-    entity_movement EntityMovement = GetEntityMovement(Entity, DeltaTime);
+    entity_movement EntityMovement = GetEntityMovement(Entity, DeltaTime); /* TODO: Maybe we should pass in the entity movement? */
     /* entity_movement TestEntityMovement = GetEntityMovement(TestEntity, DeltaTime); */
 
     Vector2 EntityEndPosition = AddV2(Entity->Position, EntityMovement.Position);
@@ -1361,6 +1386,138 @@ internal collision_result CollideEntities(game_state *GameState, entity *Entity,
     return Result;
 }
 
+internal b32 EntityRectanglesOverlap(entity *Entity, entity *TestEntity, f32 DeltaTime)
+{
+    entity_movement EntityMovement = GetEntityMovement(Entity, DeltaTime); /* TODO: Maybe we should pass in the movements? */
+    entity_movement TestEntityMovement = GetEntityMovement(TestEntity, DeltaTime);
+
+    Rectangle EntitySourceRectangle = GetSpriteRectangle(Entity);
+    Vector2 RectanglePosition = V2(EntitySourceRectangle.x, EntitySourceRectangle.y);
+    Rectangle RectangleStart = R2(RectanglePosition.x, RectanglePosition.y, EntitySourceRectangle.width, EntitySourceRectangle.height);
+    RectanglePosition = AddV2(RectanglePosition, EntityMovement.Position);
+    Rectangle RectangleEnd = R2(RectanglePosition.x, RectanglePosition.y, EntitySourceRectangle.width, EntitySourceRectangle.height);
+
+    Rectangle TestEntitySourceRectangle = GetSpriteRectangle(TestEntity);
+    Vector2 TestRectanglePosition = V2(TestEntitySourceRectangle.x, TestEntitySourceRectangle.y);
+    Rectangle TestRectangleStart = R2(TestRectanglePosition.x, TestRectanglePosition.y, TestEntitySourceRectangle.width, TestEntitySourceRectangle.height);
+    TestRectanglePosition = AddV2(TestRectanglePosition, TestEntityMovement.Position);
+    Rectangle TestRectangleEnd = R2(TestRectanglePosition.x, TestRectanglePosition.y, TestEntitySourceRectangle.width, TestEntitySourceRectangle.height);
+
+    b32 StartRectanglesCollide = CollideRectangles(RectangleStart, TestRectangleStart);
+    b32 EndRectanglesCollide = CollideRectangles(RectangleEnd, TestRectangleEnd);
+    b32 Result = StartRectanglesCollide || EndRectanglesCollide;
+
+    return Result;
+}
+
+internal void AddCollisionGeometry(game_state *GameState, collision_area *Area)
+{
+    f32 Threshold = 1.0f;
+    b32 RemovedGeometry = 0;
+    s32 FirstFreeIndex = -1;
+
+    /* NOTE: Try to find overlapping geometry, which should then be removed. */
+    for (s32 I = 0; I < MAX_COLLISION_GEOMETRY_COUNT; ++I)
+    {
+        collision_area *TestArea = GameState->CollisionGeometry + I;
+
+        if (!TestArea->Type)
+        {
+            if (FirstFreeIndex < 0)
+            {
+                FirstFreeIndex = I;
+            }
+        }
+        else
+        {
+            if (Area->Type == collision_type_Line)
+            {
+                f32 Distance00 = LengthSquaredV2(SubtractV2(Area->Line.Start, TestArea->Line.Start));
+                f32 Distance01 = LengthSquaredV2(SubtractV2(Area->Line.Start, TestArea->Line.End));
+                f32 Distance10 = LengthSquaredV2(SubtractV2(Area->Line.End, TestArea->Line.Start));
+                f32 Distance11 = LengthSquaredV2(SubtractV2(Area->Line.End, TestArea->Line.End));
+
+                if ((Distance00 < Threshold && Distance11 < Threshold) ||
+                    (Distance10 < Threshold && Distance01 < Threshold))
+                {
+                    RemovedGeometry = 1;
+                    GameState->CollisionGeometry[I].Type = 0;
+                    break;
+                }
+            }
+        }
+    }
+
+    if (FirstFreeIndex >= 0 && !RemovedGeometry)
+    {
+        if (Area->Type == collision_type_Line)
+        {
+            GameState->CollisionGeometry[FirstFreeIndex] = *Area;
+        }
+    }
+}
+
+internal void GatherCollisionGeometry(game_state *GameState, s32 EntityIndex, entity_movement EntityMovement, f32 DeltaTime)
+{
+    entity *Entity = GameState->Entities + EntityIndex;
+    collision_area *Area = GameState->CollisionAreas + Entity->CollisionAreaIndex;
+
+    /* NOTE: Clear the collision geometry array. */
+    for (s32 I = 0; I < MAX_COLLISION_GEOMETRY_COUNT; ++I)
+    {
+        GameState->CollisionGeometry[I].Type = 0;
+    }
+
+    s32 CollisionGeometryIndex = 0;
+
+    for (s32 I = 0; I < GameState->EntityCount; ++I)
+    {
+        entity *TestEntity = GameState->Entities + I;
+        collision_area *TestArea = GameState->CollisionAreas + TestEntity->CollisionAreaIndex;
+        collision_area OffsetArea = GetOffsetCollisionArea(*TestArea, TestEntity->Position);
+
+        if (!TestEntity->Sprites[0].Type)
+        {
+            continue;
+        }
+
+        b32 EntitiesOverlap = EntityRectanglesOverlap(Entity, TestEntity, DeltaTime);
+        b32 EntityNotSelf = I != EntityIndex;
+
+        if (EntitiesOverlap && EntityNotSelf)
+        {
+            if (Area->Type == collision_type_Circle && TestArea->Type == collision_type_Rectangle)
+            {
+                Rectangle R = OffsetArea.Rectangle;
+
+                Vector2 Point0 = V2(R.x,           R.y);
+                Vector2 Point1 = V2(R.x + R.width, R.y);
+                Vector2 Point2 = V2(R.x + R.width, R.y + R.height);
+                Vector2 Point3 = V2(R.x,           R.y + R.height);
+
+                line Lines[4] = {
+                    (line){Point0, Point1},
+                    (line){Point1, Point2},
+                    (line){Point2, Point3},
+                    (line){Point3, Point0}
+                };
+
+                for (s32 J = 0; J < 4; ++J)
+                {
+                    line Line = Lines[J];
+
+                    collision_area NewArea = (collision_area){collision_type_Line, Line};
+                    AddCollisionGeometry(GameState, &NewArea);
+                }
+            }
+            else
+            {
+                Assert(0);
+            }
+        }
+    }
+}
+
 internal void UpdateEntities(game_state *GameState)
 {
     f32 RemainingTime = GameState->DeltaTime;
@@ -1374,11 +1531,13 @@ internal void UpdateEntities(game_state *GameState)
         s32 SoonestEntity = -1;
         s32 SoonestTestEntity = -1;
         s32 I, J;
+        s32 EntityWasCheckedForCollision;
 
         for (I = 0; I < GameState->EntityCount; ++I)
         {
             entity *Entity = GameState->Entities + I;
             b32 EntityIsMoveable = Entity->MovementType == entity_movement_type_Moveable;
+            EntityWasCheckedForCollision = 0;
 
             if (!Entity->Sprites[0].Type)
             {
@@ -1397,26 +1556,13 @@ internal void UpdateEntities(game_state *GameState)
                 }
 
                 entity_movement EntityMovement = GetEntityMovement(Entity, RemainingTime);
-                entity_movement TestEntityMovement = GetEntityMovement(TestEntity, RemainingTime);
 
-                Rectangle EntitySourceRectangle = GetSpriteRectangle(Entity);
-                Vector2 RectanglePosition = V2(EntitySourceRectangle.x, EntitySourceRectangle.y);
-                Rectangle RectangleStart = R2(RectanglePosition.x, RectanglePosition.y, EntitySourceRectangle.width, EntitySourceRectangle.height);
-                RectanglePosition = AddV2(RectanglePosition, EntityMovement.Position);
-                Rectangle RectangleEnd = R2(RectanglePosition.x, RectanglePosition.y, EntitySourceRectangle.width, EntitySourceRectangle.height);
-
-                Rectangle TestEntitySourceRectangle = GetSpriteRectangle(TestEntity);
-                Vector2 TestRectanglePosition = V2(TestEntitySourceRectangle.x, TestEntitySourceRectangle.y);
-                Rectangle TestRectangleStart = R2(TestRectanglePosition.x, TestRectanglePosition.y, TestEntitySourceRectangle.width, TestEntitySourceRectangle.height);
-                TestRectanglePosition = AddV2(TestRectanglePosition, TestEntityMovement.Position);
-                Rectangle TestRectangleEnd = R2(TestRectanglePosition.x, TestRectanglePosition.y, TestEntitySourceRectangle.width, TestEntitySourceRectangle.height);
-
-                b32 StartRectanglesCollide = CollideRectangles(RectangleStart, TestRectangleStart);
-                b32 EndRectanglesCollide = CollideRectangles(RectangleEnd, TestRectangleEnd);
+                b32 EntitiesOverlap = EntityRectanglesOverlap(Entity, TestEntity, RemainingTime);
                 b32 EntitiesAreNotTheSame = I != J;
 
-                if ((StartRectanglesCollide || EndRectanglesCollide) && EntitiesAreNotTheSame)
+                if (EntitiesOverlap && EntitiesAreNotTheSame)
                 {
+#if 0
                     collision_result Collision = CollideEntities(GameState, Entity, TestEntity, RemainingTime, 0);
 
                     if (Collision.Count)
@@ -1431,6 +1577,36 @@ internal void UpdateEntities(game_state *GameState)
                             SoonestTestEntity = J;
                         }
                     }
+#else
+                    EntityWasCheckedForCollision = 1;
+                    GatherCollisionGeometry(GameState, I, EntityMovement, RemainingTime);
+
+                    s32 K;
+                    for (K = 0; K < MAX_COLLISION_GEOMETRY_COUNT; ++K)
+                    {
+                        collision_area Area = GameState->CollisionGeometry[K];
+                        switch (Area.Type)
+                        {
+                        case collision_type_Circle:
+                            Assert(0);
+                            PushDebugCircle(WorldToScreenCircle(GameState, GetOffsetCircle(Area.Circle, TestEntity->Position)), (Color){0,255,255,140});
+                            break;
+                        case collision_type_Line:
+                            PushDebugLine(WorldToScreenLine(GameState, Area.Line), (Color){0,255,255,140});
+                            break;
+                        case collision_type_Rectangle:
+                            Assert(0);
+                            PushDebugRectangle(WorldToScreenRectangle(GameState, GetOffsetRectangle(Area.Rectangle, TestEntity->Position)), (Color){255,0,255,140});
+                            break;
+                        }
+                    }
+#endif
+                }
+
+                if (EntityWasCheckedForCollision)
+                {
+                    /* NOTE: We break here because GatherGeometry finishing looping through entities to find the remaining colliders. */
+                    break;
                 }
             }
         }
@@ -1535,18 +1711,18 @@ internal void ResetGame(game_state *GameState)
         entity *PlayerEntity = GameState->PlayerEntity;
         PlayerEntity->Position = MultiplyV2S(V2(1.0f, 1.0f), TILE_SIZE * TEXTURE_MAP_SCALE);
 
-        entity *EelEntity = AddEntity(GameState, sprite_type_Eel);
-        EelEntity->Position = MultiplyV2S(V2(0.25f, 4.0f), TILE_SIZE * TEXTURE_MAP_SCALE);
+        /* entity *EelEntity = AddEntity(GameState, sprite_type_Eel); */
+        /* EelEntity->Position = MultiplyV2S(V2(0.25f, 4.0f), TILE_SIZE * TEXTURE_MAP_SCALE); */
 
-        entity *CrabEntity = AddEntity(GameState, sprite_type_Crab);
-        CrabEntity->Position = MultiplyV2S(V2(9.0f, 7.0f), TILE_SIZE * TEXTURE_MAP_SCALE);
+        /* entity *CrabEntity = AddEntity(GameState, sprite_type_Crab); */
+        /* CrabEntity->Position = MultiplyV2S(V2(9.0f, 7.0f), TILE_SIZE * TEXTURE_MAP_SCALE); */
 
         /* TODO: Fix z-sorting, so that the front of the cage is in front of entities
                  like the player and the crab. The easiest way is probably to split
                  the cage into two entities, with their own individual depths.
         */
-        entity *CageEntity = AddEntity(GameState, sprite_type_Cage);
-        CageEntity->Position = MultiplyV2S(V2(9.0f, 7.0f), TILE_SIZE * TEXTURE_MAP_SCALE);
+        /* entity *CageEntity = AddEntity(GameState, sprite_type_Cage); */
+        /* CageEntity->Position = MultiplyV2S(V2(9.0f, 7.0f), TILE_SIZE * TEXTURE_MAP_SCALE); */
 
         for (s32 J = 0; J < MAP_HEIGHT; ++J)
         {
