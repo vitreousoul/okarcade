@@ -50,7 +50,7 @@ typedef struct
     Vector2 Size;
     Vector2 Offset;
 
-    b32 UpdateTurtlePosition;
+    b32 UpdateTurtlePosition; /* TODO: Replace UpdateTurtlePosition with a more generic name for "mouse realeased" */
 } tablet;
 
 typedef struct
