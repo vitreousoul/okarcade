@@ -99,9 +99,20 @@ typedef struct
 
 typedef struct
 {
-    f32 X;
-    f32 Y;
-    f32 R;
+    union
+    {
+        struct
+        {
+            f32 X;
+            f32 Y;
+            f32 R;
+        };
+        struct
+        {
+            Vector2 XY;
+            f32 _Space;
+        };
+    };
 } circle;
 
 typedef struct
@@ -1021,6 +1032,23 @@ internal collision_result GetCollisionPointForRectangle(Vector2 P, Rectangle R)
     return Result;
 }
 
+internal collision_result GetCollisionPointForCircle(Vector2 P, circle Circle)
+{
+    collision_result Result = {0};
+
+    Vector2 CirclePosition = Circle.XY;
+    Vector2 Direction = SubtractV2(P, CirclePosition);
+    Vector2 NormalDirection = NormalizeV2(Direction);
+    Vector2 Offset = MultiplyV2S(NormalDirection, Circle.R);
+
+    Result.Count = 1;
+    Result.Collides = 1;
+    Result.Collisions[0] = AddV2(CirclePosition, Offset);
+    Result.Normal = NormalDirection;
+
+    return Result;
+}
+
 internal collision_result CollideCircleAndCircle(circle FirstCircle, circle SecondCircle)
 {
     /*
@@ -1133,6 +1161,14 @@ internal f32 GetWhichSideOfALine(Vector2 Point, line Line)
     }
 
     return WhichSide;
+}
+
+internal f32 GetSignedDistanceFromCircle(Vector2 P, circle Circle)
+{
+    f32 Distance = LengthV2(SubtractV2(P, Circle.XY));
+    f32 SignedDistance = Distance - Circle.R;
+
+    return SignedDistance;
 }
 
 internal entity_movement GetEntityMovement(entity *Entity, f32 DeltaTime)
@@ -1254,6 +1290,9 @@ internal collision_result CollideEntity(game_state *GameState, entity *Entity, f
                 line Line2 = (line){CircleAndLine.Lines[0].Start, CircleAndLine.Lines[1].Start};
                 line Line3 = (line){CircleAndLine.Lines[0].End, CircleAndLine.Lines[1].End};
 
+                circle Circle0 = CircleAndLine.Circles[0];
+                circle Circle1 = CircleAndLine.Circles[1];
+
                 f32 WhichSide0 = GetWhichSideOfALine(EntityEndPosition, Line0);
                 f32 WhichSide1 = GetWhichSideOfALine(EntityEndPosition, Line1);
                 f32 WhichSide2 = GetWhichSideOfALine(EntityEndPosition, Line2);
@@ -1262,8 +1301,22 @@ internal collision_result CollideEntity(game_state *GameState, entity *Entity, f
                 b32 IsBetweenLines = (WhichSide0 < 0.0f && WhichSide1 > 0.0f) || (WhichSide0 > 0.0f && WhichSide1 < 0.0f);
                 b32 IsWithinTheEndsOfTheLines = (WhichSide2 < 0.0f && WhichSide3 > 0.0f) || (WhichSide2 > 0.0f && WhichSide3 < 0.0f);
 
+                /* b32 EntityEndInCircle0 = IsPointInsideCircle(EntityEndPosition, Circle0); */
+                /* b32 EntityEndInCircle1 = IsPointInsideCircle(EntityEndPosition, Circle1); */
+
+                f32 SignedDistanceCircle0 = GetSignedDistanceFromCircle(EntityEndPosition, Circle0);
+                f32 SignedDistanceCircle1 = GetSignedDistanceFromCircle(EntityEndPosition, Circle1);
+
                 if (IsBetweenLines && IsWithinTheEndsOfTheLines)
                 {
+#if DEBUG_DRAW_COLLISIONS
+                    if (ShouldUpdateEntities)
+                    {
+                        PushDebugLine(WorldToScreenLine(GameState, Line0), (Color){255,0,255,255});
+                        PushDebugLine(WorldToScreenLine(GameState, Line1), (Color){255,0,255,255});
+                    }
+#endif
+
                     Result.Count = 1;
                     Result.Collides = 1;
                     Vector2 Projection;
@@ -1288,61 +1341,80 @@ internal collision_result CollideEntity(game_state *GameState, entity *Entity, f
                         Result.Collisions[0] = Projection;
                         Result.Normal = Normal;
                     }
+                }
+                else if (SignedDistanceCircle0 < 0.0f)
+                {
+                    collision_result Collision = GetCollisionPointForCircle(EntityEndPosition, Circle0);
+                    f32 CollisionDistance = AbsF32(SignedDistanceCircle0);
 
-                    if (ShouldUpdateEntities)
+                    if (CollisionDistance < MinimumDistance)
                     {
-                        PushDebugLine(WorldToScreenLine(GameState, Line0), (Color){255,0,255,255});
-                        PushDebugLine(WorldToScreenLine(GameState, Line1), (Color){255,0,255,255});
+                        MinimumDistance = CollisionDistance;
+                        Result = Collision;
+                    }
+                }
+                else if (SignedDistanceCircle1 < 0.0f)
+                {
+                    collision_result Collision = GetCollisionPointForCircle(EntityEndPosition, Circle1);
+                    f32 CollisionDistance = AbsF32(SignedDistanceCircle1);
 
-                        Assert(LengthV2(Result.Normal) > 0.00001f);
-                        Vector2 OffsetNormal = AddV2(Result.Normal, EntityEndPosition);
-                        Vector2 Projection = ProjectV2(EntityEndPosition, Entity->Position, OffsetNormal);
-                        Vector2 Direction = SubtractV2(Projection, Entity->Position);
-
-                        f32 DirectionThreshold = 0.1f;
-                        if (Direction.x < DirectionThreshold && Direction.x > -DirectionThreshold)
-                        {
-                            Direction.x = 0.0f;
-                        }
-
-                        if (Direction.y < DirectionThreshold && Direction.y > -DirectionThreshold)
-                        {
-                            Direction.y = 0.0f;
-                        }
-
-                        Vector2 NormalizedDirection = NormalizeV2(Direction);
-                        f32 DirectionLength = LengthV2(Direction);
-
-                        f32 MovementDistance = LengthV2(SubtractV2(EntityEndPosition, Entity->Position));
-                        f32 CollisionDistance = LengthV2(SubtractV2(Result.Collisions[0], Entity->Position));
-                        f32 PercentOfTimeTaken = ClampF32(CollisionDistance / MovementDistance, 0, 1);
-                        Result.TimeTaken = DeltaTime * PercentOfTimeTaken;
-
-                        if (ENTITY_IS_PLAYER(Entity))
-                        {
-                            if (DirectionLength > 0.01f)
-                            {
-                                Vector2 AbsNormalDirection = AbsV2(NormalizedDirection);
-                                Vector2 DivertedAcceleration = MultiplyV2(AbsNormalDirection, Entity->Acceleration);
-                                Vector2 DivertedVelocity = MultiplyV2(AbsNormalDirection, Entity->Velocity);
-
-                                /* TODO: Set entity position to just outside of the collision point. */
-                                /* Entity->Position = Result.Collisions[0]; */
-                                Entity->Velocity = DivertedVelocity;
-                                Entity->Acceleration = DivertedAcceleration;
-                            }
-                            else
-                            {
-                                Entity->Velocity = V2(0.0f, 0.0f);
-                                Entity->Acceleration = V2(0.0f, 0.0f);
-                            }
-                        }
-
+                    if (CollisionDistance < MinimumDistance)
+                    {
+                        MinimumDistance = CollisionDistance;
+                        Result = Collision;
                     }
                 }
             } break;
             default:
                 break;
+            }
+        }
+
+        if (ShouldUpdateEntities)
+        {
+            Assert(LengthV2(Result.Normal) > 0.00001f);
+            Vector2 OffsetNormal = AddV2(Result.Normal, EntityEndPosition);
+            Vector2 Projection = ProjectV2(EntityEndPosition, Entity->Position, OffsetNormal);
+            Vector2 Direction = SubtractV2(Projection, Entity->Position);
+
+            f32 DirectionThreshold = 0.1f;
+            if (Direction.x < DirectionThreshold && Direction.x > -DirectionThreshold)
+            {
+                Direction.x = 0.0f;
+            }
+
+            if (Direction.y < DirectionThreshold && Direction.y > -DirectionThreshold)
+            {
+                Direction.y = 0.0f;
+            }
+
+            Vector2 NormalizedDirection = NormalizeV2(Direction);
+            f32 DirectionLength = LengthV2(Direction);
+
+            f32 MovementDistance = LengthV2(SubtractV2(EntityEndPosition, Entity->Position));
+            f32 CollisionDistance = LengthV2(SubtractV2(Result.Collisions[0], Entity->Position));
+            f32 PercentOfTimeTaken = ClampF32(CollisionDistance / MovementDistance, 0, 1);
+            Result.TimeTaken = DeltaTime * PercentOfTimeTaken;
+
+            if (ENTITY_IS_PLAYER(Entity))
+            {
+                if (DirectionLength > 0.01f)
+                {
+                    Vector2 AbsNormalDirection = AbsV2(NormalizedDirection);
+                    /* Vector2 NegatedNormalDirection = MultiplyV2S(NormalizedDirection, 1.0f); */
+                    Vector2 DivertedAcceleration = MultiplyV2(AbsNormalDirection, Entity->Acceleration);
+                    Vector2 DivertedVelocity = MultiplyV2(AbsNormalDirection, Entity->Velocity);
+
+                    /* TODO: Set entity position to just outside of the collision point. */
+                    /* Entity->Position = AddV2(Result.Collisions[0], NegatedNormalDirection); */
+                    Entity->Velocity = DivertedVelocity;
+                    Entity->Acceleration = DivertedAcceleration;
+                }
+                else
+                {
+                    Entity->Velocity = V2(0.0f, 0.0f);
+                    Entity->Acceleration = V2(0.0f, 0.0f);
+                }
             }
         }
     }
@@ -1657,10 +1729,8 @@ internal void UpdateEntities(game_state *GameState)
     f32 RemainingTime = GameState->DeltaTime;
     s32 UpdateIterationCount = 0;
 
-    printf("\n");
     while (RemainingTime > 0.0f && UpdateIterationCount < 8)
     {
-        printf("rt %f\n", RemainingTime);
         UpdateIterationCount += 1;
         f32 SoonestCollisionDistance = FLT_MAX;
         collision_result SoonestCollision = {0};
@@ -1719,6 +1789,7 @@ internal void UpdateEntities(game_state *GameState)
                     for (K = 0; K < MAX_COLLISION_GEOMETRY_COUNT; ++K)
                     {
                         collision_area Area = GameState->CollisionGeometry[K];
+#if DEBUG_DRAW_COLLISIONS
                         switch (Area.Type)
                         {
                         case collision_type_Circle:
@@ -1733,6 +1804,7 @@ internal void UpdateEntities(game_state *GameState)
                             PushDebugRectangle(WorldToScreenRectangle(GameState, GetOffsetRectangle(Area.Rectangle, TestEntity->Position)), (Color){255,0,255,140});
                             break;
                         }
+#endif
                     }
 
                     collision_result Collision = CollideEntity(GameState, Entity, RemainingTime, 0);
@@ -1749,8 +1821,10 @@ internal void UpdateEntities(game_state *GameState)
                             SoonestTestEntity = J;
                         }
 
+#if DEBUG_DRAW_COLLISIONS
                         Vector2 ScreenPosition = WorldToScreenPosition(GameState, Collision.Collisions[0]);
                         PushDebugCircle((circle){ScreenPosition.x, ScreenPosition.y, 2.0f}, (Color){255,255,255,255});
+#endif
                     }
 #endif
                 }
