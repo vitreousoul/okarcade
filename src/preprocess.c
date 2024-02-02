@@ -61,6 +61,24 @@ typedef enum
 b32 PreprocessFile(pre_processor *PreProcessor, linear_allocator TempString, u8 *FilePath, u8 *OutputFilePath);
 void GenerateSite(linear_allocator *TempString);
 
+u8 *BlogPageTemplateOpen =
+    (u8 *)"<!doctype html>"                        \
+    "<html lang=\"en-us\">"                        \
+    "<head>"                                       \
+    "{| include ../src/layout/head_common.html |}" \
+    "<style>"                                      \
+    "</style>"                                     \
+    "</head>"                                      \
+    "<body>"                                       \
+    "<header>"                                     \
+    "<a href=\"/\">&lt; Back</a>"                  \
+    "</header>";
+
+u8 *BlogPageTemplateClose =
+    (u8 *)"</body>"                             \
+    "</html>";
+
+
 
 internal void SkipSpace(buffer *Buffer, s32 *Index)
 {
@@ -614,7 +632,6 @@ internal void GenerateBlogPages(linear_allocator *TempString, pre_processor *Pre
     BlogPageTemplate.Data[BlogPageTemplate.Size] = 0; /* null terminate */
 
     u64 TempStringOffset = TempString->Offset;
-
     u64 BlogListingOffset = Preprocessor->OutputAllocator.Offset;
 
     /* write each blog page */
@@ -622,6 +639,7 @@ internal void GenerateBlogPages(linear_allocator *TempString, pre_processor *Pre
     {
         File.Size = GetFileSize(CurrentFile->Name);
         File.Data = PushLinearAllocator(TempString, File.Size + 1);
+        u64 BlogPageDataOffset = Preprocessor->OutputAllocator.Offset;
 
         if (File.Data)
         {
@@ -630,16 +648,20 @@ internal void GenerateBlogPages(linear_allocator *TempString, pre_processor *Pre
 
             u64 BlogHtmlOffset = TempString->Offset;
 
+            PushString(TempString, BlogPageTemplateOpen);
+
             s32 BlogFileDataOffset = 0;
             while (HandleBlogLine(TempString, &File, &BlogFileDataOffset));
-            WriteLinearAllocator(TempString, (u8 *)"\0", 1);
+
+            PushString(TempString, BlogPageTemplateClose);
+
+            buffer BlogHtmlBuffer;
+            BlogHtmlBuffer.Data = TempString->Data + BlogHtmlOffset;
+            BlogHtmlBuffer.Size = TempString->Offset - BlogHtmlOffset;
 
             buffer BlogOutputPath = GetOutputHtmlPath(TempString, BlogDirectory, SiteBlogDirectory, CurrentFile->Name, 1, 1);
 
-            u8 *BlogHtmlData = TempString->Data + BlogHtmlOffset;
-            SetPreprocessVariable(Preprocessor, (u8 *)"BlogFile", BlogHtmlData);
-
-            b32 Error = PreprocessBuffer(Preprocessor, TempString, &BlogPageTemplate, BlogOutputPath.Data);
+            b32 Error = PreprocessBuffer(Preprocessor, TempString, &BlogHtmlBuffer, BlogOutputPath.Data);
 
             if (Error)
             {
@@ -660,8 +682,10 @@ internal void GenerateBlogPages(linear_allocator *TempString, pre_processor *Pre
 
         for (file_list *CurrentFile = SortedFileList; CurrentFile; CurrentFile = CurrentFile->Next)
         {
+            buffer BlogOutputPath = GetOutputHtmlPath(TempString, BlogDirectory, (u8 *)"/blog", CurrentFile->Name, 1, 1);
+
             PushString(OutputAllocator, (u8 *)"<li><a href=\"");
-            PushString(OutputAllocator, (u8 *)"#");
+            PushString(OutputAllocator, BlogOutputPath.Data);
             PushString(OutputAllocator, (u8 *)"\">");
             PushString(OutputAllocator, CurrentFile->Name);
             PushString(OutputAllocator, (u8 *)"</a></li>\n");
