@@ -103,7 +103,7 @@ internal u8 *CodePageBegin(void)
                 "</style>"                                                         \
             "</head>"                                                              \
             "<body>"                                                               \
-                "{" "| include ../src/layout/code_page_header.html |" "}"          \
+                "{" "| include ../src/layout/navigation_header.html |" "}"         \
                 "<pre>"                                                            \
                     "{" "|" "#HERE" "DOC \n");
 }

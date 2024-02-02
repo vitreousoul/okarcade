@@ -70,9 +70,7 @@ u8 *BlogPageTemplateOpen =
     "</style>"                                     \
     "</head>"                                      \
     "<body>"                                       \
-    "<header>"                                     \
-    "<a href=\"/\">&lt; Back</a>"                  \
-    "</header>";
+    "{| include ../src/layout/navigation_header.html |}";
 
 u8 *BlogPageTemplateClose =
     (u8 *)"</body>"                             \
