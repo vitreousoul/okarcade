@@ -1,5 +1,6 @@
 pre {
     padding: 1rem;
-    background-color: rgb(229, 235, 229);
+    background-color: #3b491f;
+    color: #f9e7c9;
     white-space: pre-wrap;
 }
