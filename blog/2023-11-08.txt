@@ -3,6 +3,6 @@
 
 This is a paragraph.
 
-#image ../assets/some_image.png
+#image /assets/scuba.png
 
 This is another paragraph.

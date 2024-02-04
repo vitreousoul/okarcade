@@ -65,6 +65,7 @@ date GetDate(void);
 buffer *ReadFileIntoBuffer(u8 *FilePath);
 u64 GetFileSize(u8 *FilePath);
 u64 ReadFileIntoData(u8 *FilePath, u8 *Bytes, u64 MaxBytes);
+u64 ReadFileIntoAllocator(linear_allocator *LinearAllocator, u8 *FilePath);
 void FreeBuffer(buffer *Buffer);
 void WriteFile(u8 *FilePath, u8 *Data, size Size);
 void WriteFileFromBuffer(u8 *FilePath, buffer *Buffer);
@@ -322,6 +323,30 @@ u64 ReadFileIntoData(u8 *FilePath, u8 *Bytes, u64 MaxBytes)
     fclose(File);
 
     return FileSize;
+}
+
+u64 ReadFileIntoAllocator(linear_allocator *Allocator, u8 *FilePath)
+{
+    u64 BytesWritten = 0;
+    u64 FileSize = GetFileSize(FilePath);
+    u64 AllocatorSpace = Allocator->Capacity - Allocator->Offset;
+
+    if (!FileSize)
+    {
+        printf("Error in ReadFileIntoAllocator getting file size\n");
+    }
+    else if (FileSize <= AllocatorSpace)
+    {
+        FILE *File = fopen((char *)FilePath, "rb");
+        u8 *Data = Allocator->Data + Allocator->Offset;
+
+        fread(Data, 1, FileSize, File);
+        fclose(File);
+
+        BytesWritten = FileSize;
+    }
+
+    return BytesWritten;
 }
 
 void FreeBuffer(buffer *Buffer)

@@ -703,8 +703,11 @@ void GenerateSite(linear_allocator *TempString)
     u8 *GenDirectory =       (u8 *)"../gen";
     u8 *CodePagesDirectory = (u8 *)"../gen/code_pages";
 
+    u8 *AssetsDirectory = (u8 *)"../assets";
+
     u8 *SiteDirectory =     (u8 *)"../site";
     u8 *SiteBlogDirectory = (u8 *)"../site/blog";
+    u8 *SiteAssetsDirectory = (u8 *)"../site/assets";
 
     u8 *IndexIn =  (u8 *)"../src/layout/index.html";
     u8 *IndexOut = (u8 *)"../site/index.html";
@@ -726,8 +729,18 @@ void GenerateSite(linear_allocator *TempString)
 
     EnsureDirectoryExists(GenDirectory);
     EnsureDirectoryExists(CodePagesDirectory);
+    EnsureDirectoryExists(AssetsDirectory);
     EnsureDirectoryExists(SiteDirectory);
     EnsureDirectoryExists(SiteBlogDirectory);
+    EnsureDirectoryExists(SiteAssetsDirectory);
+
+    { /* Copy some ../assets into ../site/assets. */
+        /* TODO: Put asset mappings into some kind of data structure and loop thoough it? */
+        u64 OldAllocatorOffset = TempString->Offset;
+        u64 FileSize = ReadFileIntoAllocator(TempString, (u8 *)"../assets/scuba.png");
+        WriteFile((u8 *)"../site/assets/scuba.png", TempString->Data + OldAllocatorOffset, FileSize);
+        TempString->Offset = OldAllocatorOffset;
+    }
 
     GenerateCodePages(TempString);
 
