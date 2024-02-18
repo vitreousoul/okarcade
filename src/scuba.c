@@ -167,6 +167,7 @@ typedef enum
 {
     entity_movement_type_None,
     entity_movement_type_Moveable,
+    entity_movement_type_NoCollide,
 } entity_movement_type; /* TODO: maybe these should be flags? */
 
 typedef struct
@@ -512,7 +513,7 @@ internal entity *AddEntity(game_state *GameState, sprite_type SpriteType)
         case sprite_type_Eel:
         {
             Entity->Type = entity_type_Base;
-            Entity->MovementType = entity_movement_type_Moveable;
+            Entity->MovementType = entity_movement_type_NoCollide;
             Entity->Sprites[0].Type = SpriteType;
             Entity->Sprites[0].SourceRectangle = R2(1,27,34,20);
             Entity->Sprites[0].DepthZ = 1;
@@ -1268,9 +1269,11 @@ internal collision_result CollideEntity(game_state *GameState, entity *Entity, f
     entity_movement EntityMovement = GetEntityMovement(Entity, DeltaTime); /* TODO: Maybe we should pass in the entity movement? */
     Vector2 EntityEndPosition = AddV2(Entity->Position, EntityMovement.Position);
 
+    b32 EntityDoesNotCollide = Entity->MovementType == entity_movement_type_NoCollide;
+
     Assert(Area->Type == collision_type_Circle);
 
-    if (Area->Type == collision_type_Circle)
+    if (!EntityDoesNotCollide && Area->Type == collision_type_Circle)
     {
         f32 MinimumDistance = 999999999999999.0f;
         f32 SignedDistance = 0.0f;
@@ -1718,7 +1721,6 @@ internal void GatherCollisionGeometry(game_state *GameState, s32 EntityIndex, f3
             }
             else
             {
-                Assert(0);
             }
         }
     }
@@ -1937,8 +1939,8 @@ internal void ResetGame(game_state *GameState)
         entity *PlayerEntity = GameState->PlayerEntity;
         PlayerEntity->Position = MultiplyV2S(V2(1.0f, 1.0f), TILE_SIZE * TEXTURE_MAP_SCALE);
 
-        /* entity *EelEntity = AddEntity(GameState, sprite_type_Eel); */
-        /* EelEntity->Position = MultiplyV2S(V2(0.25f, 4.0f), TILE_SIZE * TEXTURE_MAP_SCALE); */
+        entity *EelEntity = AddEntity(GameState, sprite_type_Eel);
+        EelEntity->Position = MultiplyV2S(V2(0.25f, 4.0f), TILE_SIZE * TEXTURE_MAP_SCALE);
 
         /* entity *CrabEntity = AddEntity(GameState, sprite_type_Crab); */
         /* CrabEntity->Position = MultiplyV2S(V2(9.0f, 7.0f), TILE_SIZE * TEXTURE_MAP_SCALE); */
