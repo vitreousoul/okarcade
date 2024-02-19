@@ -26,6 +26,8 @@ Rectangle MultiplyR2S(Rectangle Rect, f32 S);
 
 f32 LengthSquaredV2(Vector2 Vector);
 f32 LengthV2(Vector2 Vector);
+f32 DistanceSquaredV2(Vector2 A, Vector2 B);
+f32 DistanceV2(Vector2 A, Vector2 B);
 
 Vector2 NormalizeV2(Vector2 Vector);
 
@@ -67,6 +69,18 @@ f32 LengthSquaredV2(Vector2 Vector)
 f32 LengthV2(Vector2 Vector)
 {
     f32 Result = sqrt(Vector.x * Vector.x + Vector.y * Vector.y);
+
+    return Result;
+}
+
+f32 DistanceSquaredV2(Vector2 A, Vector2 B)
+{
+    return LengthSquaredV2(SubtractV2(A, B));
+}
+
+f32 DistanceV2(Vector2 A, Vector2 B)
+{
+    f32 Result = sqrt(LengthSquaredV2(SubtractV2(A, B)));
 
     return Result;
 }

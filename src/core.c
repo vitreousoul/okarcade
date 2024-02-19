@@ -22,6 +22,8 @@ internal void Assert_(b32 Proposition, char *FilePath, s32 LineNumber)
     }
 }
 
+#define NotImplemented Assert(0)
+
 b32 StringsEqual(u8 *StringA, u8 *StringB)
 {
     s32 AreEqual = 1;

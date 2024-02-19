@@ -168,7 +168,8 @@ typedef enum
     entity_movement_type_None,
     entity_movement_type_Moveable,
     entity_movement_type_NoCollide,
-} entity_movement_type; /* TODO: maybe these should be flags? */
+    entity_movement_type_Monorail,
+} entity_movement_type;
 
 typedef struct
 {
@@ -215,6 +216,10 @@ typedef struct
     Vector2 Position;
     Vector2 Velocity;
     Vector2 Acceleration;
+
+    b32 MonorailTowardsStart;
+    Vector2 MonorailStart;
+    Vector2 MonorailEnd;
 
     sprite Sprites[ENTITY_SPRITE_COUNT];
 
@@ -513,7 +518,7 @@ internal entity *AddEntity(game_state *GameState, sprite_type SpriteType)
         case sprite_type_Eel:
         {
             Entity->Type = entity_type_Base;
-            Entity->MovementType = entity_movement_type_NoCollide;
+            Entity->MovementType = entity_movement_type_Monorail;
             Entity->Sprites[0].Type = SpriteType;
             Entity->Sprites[0].SourceRectangle = R2(1,27,34,20);
             Entity->Sprites[0].DepthZ = 1;
@@ -1210,34 +1215,80 @@ internal void UpdateEntity(game_state *GameState, entity *Entity, f32 DeltaTime)
 {
     /* TODO: Fix bug where entity (really only the player-entity for now) still has velocity even though it has stopped moving. This is due to the way we only add entity-movement to the entity velocity/acceleration. */
     ryn_BEGIN_TIMED_BLOCK(TB_UpdateEntity);
-    entity_movement Movement = GetEntityMovement(Entity, DeltaTime);
 
-    f32 Threshold = 1.8f;
-
-    f32 MovementPositionDelta = LengthSquaredV2(Movement.Position);
-    f32 MovementVelocityDelta = LengthSquaredV2(Movement.Velocity);
-
-    b32 MovementPositionIsSmall = MovementPositionDelta < Threshold;
-    b32 MovementVelocityIsSmall = MovementVelocityDelta < Threshold;
-
-    if (MovementPositionIsSmall && MovementVelocityIsSmall)
+    switch (Entity->MovementType)
     {
-        Entity->Velocity = V2(0.0f, 0.0f);
-    }
-    else
+    case entity_movement_type_Moveable:
     {
-        if (MovementPositionIsSmall)
+        entity_movement Movement = GetEntityMovement(Entity, DeltaTime);
+
+        f32 Threshold = 1.8f;
+
+        f32 MovementPositionDelta = LengthSquaredV2(Movement.Position);
+        f32 MovementVelocityDelta = LengthSquaredV2(Movement.Velocity);
+
+        b32 MovementPositionIsSmall = MovementPositionDelta < Threshold;
+        b32 MovementVelocityIsSmall = MovementVelocityDelta < Threshold;
+
+        if (MovementPositionIsSmall && MovementVelocityIsSmall)
         {
-            Movement.Position = V2(0.0f, 0.0f);
+            Entity->Velocity = V2(0.0f, 0.0f);
+        }
+        else
+        {
+            if (MovementPositionIsSmall)
+            {
+                Movement.Position = V2(0.0f, 0.0f);
+            }
+
+            if (MovementVelocityIsSmall)
+            {
+                Movement.Velocity = V2(0.0f, 0.0f);
+            }
+
+            Entity->Velocity = AddV2(Entity->Velocity, Movement.Velocity);
+            Entity->Position = AddV2(Entity->Position, Movement.Position);
+        }
+    } break;
+    case entity_movement_type_Monorail:
+    {
+        f32 CloseEnough = 10.0f;
+
+        Vector2 TowardsStart = SubtractV2(Entity->MonorailStart, Entity->Position);
+        Vector2 TowardsEnd = SubtractV2(Entity->MonorailEnd, Entity->Position);
+        f32 DistanceFromStart = LengthV2(TowardsStart);
+        f32 DistanceFromEnd = LengthV2(TowardsEnd);
+
+        if (Entity->MonorailTowardsStart)
+        {
+            if (DistanceFromStart < CloseEnough)
+            {
+                Entity->MonorailTowardsStart = 0;
+                Entity->Acceleration = NormalizeV2(TowardsEnd);
+            }
+            else
+            {
+                Entity->Acceleration = NormalizeV2(TowardsStart);
+            }
+        }
+        else
+        {
+            if (DistanceFromEnd < CloseEnough)
+            {
+                Entity->MonorailTowardsStart = 1;
+                Entity->Acceleration = NormalizeV2(TowardsStart);
+            }
+            else
+            {
+                Entity->Acceleration = NormalizeV2(TowardsEnd);
+            }
         }
 
-        if (MovementVelocityIsSmall)
-        {
-            Movement.Velocity = V2(0.0f, 0.0f);
-        }
-
+        entity_movement Movement = GetEntityMovement(Entity, DeltaTime);
         Entity->Velocity = AddV2(Entity->Velocity, Movement.Velocity);
         Entity->Position = AddV2(Entity->Position, Movement.Position);
+    } break;
+    default: break;
     }
 
     ryn_END_TIMED_BLOCK(TB_UpdateEntity);
@@ -1941,6 +1992,8 @@ internal void ResetGame(game_state *GameState)
 
         entity *EelEntity = AddEntity(GameState, sprite_type_Eel);
         EelEntity->Position = MultiplyV2S(V2(0.25f, 4.0f), TILE_SIZE * TEXTURE_MAP_SCALE);
+        EelEntity->MonorailStart = EelEntity->Position;
+        EelEntity->MonorailEnd = AddV2(EelEntity->Position, V2(50.0f, 0.0f));
 
         /* entity *CrabEntity = AddEntity(GameState, sprite_type_Crab); */
         /* CrabEntity->Position = MultiplyV2S(V2(9.0f, 7.0f), TILE_SIZE * TEXTURE_MAP_SCALE); */
