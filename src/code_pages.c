@@ -259,8 +259,9 @@ internal path_parts GetPathParts(linear_allocator *TempString, u8 *Path)
     {
         if (!Path[I])
         {
+            u64 PathStringSize = I - Begin + 1; /* NOTE: Add one, and assume that Path is null-terminated. */
             u8 *WriteLocation = GetLinearAllocatorWriteLocation(TempString);
-            s32 WriteError = WriteLinearAllocator(TempString, Path + Begin, I - Begin);
+            s32 WriteError = WriteLinearAllocator(TempString, Path + Begin, PathStringSize);
 
             if (WriteError)
             {
