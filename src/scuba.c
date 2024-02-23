@@ -266,6 +266,15 @@ typedef struct
 } game_state;
 
 /* BEGIN Debug Draw Commands */
+global_variable b32 DebugPause;
+global_variable b32 DebugCopyGameState;
+
+#define DebugGameStatesCountLog2 6
+#define DebugGameStatesCount (1 << DebugGameStatesCountLog2)
+#define DebugGameStatesMask (DebugGameStatesCount - 1)
+global_variable game_state DebugGameStates[DebugGameStatesCount];
+global_variable s32 DebugGameStatesIndex;
+
 typedef enum
 {
    debug_draw_type_Circle,
@@ -594,6 +603,8 @@ internal entity *AddEntity(game_state *GameState, sprite_type SpriteType)
 
 internal void HandleUserInput(game_state *GameState)
 {
+    DebugCopyGameState = 0;
+
     GameState->UI.MousePosition = GetMousePosition();
     GameState->UI.MouseButtonPressed = IsMouseButtonPressed(0);
     GameState->UI.MouseButtonReleased = IsMouseButtonReleased(0);
@@ -621,6 +632,30 @@ internal void HandleUserInput(game_state *GameState)
     if (IsKeyDown(KEY_W))
     {
         Acceleration->y -= 1.0f;
+    }
+
+    if (IsKeyPressed(KEY_P))
+    {
+        DebugPause = !DebugPause;
+
+        if (DebugPause)
+        {
+            DebugCopyGameState = 1;
+        }
+    }
+
+    if (DebugPause)
+    {
+        if (IsKeyPressed(KEY_LEFT) || IsKeyDown(KEY_LEFT_SHIFT) && IsKeyDown(KEY_LEFT))
+        {
+            DebugGameStatesIndex = (DebugGameStatesIndex - 1) & DebugGameStatesMask;
+            DebugCopyGameState = 1;
+        }
+        else if (IsKeyPressed(KEY_RIGHT) || IsKeyDown(KEY_LEFT_SHIFT) && IsKeyDown(KEY_RIGHT))
+        {
+            DebugGameStatesIndex = (DebugGameStatesIndex + 1) & DebugGameStatesMask;
+            DebugCopyGameState = 1;
+        }
     }
 
     GameState->Input.KeyboardEnter = IsKeyDown(KEY_ENTER);
@@ -1441,7 +1476,7 @@ internal collision_result CollideEntity(game_state *GameState, entity *Entity, f
         if (ShouldUpdateEntities && ENTITY_IS_PLAYER(Entity) && LengthV2(Result.Normal) > 0.00001f)
         {
             Assert(LengthV2(Result.Normal) > 0.00001f); /* TODO: Fix normals for circular collision_areas. */
-            printf("%f %f\n", Result.Normal.x, Result.Normal.y);
+
             Vector2 OffsetNormal = AddV2(Result.Normal, EntityEndPosition);
             Vector2 Projection = ProjectV2(EntityEndPosition, Entity->Position, OffsetNormal);
             Vector2 Direction = SubtractV2(Projection, Entity->Position);
@@ -1987,49 +2022,74 @@ internal void UpdateAndRender(void *VoidGameState)
     } break;
     case game_mode_Play:
     {
-        if (!IsTextureReady(GameState->ScubaTexture))
+        /* TODO: Get rid of control flow involving debug state, so that debug code can be compiled out. */
+        if (DebugPause)
         {
-            break;
-        }
+            printf("DebugGameStatesIndex %d\n", DebugGameStatesIndex);
+            game_state *DebugGameState = &DebugGameStates[DebugGameStatesIndex];
 
-        f32 StartTime = GetTime();
+            ClearBackground(BackgroundColor);
 
-        { /* update timer */
-            f32 DeltaTime = StartTime - GameState->LastTime;
-            RecordFrameRate(DeltaTime);
-            GameState->DeltaTime = MinF32(MAX_DELTA_TIME, DeltaTime);
-            GameState->LastTime = StartTime;
-        }
-
-        { /* update entities */
-            UpdateEntities(GameState);
-            GameState->CameraPosition = GameState->PlayerEntity->Position;
-        }
-
-        if (GameState->PlayerEntity->Health == 0)
-        {
-            GameState->Mode = game_mode_GameOver;
-        }
-
-        ClearBackground(BackgroundColor);
-
-        { /* draw entities */
-            ryn_BEGIN_TIMED_BLOCK(TB_DrawEntities);
-            for (s32 I = 0; I < GameState->EntityCount; ++I)
-            {
-                s32 EntityIndex = GameState->SortedEntityTable[I];
-                Assert(EntityIndex >= 0 && EntityIndex < MAX_ENTITY_COUNT);
-                entity *Entity = GameState->Entities + EntityIndex;
-                DrawSprite(GameState, Entity);
+            { /* draw entities */
+                ryn_BEGIN_TIMED_BLOCK(TB_DrawEntities);
+                for (s32 I = 0; I < DebugGameState->EntityCount; ++I)
+                {
+                    s32 EntityIndex = DebugGameState->SortedEntityTable[I];
+                    Assert(EntityIndex >= 0 && EntityIndex < MAX_ENTITY_COUNT);
+                    entity *Entity = DebugGameState->Entities + EntityIndex;
+                    /* if (ENTITY_IS_PLAYER(Entity)) printf("%f %f\n", Entity->Position.x, Entity->Position.y); */
+                    DrawSprite(DebugGameState, Entity);
+                }
+                ryn_END_TIMED_BLOCK(TB_DrawEntities);
             }
-            ryn_END_TIMED_BLOCK(TB_DrawEntities);
         }
+        else
+        {
 
-        { /* debug graphics */
-            ryn_BEGIN_TIMED_BLOCK(TB_DebugGraphics);
-            RenderDebugDrawCommands();
-            DrawFrameRateHistory();
-            ryn_END_TIMED_BLOCK(TB_DebugGraphics);
+            if (!IsTextureReady(GameState->ScubaTexture))
+            {
+                break;
+            }
+
+            f32 StartTime = GetTime();
+
+            { /* update timer */
+                f32 DeltaTime = StartTime - GameState->LastTime;
+                RecordFrameRate(DeltaTime);
+                GameState->DeltaTime = MinF32(MAX_DELTA_TIME, DeltaTime);
+                GameState->LastTime = StartTime;
+            }
+
+            { /* update entities */
+                UpdateEntities(GameState);
+                GameState->CameraPosition = GameState->PlayerEntity->Position;
+            }
+
+            if (GameState->PlayerEntity->Health == 0)
+            {
+                GameState->Mode = game_mode_GameOver;
+            }
+
+            ClearBackground(BackgroundColor);
+
+            { /* draw entities */
+                ryn_BEGIN_TIMED_BLOCK(TB_DrawEntities);
+                for (s32 I = 0; I < GameState->EntityCount; ++I)
+                {
+                    s32 EntityIndex = GameState->SortedEntityTable[I];
+                    Assert(EntityIndex >= 0 && EntityIndex < MAX_ENTITY_COUNT);
+                    entity *Entity = GameState->Entities + EntityIndex;
+                    DrawSprite(GameState, Entity);
+                }
+                ryn_END_TIMED_BLOCK(TB_DrawEntities);
+            }
+
+            { /* debug graphics */
+                ryn_BEGIN_TIMED_BLOCK(TB_DebugGraphics);
+                RenderDebugDrawCommands();
+                DrawFrameRateHistory();
+                ryn_END_TIMED_BLOCK(TB_DebugGraphics);
+            }
         }
     } break;
     default: break;
@@ -2037,6 +2097,10 @@ internal void UpdateAndRender(void *VoidGameState)
 
     ryn_END_TIMED_BLOCK(TB_UpdateAndRender);
 #if ryn_PROFILER
+    if (!DebugPause) {
+        DebugGameStatesIndex = (DebugGameStatesIndex + 1) & DebugGameStatesMask;
+        DebugGameStates[DebugGameStatesIndex] = *GameState;
+    }
     ryn_EndProfile();
 #endif
 
