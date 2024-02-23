@@ -103,14 +103,16 @@ internal u8 *CodePageBegin(void)
                 "</style>"                                                         \
             "</head>"                                                              \
             "<body>"                                                               \
-                "{" "| include ../src/layout/navigation_header.html |" "}"         \
-                "<pre>"                                                            \
-                    "{" "|" "#HERE" "DOC \n");
+        /* TODO: move hard-coded style */
+                "<div style=\"padding: 1rem\">"                                    \
+                    "{" "| include ../src/layout/navigation_header.html |" "}"     \
+                        "<pre>"                                                    \
+                            "{" "|" "#HERE" "DOC \n");
 }
 
 internal u8 *CodePageEnd(void)
 {
-    return (u8 *)"HERE" "DOC</pre></body></html>";
+    return (u8 *)"HERE" "DOC</pre></div></body></html>";
 }
 
 internal void PushNullTerminator(linear_allocator *Allocator)

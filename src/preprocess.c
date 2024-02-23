@@ -70,10 +70,13 @@ u8 *BlogPageTemplateOpen =
     "</style>"                                     \
     "</head>"                                      \
     "<body>"                                       \
+    /* TODO: Remove hard-coded style */
+    "<div style=\"padding: 1rem;\">"               \
     "{| include ../src/layout/navigation_header.html |}";
 
 u8 *BlogPageTemplateClose =
     (u8 *)"</body>"                             \
+    "</div>"                                    \
     "</html>";
 
 
