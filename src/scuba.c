@@ -2025,7 +2025,6 @@ internal void UpdateAndRender(void *VoidGameState)
         /* TODO: Get rid of control flow involving debug state, so that debug code can be compiled out. */
         if (DebugPause)
         {
-            printf("DebugGameStatesIndex %d\n", DebugGameStatesIndex);
             game_state *DebugGameState = &DebugGameStates[DebugGameStatesIndex];
 
             ClearBackground(BackgroundColor);
@@ -2037,7 +2036,7 @@ internal void UpdateAndRender(void *VoidGameState)
                     s32 EntityIndex = DebugGameState->SortedEntityTable[I];
                     Assert(EntityIndex >= 0 && EntityIndex < MAX_ENTITY_COUNT);
                     entity *Entity = DebugGameState->Entities + EntityIndex;
-                    /* if (ENTITY_IS_PLAYER(Entity)) printf("%f %f\n", Entity->Position.x, Entity->Position.y); */
+
                     DrawSprite(DebugGameState, Entity);
                 }
                 ryn_END_TIMED_BLOCK(TB_DrawEntities);
