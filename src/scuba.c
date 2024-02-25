@@ -1308,13 +1308,17 @@ internal void UpdateEntity(game_state *GameState, entity *Entity, f32 DeltaTime)
     {
         entity_movement Movement = GetEntityMovement(Entity, DeltaTime);
 
-        f32 Threshold = 1.8f;
+        f32 Threshold = 0.01f;
 
-        f32 MovementPositionDelta = LengthSquaredV2(Movement.Position);
-        f32 MovementVelocityDelta = LengthSquaredV2(Movement.Velocity);
+        f32 MovementPositionDelta = LengthV2(Movement.Position);
+        f32 MovementVelocityDelta = LengthV2(Movement.Velocity);
 
         b32 MovementPositionIsSmall = MovementPositionDelta < Threshold;
         b32 MovementVelocityIsSmall = MovementVelocityDelta < Threshold;
+
+#if DEBUG_DRAW_COLLISIONS
+        PushDebugLine(WorldToScreenLine(GameState, (line){Entity->Position, AddV2(Entity->Position, Movement.Position)}), (Color){255,255,255,255});
+#endif
 
         if (MovementPositionIsSmall && MovementVelocityIsSmall)
         {
@@ -1780,11 +1784,6 @@ internal void UpdateEntities(game_state *GameState)
                             SoonestEntity = I;
                             SoonestTestEntity = J;
                         }
-
-#if DEBUG_DRAW_COLLISIONS
-                        Vector2 ScreenPosition = WorldToScreenPosition(GameState, Collision.Collisions[0]);
-                        PushDebugCircle((circle){ScreenPosition.x, ScreenPosition.y, 2.0f}, (Color){255,255,255,255});
-#endif
                     }
                 }
 
@@ -1824,6 +1823,10 @@ internal void UpdateEntities(game_state *GameState)
             {
                 UpdateEntity(GameState, Entity, RemainingTime);
             }
+            else
+            {
+                UpdateEntity(GameState, Entity, GameState->DeltaTime);
+            }
         }
 
         if (NewRemainingTime > 0.0001f)
@@ -1833,16 +1836,6 @@ internal void UpdateEntities(game_state *GameState)
         else
         {
             RemainingTime = -1.0f;
-        }
-    }
-
-    for (s32 I = 0; I < GameState->EntityCount; ++I)
-    {
-        entity *Entity = GameState->Entities + I;
-
-        if (Entity->MovementType == entity_movement_type_Monorail)
-        {
-            UpdateEntity(GameState, Entity, GameState->DeltaTime);
         }
     }
 }
@@ -2266,10 +2259,9 @@ int main(void)
 
         for (;;)
         {
-            b32 ShouldCloseWindow = WindowShouldClose() && !IsKeyPressed(KEY_ESCAPE);
-            b32 IsQuitMode = GameState.Mode == game_mode_Quit;
+            b32 ShouldCloseWindow = WindowShouldClose();
 
-            if (ShouldCloseWindow || IsQuitMode)
+            if (ShouldCloseWindow)
             {
                 break;
             }
