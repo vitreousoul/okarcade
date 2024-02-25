@@ -269,6 +269,9 @@ typedef struct
 global_variable b32 DebugPause;
 global_variable b32 DebugCopyGameState;
 
+global_variable Vector2 DebugCameraPosition;
+global_variable f32 DebugCameraZoom = 1.0f;;
+
 #define DebugGameStatesCountLog2 6
 #define DebugGameStatesCount (1 << DebugGameStatesCountLog2)
 #define DebugGameStatesMask (DebugGameStatesCount - 1)
@@ -361,8 +364,19 @@ internal void PushDebugRectangle(Rectangle R, Color Color)
 
 internal Vector2 WorldToScreenPosition(game_state *GameState, Vector2 P)
 {
-    Vector2 HalfScreen = MultiplyV2S(V2(SCREEN_WIDTH, SCREEN_HEIGHT), 0.5f);
-    Vector2 Result = AddV2(SubtractV2(P, GameState->CameraPosition), HalfScreen);
+    Vector2 Result;
+    /* TODO: Get rid of control flow involving debug state, so that debug code can be compiled out. */
+    if (DebugPause)
+    {
+        Vector2 HalfScreen = MultiplyV2S(V2(SCREEN_WIDTH, SCREEN_HEIGHT), 0.5f);
+        HalfScreen = MultiplyV2S(HalfScreen, DebugCameraZoom);
+        Result = AddV2(MultiplyV2S(SubtractV2(P, DebugCameraPosition), DebugCameraZoom), HalfScreen);
+    }
+    else
+    {
+        Vector2 HalfScreen = MultiplyV2S(V2(SCREEN_WIDTH, SCREEN_HEIGHT), 0.5f);
+        Result = AddV2(SubtractV2(P, GameState->CameraPosition), HalfScreen);
+    }
 
     return Result;
 }
@@ -609,8 +623,9 @@ internal void HandleUserInput(game_state *GameState)
     GameState->UI.MouseButtonPressed = IsMouseButtonPressed(0);
     GameState->UI.MouseButtonReleased = IsMouseButtonReleased(0);
 
-    Vector2 *Acceleration = &GameState->PlayerEntity->Acceleration;
+    GameState->Input.KeyboardEnter = IsKeyDown(KEY_ENTER);
 
+    Vector2 *Acceleration = &GameState->PlayerEntity->Acceleration;
     Acceleration->x = 0;
     Acceleration->y = 0;
 
@@ -634,6 +649,8 @@ internal void HandleUserInput(game_state *GameState)
         Acceleration->y -= 1.0f;
     }
 
+    *Acceleration = NormalizeV2(*Acceleration);
+
     if (IsKeyPressed(KEY_P))
     {
         DebugPause = !DebugPause;
@@ -641,26 +658,50 @@ internal void HandleUserInput(game_state *GameState)
         if (DebugPause)
         {
             DebugCopyGameState = 1;
+            DebugCameraPosition = GameState->CameraPosition;
+            DebugCameraZoom = 1.0f;
         }
     }
 
     if (DebugPause)
     {
-        if (IsKeyPressed(KEY_LEFT) || IsKeyDown(KEY_LEFT_SHIFT) && IsKeyDown(KEY_LEFT))
+        b32 ShiftIsDown = IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT);
+
+        if (IsKeyPressed(KEY_LEFT) || ShiftIsDown && IsKeyDown(KEY_LEFT))
         {
             DebugGameStatesIndex = (DebugGameStatesIndex - 1) & DebugGameStatesMask;
             DebugCopyGameState = 1;
         }
-        else if (IsKeyPressed(KEY_RIGHT) || IsKeyDown(KEY_LEFT_SHIFT) && IsKeyDown(KEY_RIGHT))
+        else if (IsKeyPressed(KEY_RIGHT) || ShiftIsDown && IsKeyDown(KEY_RIGHT))
         {
             DebugGameStatesIndex = (DebugGameStatesIndex + 1) & DebugGameStatesMask;
             DebugCopyGameState = 1;
         }
+
+        if (IsKeyDown(KEY_MINUS))
+        {
+            DebugCameraZoom -= 0.1f;
+        }
+        else if (IsKeyDown(KEY_EQUAL))
+        {
+            DebugCameraZoom += 0.1f;
+        }
+
+        f32 DebugCameraSpeed;
+        if (ShiftIsDown)
+        {
+            DebugCameraSpeed = 2.0f;
+        }
+        else
+        {
+            DebugCameraSpeed = 2.0f * DebugCameraZoom;
+        }
+
+        if (IsKeyDown(KEY_D)) DebugCameraPosition.x += DebugCameraSpeed;
+        if (IsKeyDown(KEY_S)) DebugCameraPosition.y += DebugCameraSpeed;
+        if (IsKeyDown(KEY_A)) DebugCameraPosition.x -= DebugCameraSpeed;
+        if (IsKeyDown(KEY_W)) DebugCameraPosition.y -= DebugCameraSpeed;
     }
-
-    GameState->Input.KeyboardEnter = IsKeyDown(KEY_ENTER);
-
-    *Acceleration = NormalizeV2(*Acceleration);
 }
 
 internal void DrawSprite(game_state *GameState, entity *Entity)
@@ -671,6 +712,11 @@ internal void DrawSprite(game_state *GameState, entity *Entity)
         Rectangle SourceRectangle = Sprite.SourceRectangle;
         Vector2 SpriteSize = (Vector2){TEXTURE_MAP_SCALE*SourceRectangle.width,
                                        TEXTURE_MAP_SCALE*SourceRectangle.height};
+        /* TODO: Get rid of control flow involving debug state, so that debug code can be compiled out. */
+        if (DebugPause)
+        {
+            SpriteSize = MultiplyV2S(SpriteSize, DebugCameraZoom);
+        }
 
         Vector2 EntityScreenPosition = WorldToScreenPosition(GameState, Entity->Position);
         Vector2 SpriteOffset = MultiplyV2S(SpriteSize, -0.5f);
@@ -1950,6 +1996,17 @@ internal void DrawDebugProfile(game_state *GameState)
 #endif
 }
 
+internal void DrawDebugGraphics(void)
+{
+#if ryn_PROFILER
+    ryn_BEGIN_TIMED_BLOCK(TB_DebugGraphics);
+    RenderDebugDrawCommands();
+    DrawFrameRateHistory();
+    ryn_END_TIMED_BLOCK(TB_DebugGraphics);
+#endif
+}
+
+
 internal void ResetProfilerTimers(void)
 {
 #if ryn_PROFILER
@@ -2041,6 +2098,8 @@ internal void UpdateAndRender(void *VoidGameState)
                 }
                 ryn_END_TIMED_BLOCK(TB_DrawEntities);
             }
+
+            DrawDebugGraphics();
         }
         else
         {
@@ -2083,12 +2142,7 @@ internal void UpdateAndRender(void *VoidGameState)
                 ryn_END_TIMED_BLOCK(TB_DrawEntities);
             }
 
-            { /* debug graphics */
-                ryn_BEGIN_TIMED_BLOCK(TB_DebugGraphics);
-                RenderDebugDrawCommands();
-                DrawFrameRateHistory();
-                ryn_END_TIMED_BLOCK(TB_DebugGraphics);
-            }
+            DrawDebugGraphics();
         }
     } break;
     default: break;
