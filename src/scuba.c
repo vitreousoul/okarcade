@@ -29,7 +29,7 @@ int SCREEN_HEIGHT = 700;
 
 #define PI_OVER_2 (PI/2.0f)
 
-#define DEBUG_DRAW_COLLISIONS 0
+#define DEBUG_DRAW_COLLISIONS 1
 
 #define TEXTURE_MAP_SCALE 4
 #define MAX_ENTITY_COUNT 256
@@ -277,6 +277,7 @@ global_variable f32 DebugCameraZoom = 1.0f;;
 #define DebugGameStatesMask (DebugGameStatesCount - 1)
 global_variable game_state DebugGameStates[DebugGameStatesCount];
 global_variable s32 DebugGameStatesIndex;
+global_variable game_state NextDebugGameState;
 
 typedef enum
 {
@@ -1754,14 +1755,12 @@ internal void UpdateEntities(game_state *GameState)
                         switch (Area.Type)
                         {
                         case collision_type_Circle:
-                            Assert(0);
                             PushDebugCircle(WorldToScreenCircle(GameState, GetOffsetCircle(Area.Circle, TestEntity->Position)), (Color){0,255,255,140});
                             break;
                         case collision_type_Line:
                             PushDebugLine(WorldToScreenLine(GameState, Area.Line), (Color){0,255,255,140});
                             break;
                         case collision_type_Rectangle:
-                            Assert(0);
                             PushDebugRectangle(WorldToScreenRectangle(GameState, GetOffsetRectangle(Area.Rectangle, TestEntity->Position)), (Color){255,0,255,140});
                             break;
                         }
@@ -2083,6 +2082,9 @@ internal void UpdateAndRender(void *VoidGameState)
         if (DebugPause)
         {
             game_state *DebugGameState = &DebugGameStates[DebugGameStatesIndex];
+            NextDebugGameState = *DebugGameState;
+
+            UpdateEntities(&NextDebugGameState);
 
             ClearBackground(BackgroundColor);
 
