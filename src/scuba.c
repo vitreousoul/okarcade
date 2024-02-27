@@ -234,6 +234,7 @@ typedef enum
     game_mode_Start,
     game_mode_Play,
     game_mode_GameOver,
+    game_mode_Win,
     game_mode_Quit,
 } game_mode;
 
@@ -1800,13 +1801,18 @@ internal void UpdateEntities(game_state *GameState)
         if (SoonestCollision.Count)
         {
             entity *Entity = GameState->Entities + SoonestEntity;
+            Assert(ENTITY_IS_PLAYER(Entity));
             entity *TestEntity = GameState->Entities + SoonestTestEntity;
 
             if (TestEntity->Sprites[0].Type == sprite_type_Eel)
             {
                 Entity->Health -= 1;
             }
-            else
+            else if (TestEntity->Sprites[0].Type == sprite_type_Cage)
+            {
+                GameState->Mode = game_mode_Win;
+            }
+            else if (TestEntity->Sprites[0].Type == sprite_type_Wall)
             {
                 collision_result Collision = CollideEntity(GameState, Entity, RemainingTime, 1);
 
@@ -1909,15 +1915,15 @@ internal void ResetGame(game_state *GameState)
         EelEntity->MonorailStart = EelEntity->Position;
         EelEntity->MonorailEnd = AddV2(EelEntity->Position, V2(50.0f, 0.0f));
 
-        /* entity *CrabEntity = AddEntity(GameState, sprite_type_Crab); */
-        /* CrabEntity->Position = MultiplyV2S(V2(9.0f, 7.0f), TILE_SIZE * TEXTURE_MAP_SCALE); */
+        entity *CrabEntity = AddEntity(GameState, sprite_type_Crab);
+        CrabEntity->Position = MultiplyV2S(V2(9.0f, 7.0f), TILE_SIZE * TEXTURE_MAP_SCALE);
 
         /* TODO: Fix z-sorting, so that the front of the cage is in front of entities
                  like the player and the crab. The easiest way is probably to split
                  the cage into two entities, with their own individual depths.
         */
-        /* entity *CageEntity = AddEntity(GameState, sprite_type_Cage); */
-        /* CageEntity->Position = MultiplyV2S(V2(9.0f, 7.0f), TILE_SIZE * TEXTURE_MAP_SCALE); */
+        entity *CageEntity = AddEntity(GameState, sprite_type_Cage);
+        CageEntity->Position = MultiplyV2S(V2(9.0f, 7.0f), TILE_SIZE * TEXTURE_MAP_SCALE);
 
         for (s32 J = 0; J < MAP_HEIGHT; ++J)
         {
@@ -2050,6 +2056,36 @@ internal void UpdateAndRender(void *VoidGameState)
         f32 StartY = SCREEN_HEIGHT * 0.4;
 
         ClearBackground(BackgroundColor);
+
+        alignment Alignment = alignment_CenterCenter;
+        b32 PlayPressed = DoButtonWith(UI, ui_id_PlayButton, (u8 *)"Play Again", V2(CenterX, StartY), Alignment);
+        b32 QuitPressed = 0;
+
+#if !PLATFORM_WEB
+        QuitPressed = DoButtonWith(UI, ui_id_QuitButton, (u8 *)"Quit", V2(CenterX, StartY + 44), Alignment);
+#endif
+
+        if (PlayPressed)
+        {
+            ResetGame(GameState);
+            GameState->Mode = game_mode_Play;
+        }
+        else if (QuitPressed)
+        {
+            GameState->Mode = game_mode_Quit;
+        }
+    } break;
+    case game_mode_Win:
+    {
+        f32 CenterX = SCREEN_WIDTH / 2.0;
+        f32 StartY = SCREEN_HEIGHT * 0.4;
+
+        ClearBackground(BackgroundColor);
+
+        char *WinMessage = "You Win!";
+        s32 TextWidth = MeasureText(WinMessage, UI->FontSize);
+        Vector2 TextPosition = V2(CenterX - (TextWidth / 2), 30);
+        DrawTextEx(GameState->UI.Font, WinMessage, TextPosition, UI->FontSize, 1, (Color){255,255,255,255});
 
         alignment Alignment = alignment_CenterCenter;
         b32 PlayPressed = DoButtonWith(UI, ui_id_PlayButton, (u8 *)"Play Again", V2(CenterX, StartY), Alignment);
@@ -2259,7 +2295,7 @@ int main(void)
 
         for (;;)
         {
-            b32 ShouldCloseWindow = WindowShouldClose();
+            b32 ShouldCloseWindow = WindowShouldClose() || GameState.Mode == game_mode_Quit;
 
             if (ShouldCloseWindow)
             {
