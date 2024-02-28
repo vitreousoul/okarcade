@@ -264,6 +264,10 @@ typedef struct
     entity *PlayerEntity;
 
     Texture2D ScubaTexture;
+
+    ui_element StartElements[8];
+    ui_element GameOverElements[8];
+    ui_element WinElements[8];
 } game_state;
 
 /* BEGIN Debug Draw Commands */
@@ -1898,11 +1902,69 @@ internal void GenerateSortedEntityTable(game_state *GameState)
 
 internal void ResetGame(game_state *GameState)
 {
+    s32 UiId = 1; /* NOTE: Start at 1 because 0 is reserved as a null id. */
     GameState->EntityCount = 0;
 
+    /* TODO: We probably don't need to loop through and clear the entities. */
     for (s32 I = 0; I < MAX_ENTITY_COUNT; ++I)
     {
         GameState->Entities[I] = NullEntity;
+    }
+
+    { /* init ui */
+        GameState->StartElements[0] = (ui_element){
+            ui_element_type_Button, UiId++,
+            V2(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 30),
+            alignment_CenterCenter,
+            V2(0, 0),
+            (u8 *)"Play Game"
+        };
+
+#if !PLATFORM_WEB
+        GameState->StartElements[1] = (ui_element){
+            ui_element_type_Button, UiId++,
+            V2(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 30),
+            alignment_CenterCenter,
+            V2(0, 0),
+            (u8 *)"Quit"
+        };
+#endif
+
+        GameState->GameOverElements[0] = (ui_element){
+            ui_element_type_Button, UiId++,
+            V2(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 30),
+            alignment_CenterCenter,
+            V2(0, 0),
+            (u8 *)"Play Again"
+        };
+
+#if !PLATFORM_WEB
+        GameState->GameOverElements[1] = (ui_element){
+            ui_element_type_Button, UiId++,
+            V2(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 30),
+            alignment_CenterCenter,
+            V2(0, 0),
+            (u8 *)"Quit"
+        };
+#endif
+
+        GameState->WinElements[0] = (ui_element){
+            ui_element_type_Button, UiId++,
+            V2(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 30),
+            alignment_CenterCenter,
+            V2(0, 0),
+            (u8 *)"Play Again"
+        };
+
+#if !PLATFORM_WEB
+        GameState->WinElements[1] = (ui_element){
+            ui_element_type_Button, UiId++,
+            V2(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 30),
+            alignment_CenterCenter,
+            V2(0, 0),
+            (u8 *)"Quit"
+        };
+#endif
     }
 
     { /* init entities */
@@ -2019,6 +2081,32 @@ internal void ResetProfilerTimers(void)
 #endif
 }
 
+internal u32 DoElementArray(game_state *GameState, ui_element *Elements, u64 Count)
+{
+    u32 InteractedIndex = -1;
+
+    for (u32 I = 0; I < Count; ++I)
+    {
+        ui_element Element = Elements[I];
+
+        switch(Element.Type)
+        {
+        case ui_element_type_Button:
+        {
+            b32 Pressed = DoButton(&GameState->UI, &Element.Button);
+
+            if (Pressed)
+            {
+                InteractedIndex = I;
+            }
+        } break;
+        default: break;
+        }
+    }
+
+    return InteractedIndex;
+}
+
 internal void UpdateAndRender(void *VoidGameState)
 {
 #if ryn_PROFILER
@@ -2037,40 +2125,41 @@ internal void UpdateAndRender(void *VoidGameState)
     {
     case game_mode_Start:
     {
-        f32 CenterX = SCREEN_WIDTH / 2.0;
-        f32 StartY = SCREEN_HEIGHT * 0.5;
-
         ClearBackground(BackgroundColor);
 
-        alignment Alignment = alignment_CenterCenter;
-        b32 Pressed = DoButtonWith(UI, ui_id_PlayButton, (u8 *)"Play", V2(CenterX, StartY), Alignment);
+        b32 Play = 0;
+        ui_element *Elements = GameState->StartElements;
+        u64 ElementCount = ArrayCount(GameState->StartElements);
+        s32 InteractedIndex = DoElementArray(GameState, Elements, ElementCount);
 
-        if (Pressed || GameState->Input.KeyboardEnter)
+        if (InteractedIndex == 0)
+        {
+            Play = 1;
+        }
+        else if (InteractedIndex == 1)
+        {
+            GameState->Mode = game_mode_Quit;
+        }
+
+        if (Play || GameState->Input.KeyboardEnter)
         {
             GameState->Mode = game_mode_Play;
         }
     } break;
     case game_mode_GameOver:
     {
-        f32 CenterX = SCREEN_WIDTH / 2.0;
-        f32 StartY = SCREEN_HEIGHT * 0.4;
-
         ClearBackground(BackgroundColor);
 
-        alignment Alignment = alignment_CenterCenter;
-        b32 PlayPressed = DoButtonWith(UI, ui_id_PlayButton, (u8 *)"Play Again", V2(CenterX, StartY), Alignment);
-        b32 QuitPressed = 0;
+        ui_element *Elements = GameState->GameOverElements;
+        u64 ElementCount = ArrayCount(GameState->GameOverElements);
+        s32 InteractedIndex = DoElementArray(GameState, Elements, ElementCount);
 
-#if !PLATFORM_WEB
-        QuitPressed = DoButtonWith(UI, ui_id_QuitButton, (u8 *)"Quit", V2(CenterX, StartY + 44), Alignment);
-#endif
-
-        if (PlayPressed)
+        if (InteractedIndex == 0)
         {
             ResetGame(GameState);
             GameState->Mode = game_mode_Play;
         }
-        else if (QuitPressed)
+        else if (InteractedIndex == 1)
         {
             GameState->Mode = game_mode_Quit;
         }
@@ -2078,7 +2167,6 @@ internal void UpdateAndRender(void *VoidGameState)
     case game_mode_Win:
     {
         f32 CenterX = SCREEN_WIDTH / 2.0;
-        f32 StartY = SCREEN_HEIGHT * 0.4;
 
         ClearBackground(BackgroundColor);
 
@@ -2087,20 +2175,16 @@ internal void UpdateAndRender(void *VoidGameState)
         Vector2 TextPosition = V2(CenterX - (TextWidth / 2), 30);
         DrawTextEx(GameState->UI.Font, WinMessage, TextPosition, UI->FontSize, 1, (Color){255,255,255,255});
 
-        alignment Alignment = alignment_CenterCenter;
-        b32 PlayPressed = DoButtonWith(UI, ui_id_PlayButton, (u8 *)"Play Again", V2(CenterX, StartY), Alignment);
-        b32 QuitPressed = 0;
+        ui_element *Elements = GameState->WinElements;
+        u64 ElementCount = ArrayCount(GameState->WinElements);
+        s32 InteractedIndex = DoElementArray(GameState, Elements, ElementCount);
 
-#if !PLATFORM_WEB
-        QuitPressed = DoButtonWith(UI, ui_id_QuitButton, (u8 *)"Quit", V2(CenterX, StartY + 44), Alignment);
-#endif
-
-        if (PlayPressed)
+        if (InteractedIndex == 0)
         {
             ResetGame(GameState);
             GameState->Mode = game_mode_Play;
         }
-        else if (QuitPressed)
+        else if (InteractedIndex == 1)
         {
             GameState->Mode = game_mode_Quit;
         }
