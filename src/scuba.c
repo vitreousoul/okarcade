@@ -67,13 +67,6 @@ global_variable u8 Map[MAP_HEIGHT][MAP_WIDTH] = {
 
 typedef enum
 {
-    ui_id_Null,
-    ui_id_PlayButton,
-    ui_id_QuitButton,
-} ui_id;
-
-typedef enum
-{
     sprite_type_NONE,
     sprite_type_Fish,
     sprite_type_Eel,
@@ -240,7 +233,17 @@ typedef enum
 
 typedef struct
 {
-    b32 KeyboardEnter;
+    b32 IsDown;
+    b32 IsPressed;
+} keyboard_input;
+
+typedef struct
+{
+    keyboard_input KeyboardEnter;
+    keyboard_input KeyboardUp;
+    keyboard_input KeyboardRight;
+    keyboard_input KeyboardDown;
+    keyboard_input KeyboardLeft;
 } user_input;
 
 typedef struct
@@ -275,7 +278,7 @@ global_variable b32 DebugPause;
 global_variable b32 DebugCopyGameState;
 
 global_variable Vector2 DebugCameraPosition;
-global_variable f32 DebugCameraZoom = 1.0f;;
+global_variable f32 DebugCameraZoom = 1.0f;
 
 #define DebugGameStatesCountLog2 6
 #define DebugGameStatesCount (1 << DebugGameStatesCountLog2)
@@ -621,6 +624,10 @@ internal entity *AddEntity(game_state *GameState, sprite_type SpriteType)
     return Entity;
 }
 
+#define StoreGameInput(InputName, KeyCode) \
+    GameState->Input.InputName.IsDown = IsKeyDown(KeyCode); \
+    GameState->Input.InputName.IsPressed = IsKeyPressed(KeyCode)
+
 internal void HandleUserInput(game_state *GameState)
 {
     DebugCopyGameState = 0;
@@ -628,8 +635,13 @@ internal void HandleUserInput(game_state *GameState)
     GameState->UI.MousePosition = GetMousePosition();
     GameState->UI.MouseButtonPressed = IsMouseButtonPressed(0);
     GameState->UI.MouseButtonReleased = IsMouseButtonReleased(0);
+    GameState->UI.EnterPressed = IsKeyPressed(KEY_ENTER);
 
-    GameState->Input.KeyboardEnter = IsKeyDown(KEY_ENTER);
+    StoreGameInput(KeyboardEnter, KEY_ENTER);
+    StoreGameInput(KeyboardUp, KEY_UP);
+    StoreGameInput(KeyboardRight, KEY_RIGHT);
+    StoreGameInput(KeyboardDown, KEY_DOWN);
+    StoreGameInput(KeyboardLeft, KEY_LEFT);
 
     Vector2 *Acceleration = &GameState->PlayerEntity->Acceleration;
     Acceleration->x = 0;
@@ -1304,7 +1316,6 @@ internal entity_movement GetEntityMovement(entity *Entity, f32 DeltaTime)
 
 internal void UpdateEntity(game_state *GameState, entity *Entity, f32 DeltaTime)
 {
-    /* TODO: Fix bug where entity (really only the player-entity for now) still has velocity even though it has stopped moving. This is due to the way we only add entity-movement to the entity velocity/acceleration. */
     ryn_BEGIN_TIMED_BLOCK(TB_UpdateEntity);
 
     switch (Entity->MovementType)
@@ -1711,6 +1722,13 @@ internal void GatherCollisionGeometry(game_state *GameState, s32 EntityIndex, f3
     }
 }
 
+internal void SetGameMode(game_state *GameState, game_mode Mode)
+{
+    GameState->Mode = Mode;
+    GameState->UI.Hot = 0;
+    GameState->UI.Active = 0;
+}
+
 internal void UpdateEntities(game_state *GameState)
 {
     f32 RemainingTime = GameState->DeltaTime;
@@ -1814,7 +1832,7 @@ internal void UpdateEntities(game_state *GameState)
             }
             else if (TestEntity->Sprites[0].Type == sprite_type_Cage)
             {
-                GameState->Mode = game_mode_Win;
+                SetGameMode(GameState, game_mode_Win);
             }
             else if (TestEntity->Sprites[0].Type == sprite_type_Wall)
             {
@@ -2010,7 +2028,7 @@ internal void ResetGame(game_state *GameState)
     GenerateSortedEntityTable(GameState);
 
     GameState->CameraPosition = GameState->PlayerEntity->Position;
-    GameState->Mode = game_mode_Start;
+    SetGameMode(GameState, game_mode_Start);
     GameState->LastTime = GetTime();
 }
 
@@ -2081,9 +2099,88 @@ internal void ResetProfilerTimers(void)
 #endif
 }
 
-internal u32 DoElementArray(game_state *GameState, ui_element *Elements, u64 Count)
+internal s32 DoElementArray(game_state *GameState, ui_element *Elements, u64 Count)
 {
-    u32 InteractedIndex = -1;
+    s32 InteractedIndex = -1;
+
+    if (!Count)
+    {
+        return InteractedIndex;
+    }
+
+    if (!GameState->UI.Hot)
+    {
+        /* NOTE: If there are no hot elements, set the first element as hot. */
+        GameState->UI.Hot = GetElementId(Elements[0]);
+    }
+
+    if (GameState->Input.KeyboardDown.IsPressed)
+    {
+        b32 FoundHot = 0;
+
+        for (u32 I = 0; I < Count; ++I)
+        {
+            ui_element Element = Elements[I];
+            ui_id ElementId = GetElementId(Element);
+
+            if (!Element.Type)
+            {
+                break;
+            }
+            else if (FoundHot)
+            {
+                ui_id Id = GetElementId(Element);
+                GameState->UI.Hot = Id;
+                break;
+            }
+            else if (ElementId == GameState->UI.Hot)
+            {
+                if (I + 1 == Count)
+                {
+                    ui_id Id = GetElementId(Elements[0]);
+                    GameState->UI.Hot = Id;
+                    break;
+                }
+                else
+                {
+                    FoundHot = 1;
+                }
+            }
+        }
+    }
+    else if (GameState->Input.KeyboardUp.IsPressed)
+    {
+        /* NOTE: Set the previous ui_element to be active. */
+        b32 FoundHot = 0;
+
+        for (u32 I = 0; I < Count; ++I)
+        {
+            ui_element Element = Elements[I];
+            ui_id ElementId = GetElementId(Element);
+
+            if (!Element.Type)
+            {
+                break;
+            }
+            else if (FoundHot && I + 1 == Count)
+            {
+                GameState->UI.Hot = GetElementId(Element);
+                break;
+            }
+            else if (ElementId == GameState->UI.Hot)
+            {
+                if (I == 0)
+                {
+                    FoundHot = 1;
+                }
+                else
+                {
+                    GameState->UI.Hot = GetElementId(Elements[I - 1]);
+                    break;
+                }
+            }
+        }
+    }
 
     for (u32 I = 0; I < Count; ++I)
     {
@@ -2138,12 +2235,12 @@ internal void UpdateAndRender(void *VoidGameState)
         }
         else if (InteractedIndex == 1)
         {
-            GameState->Mode = game_mode_Quit;
+            SetGameMode(GameState, game_mode_Quit);
         }
 
-        if (Play || GameState->Input.KeyboardEnter)
+        if (Play)
         {
-            GameState->Mode = game_mode_Play;
+            SetGameMode(GameState, game_mode_Play);
         }
     } break;
     case game_mode_GameOver:
@@ -2157,11 +2254,11 @@ internal void UpdateAndRender(void *VoidGameState)
         if (InteractedIndex == 0)
         {
             ResetGame(GameState);
-            GameState->Mode = game_mode_Play;
+            SetGameMode(GameState, game_mode_Play);
         }
         else if (InteractedIndex == 1)
         {
-            GameState->Mode = game_mode_Quit;
+            SetGameMode(GameState, game_mode_Quit);
         }
     } break;
     case game_mode_Win:
@@ -2182,11 +2279,11 @@ internal void UpdateAndRender(void *VoidGameState)
         if (InteractedIndex == 0)
         {
             ResetGame(GameState);
-            GameState->Mode = game_mode_Play;
+            SetGameMode(GameState, game_mode_Play);
         }
         else if (InteractedIndex == 1)
         {
-            GameState->Mode = game_mode_Quit;
+            SetGameMode(GameState, game_mode_Quit);
         }
     } break;
     case game_mode_Play:
@@ -2240,7 +2337,7 @@ internal void UpdateAndRender(void *VoidGameState)
 
             if (GameState->PlayerEntity->Health == 0)
             {
-                GameState->Mode = game_mode_GameOver;
+                SetGameMode(GameState, game_mode_GameOver);
             }
 
             ClearBackground(BackgroundColor);

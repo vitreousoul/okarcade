@@ -1,5 +1,7 @@
 #define BUTTON_PADDING 8
 
+typedef s32 ui_id;
+
 typedef enum
 {
     ui_element_type_UNDEFINED,
@@ -24,7 +26,7 @@ typedef enum
 
 typedef struct
 {
-    s32 Id;
+    ui_id Id;
 
     Vector2 Position;
     alignment Alignment;
@@ -35,7 +37,7 @@ typedef struct
 
 typedef struct
 {
-    s32 Id;
+    ui_id Id;
 
     Vector2 Position;
     Vector2 Size;
@@ -44,7 +46,7 @@ typedef struct
 
 typedef struct
 {
-    s32 Id;
+    ui_id Id;
 
     Vector2 Position;
     Vector2 Size;
@@ -66,9 +68,8 @@ typedef struct
 
 typedef struct
 {
-    s32 Active;
-    s32 Hot;
-
+    ui_id Active;
+    ui_id Hot;
 
     Font Font;
     s32 FontSize;
@@ -77,8 +78,12 @@ typedef struct
     b32 MouseButtonReleased;
     Vector2 MousePosition;
 
+    b32 EnterPressed;
+
     Vector2 ActivationPosition;
 } ui;
+
+ui_id GetElementId(ui_element Element);
 
 button CreateButton(Vector2 Position, u8 *Text, s32 Id);
 
@@ -87,6 +92,34 @@ b32 DoButtonWith(ui *UI, s32 Id, u8 *Text, Vector2 Position, alignment Alignment
 b32 DoSlider(ui *UI, slider *Slider);
 b32 DoTablet(ui *UI, tablet *Tablet);
 b32 DoUiElement(ui *UI, ui_element *UiElement);
+
+
+ui_id GetElementId(ui_element Element)
+{
+    ui_id Result;
+
+    switch (Element.Type)
+    {
+    case ui_element_type_Button:
+    {
+        Result = Element.Button.Id;
+    } break;
+    case ui_element_type_Slider:
+    {
+        Result = Element.Slider.Id;
+    } break;
+    case ui_element_type_Tablet:
+    {
+        Result = Element.Tablet.Id;
+    } break;
+    default:
+    {
+        Result = 0;
+    } break;
+    }
+
+    return Result;
+}
 
 button CreateButton(Vector2 Position, u8 *Text, s32 Id)
 {
@@ -180,10 +213,11 @@ b32 DoButton(ui *UI, button *Button)
 
     Rectangle AlignedRect = GetAlignedRectangle(Button->Position, Button->Size, Button->Alignment);
 
-    b32 IsHot = PositionIsInsideRect(UI->MousePosition, AlignedRect);
+    b32 IsMouseOver = PositionIsInsideRect(UI->MousePosition, AlignedRect);
+    b32 IsHot = UI->Hot == Button->Id;
     b32 IsActive = UI->Active == Button->Id;
 
-    if (IsHot)
+    if (IsMouseOver)
     {
         UI->Hot = Button->Id;
     }
@@ -208,6 +242,13 @@ b32 DoButton(ui *UI, button *Button)
         if (IsActive)
         {
             UI->Active = 0;
+        }
+    }
+    else if (UI->EnterPressed)
+    {
+        if (IsHot)
+        {
+            ButtonPressed = 1;
         }
     }
 
