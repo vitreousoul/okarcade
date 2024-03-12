@@ -703,29 +703,32 @@ internal void GenerateBlogPages(linear_allocator *TempString, pre_processor *Pre
 
 void GenerateSite(linear_allocator *TempString)
 {
-    u8 *GenDirectory =       (u8 *)"../gen";
+    u8 *GenDirectory       = (u8 *)"../gen";
     u8 *CodePagesDirectory = (u8 *)"../gen/code_pages";
 
     u8 *AssetsDirectory = (u8 *)"../assets";
 
-    u8 *SiteDirectory =     (u8 *)"../site";
-    u8 *SiteBlogDirectory = (u8 *)"../site/blog";
+    u8 *SiteDirectory       = (u8 *)"../site";
+    u8 *SiteBlogDirectory   = (u8 *)"../site/blog";
     u8 *SiteAssetsDirectory = (u8 *)"../site/assets";
 
-    u8 *IndexIn =  (u8 *)"../src/layout/index.html";
+    u8 *IndexIn  = (u8 *)"../src/layout/index.html";
     u8 *IndexOut = (u8 *)"../site/index.html";
 
-    u8 *CodeIn =  (u8 *)"../src/layout/code.html";
+    u8 *CodeIn  = (u8 *)"../src/layout/code.html";
     u8 *CodeOut = (u8 *)"../site/code.html";
 
-    u8 *BlogIn =  (u8 *)"../src/layout/blog.html";
+    u8 *BlogIn  = (u8 *)"../src/layout/blog.html";
     u8 *BlogOut = (u8 *)"../site/blog/index.html";
 
-    u8 *LSystemIn =  (u8 *)"../src/layout/l_system.html";
+    u8 *LSystemIn  = (u8 *)"../src/layout/l_system.html";
     u8 *LSystemOut = (u8 *)"../gen/l_system.html";
 
-    u8 *ScubaIn =  (u8 *)"../src/layout/scuba.html";
+    u8 *ScubaIn  = (u8 *)"../src/layout/scuba.html";
     u8 *ScubaOut = (u8 *)"../gen/scuba.html";
+
+    u8 *EstudiosoIn  = (u8 *)"../src/layout/estudioso.html";
+    u8 *EstudiosoOut = (u8 *)"../gen/estudioso.html";
 
     u8 *Bra = (u8 *)"{|";
     u8 *Ket = (u8 *)"|}";
@@ -771,6 +774,7 @@ void GenerateSite(linear_allocator *TempString)
     PreprocessFile(&PreProcessor, *TempString, BlogIn, BlogOut);
     PreprocessFile(&PreProcessor, *TempString, LSystemIn, LSystemOut);
     PreprocessFile(&PreProcessor, *TempString, ScubaIn, ScubaOut);
+    PreprocessFile(&PreProcessor, *TempString, EstudiosoIn, EstudiosoOut);
 
     FreeLinearAllocator(FileAllocator);
 }

@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en-us">
+
+  <head>
+    {| include ../src/layout/head_common.html |}
+    <title>Estudioso!</title>
+    <style>
+      {| include ../src/layout/raylib_app.css |}
+    </style>
+  </head>
+
+  <body>
+    {| include ../src/layout/game_header.html |}
+
+    <canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex=-1></canvas>
+
+    <script type='text/javascript'>
+      {| include ../src/layout/raylib_app.js |}
+    </script>
+
+    {{{ SCRIPT }}}
+  </body>
+
+</html>
