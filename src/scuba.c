@@ -696,6 +696,19 @@ internal void HandleUserInput(game_state *GameState)
             DebugCopyGameState = 1;
         }
 
+
+        { /* TODO: Remove this or use a debug-if... */
+            if (IsKeyPressed(KEY_RIGHT) || ShiftIsDown && IsKeyDown(KEY_RIGHT) ||
+                IsKeyPressed(KEY_LEFT) || ShiftIsDown && IsKeyDown(KEY_LEFT))
+            {
+                entity *DebugPlayer = &DebugGameStates[DebugGameStatesIndex].Entities[0];
+                printf("[%d] player position %p:\n", DebugGameStatesIndex, DebugPlayer);
+                printf("    P (%f %f)\n", DebugPlayer->Position.x, DebugPlayer->Position.y);
+                printf("    V (%f %f)\n", DebugPlayer->Velocity.x, DebugPlayer->Velocity.y);
+                printf("    A (%f %f)\n", DebugPlayer->Acceleration.x, DebugPlayer->Acceleration.y);
+            }
+        }
+
         if (IsKeyDown(KEY_MINUS))
         {
             DebugCameraZoom -= 0.1f;
@@ -2365,6 +2378,11 @@ internal void UpdateAndRender(void *VoidGameState)
     if (!DebugPause) {
         DebugGameStatesIndex = (DebugGameStatesIndex + 1) & DebugGameStatesMask;
         DebugGameStates[DebugGameStatesIndex] = *GameState;
+        /* HACK: When we copy the GameState, pointers within the state still point to the original GameState.
+           just manually updating PlayerEntity, but this could be a problem if there are many other pointers
+           that need to be fixed here...
+        */
+        DebugGameStates[DebugGameStatesIndex].PlayerEntity = &DebugGameStates[DebugGameStatesIndex].Entities[0];
     }
     ryn_EndProfile();
 #endif
