@@ -2,6 +2,7 @@
     TODO: Allow a history of quiz items, so you can scroll back and view previous answers.
     TODO: Use font that supports displaying raw accents, including small-tilde "˜" (not the standard tilde "~")
     TODO: Add upside-down question mark
+    TODO: Display the cursor!
 */
 
 #include <stdlib.h>
@@ -150,8 +151,8 @@ typedef struct
     b32 KeyHasRepeated;
 
 #define Test_Buffer_Count 64
-    char QuizInputBuffer[Test_Buffer_Count + 1];
-    s32 QuizInputBufferIndex;
+    char QuizInput[Test_Buffer_Count + 1];
+    s32 QuizInputIndex;
 
     u32 QuizItemIndex;
     quiz_mode QuizMode;
@@ -252,57 +253,6 @@ internal inline b32 KeyLocationIsValid(key_location Location)
     return Location.Index >= 0 && Location.Shift >= 0;
 }
 
-internal key_state GetKeyState(state *State, u32 KeyStateIndex, u32 KeyNumber)
-{
-    Assert(KeyNumber < Total_Number_Of_Keys);
-    key_state KeyState = key_state_Undefined;
-
-    key_location Location = GetKeyLocation(KeyNumber);
-
-    if (KeyLocationIsValid(Location))
-    {
-        u32 KeyStateChunk = State->KeyStates[KeyStateIndex][Location.Index];
-        KeyState = (KeyStateChunk >> Location.Shift) & Bits_Per_Key_State_Mask;
-    }
-
-    return KeyState;
-}
-
-internal b32 SetKeyState(state *State, u32 KeyStateIndex, u32 KeyNumber, key_state KeyState)
-{
-    b32 Error = 0;
-    key_location Location = GetKeyLocation(KeyNumber);
-    b32 Valid = KeyLocationIsValid(Location);
-
-    if (Valid)
-    {
-        Assert(KeyNumber < Total_Number_Of_Keys);
-        Assert(KeyState < key_state_Count);
-
-        u32 KeyStateChunk = State->KeyStates[KeyStateIndex][Location.Index];
-        u32 UnsetMask = ~(Bits_Per_Key_State_Mask << Location.Shift);
-        u32 NewChunk = (KeyStateChunk & UnsetMask) | (KeyState << Location.Shift);
-
-        State->KeyStates[KeyStateIndex][Location.Index] = NewChunk;
-    }
-    else
-    {
-        Error = 1;
-    }
-
-    return Error;
-}
-
-internal inline void UpdateKey(state *State, u32 Key)
-{
-    u32 NextKeyStateIndex = !State->KeyStateIndex;
-    b32 IsDown = IsKeyDown(Key);
-    key_state CurrentState = GetKeyState(State, State->KeyStateIndex, Key);
-    key_state NextState = KeyStateMap[CurrentState][IsDown];
-
-    SetKeyState(State, NextKeyStateIndex, Key, NextState);
-}
-
 internal void ClearAccentKey(state *State)
 {
     switch (State->CurrentAccent)
@@ -310,10 +260,10 @@ internal void ClearAccentKey(state *State)
     case accent_Acute:
     case accent_Tilde:
     {
-        State->QuizInputBuffer[State->QuizInputBufferIndex] = 0;
-        if (State->QuizInputBufferIndex + 1 < Test_Buffer_Count)
+        State->QuizInput[State->QuizInputIndex] = 0;
+        if (State->QuizInputIndex + 1 < Test_Buffer_Count)
         {
-            State->QuizInputBuffer[State->QuizInputBufferIndex+1] = 0;
+            State->QuizInput[State->QuizInputIndex+1] = 0;
         }
         State->AccentMode = 0;
         State->CurrentAccent = 0;
@@ -329,13 +279,13 @@ internal void HandleKey(state *State, key_code Key)
 {
     if (PrintableKeys[Key])
     {
-        if (State->QuizInputBufferIndex + 1 < Test_Buffer_Count)
+        if (State->QuizInputIndex + 1 < Test_Buffer_Count)
         {
             if (State->AccentMode)
             {
                 unsigned char SecondByte = 0;
 
-                if (State->QuizInputBufferIndex + 2 < Test_Buffer_Count)
+                if (State->QuizInputIndex + 2 < Test_Buffer_Count)
                 {
                     if (State->CurrentAccent == accent_Acute)
                     {
@@ -362,9 +312,9 @@ internal void HandleKey(state *State, key_code Key)
                                 SecondByte += 32;
                             }
 
-                            State->QuizInputBuffer[State->QuizInputBufferIndex] = 0xC3;
-                            State->QuizInputBuffer[State->QuizInputBufferIndex+1] = SecondByte;
-                            State->QuizInputBufferIndex += 2;
+                            State->QuizInput[State->QuizInputIndex] = 0xC3;
+                            State->QuizInput[State->QuizInputIndex+1] = SecondByte;
+                            State->QuizInputIndex += 2;
                         }
                     }
                     else if (State->CurrentAccent == accent_Tilde && Key == KEY_N)
@@ -376,9 +326,9 @@ internal void HandleKey(state *State, key_code Key)
                             SecondByte += 32;
                         }
 
-                        State->QuizInputBuffer[State->QuizInputBufferIndex] = 0xC3;
-                        State->QuizInputBuffer[State->QuizInputBufferIndex+1] = SecondByte;
-                        State->QuizInputBufferIndex += 2;
+                        State->QuizInput[State->QuizInputIndex] = 0xC3;
+                        State->QuizInput[State->QuizInputIndex+1] = SecondByte;
+                        State->QuizInputIndex += 2;
                     }
                     else
                     {
@@ -395,23 +345,23 @@ internal void HandleKey(state *State, key_code Key)
                 {
                 case KEY_E:
                 {
-                    if (State->QuizInputBufferIndex + 2 < Test_Buffer_Count)
+                    if (State->QuizInputIndex + 2 < Test_Buffer_Count)
                     {
                         /* NOTE: Acute accent */
-                        State->QuizInputBuffer[State->QuizInputBufferIndex] = 0xC2;
-                        State->QuizInputBuffer[State->QuizInputBufferIndex+1] = 0xB4;
+                        State->QuizInput[State->QuizInputIndex] = 0xC2;
+                        State->QuizInput[State->QuizInputIndex+1] = 0xB4;
                         State->AccentMode = 1;
                         State->CurrentAccent = accent_Acute;
                     }
                 } break;
                 case KEY_N:
                 {
-                    if (State->QuizInputBufferIndex + 2 < Test_Buffer_Count)
+                    if (State->QuizInputIndex + 2 < Test_Buffer_Count)
                     {
                         /* NOTE: Tilde */
-                        /* State->QuizInputBuffer[State->QuizInputBufferIndex] = '~'; */
-                        State->QuizInputBuffer[State->QuizInputBufferIndex] = 0xCB;
-                        State->QuizInputBuffer[State->QuizInputBufferIndex+1] = 0x9C;
+                        /* State->QuizInput[State->QuizInputIndex] = '~'; */
+                        State->QuizInput[State->QuizInputIndex] = 0xCB;
+                        State->QuizInput[State->QuizInputIndex+1] = 0x9C;
                         State->AccentMode = 1;
                         State->CurrentAccent = accent_Tilde;
                     }
@@ -421,8 +371,8 @@ internal void HandleKey(state *State, key_code Key)
             }
             else if (State->ModifierKeys.Shift && Key == KEY_SLASH)
             {
-                State->QuizInputBuffer[State->QuizInputBufferIndex] = '?';
-                State->QuizInputBufferIndex = State->QuizInputBufferIndex + 1;
+                State->QuizInput[State->QuizInputIndex] = '?';
+                State->QuizInputIndex = State->QuizInputIndex + 1;
             }
             else
             {
@@ -431,8 +381,8 @@ internal void HandleKey(state *State, key_code Key)
                     Key += 32;
                 }
 
-                State->QuizInputBuffer[State->QuizInputBufferIndex] = Key;
-                State->QuizInputBufferIndex = State->QuizInputBufferIndex + 1;
+                State->QuizInput[State->QuizInputIndex] = Key;
+                State->QuizInputIndex = State->QuizInputIndex + 1;
             }
         }
     }
@@ -452,48 +402,48 @@ internal void HandleKey(state *State, key_code Key)
 
                 for (;;)
                 {
-                    if (State->QuizInputBufferIndex > 0)
+                    if (State->QuizInputIndex > 0)
                     {
-                        State->QuizInputBufferIndex = State->QuizInputBufferIndex - 1;
+                        State->QuizInputIndex = State->QuizInputIndex - 1;
                     }
 
-                    if (State->QuizInputBufferIndex < 0)
+                    if (State->QuizInputIndex < 0)
                     {
                         break;
                     }
 
-                    char Char = State->QuizInputBuffer[State->QuizInputBufferIndex];
+                    char Char = State->QuizInput[State->QuizInputIndex];
 
                     if (Is_Utf8_Tail_Byte(Char))
                     {
-                        State->QuizInputBuffer[State->QuizInputBufferIndex] = 0;
+                        State->QuizInput[State->QuizInputIndex] = 0;
                         TailBytesSkipped += 1;
                     }
                     else if (TailBytesSkipped == 1 && Is_Utf8_Header_Byte2(Char))
                     {
                         Assert(TailBytesSkipped == 1);
-                        if (State->QuizInputBufferIndex < 0) break;
-                        State->QuizInputBuffer[State->QuizInputBufferIndex] = 0;
+                        if (State->QuizInputIndex < 0) break;
+                        State->QuizInput[State->QuizInputIndex] = 0;
                         break;
                     }
                     else if (TailBytesSkipped == 2 && Is_Utf8_Header_Byte3(Char))
                     {
                         Assert(!"Three-byte characters have not been tested. Delete this assertion to begin testing three-byte characters.");
-                        if (State->QuizInputBufferIndex < 0) break;
-                        State->QuizInputBuffer[State->QuizInputBufferIndex] = 0;
+                        if (State->QuizInputIndex < 0) break;
+                        State->QuizInput[State->QuizInputIndex] = 0;
                         break;
                     }
                     else if (TailBytesSkipped == 3 && Is_Utf8_Header_Byte4(Char))
                     {
                         Assert(!"Four-byte characters have not been tested. Delete this assertion to begin testing four-byte characters.");
-                        if (State->QuizInputBufferIndex < 0) break;
-                        State->QuizInputBuffer[State->QuizInputBufferIndex] = 0;
+                        if (State->QuizInputIndex < 0) break;
+                        State->QuizInput[State->QuizInputIndex] = 0;
                         break;
                     }
                     else
                     {
                         /* NOTE: Delete an ASCII character. */
-                        State->QuizInputBuffer[State->QuizInputBufferIndex] = 0;
+                        State->QuizInput[State->QuizInputIndex] = 0;
                         break;
                     }
                 }
@@ -554,6 +504,7 @@ internal void HandleUserInput(state *State)
 
     if (!KeysWerePressed && IsKeyDown(State->LastKeyPressed))
     {
+        /* NOTE: Handle keyboard repeat */
         State->KeyRepeatTime += State->DeltaTime;
 
         b32 InitialKeyRepeat = !State->KeyHasRepeated && State->KeyRepeatTime > 0.3f;
@@ -570,7 +521,29 @@ internal void HandleUserInput(state *State)
 
     for (u32 Key = 0; Key < Total_Number_Of_Keys; ++Key)
     {
-        UpdateKey(State, Key);
+        /* NOTE: Update state for each key */
+        u32 NextKeyStateIndex = !State->KeyStateIndex;
+        b32 IsDown = IsKeyDown(Key);
+        key_location Location = GetKeyLocation(Key);
+        key_state CurrentState = key_state_Undefined;
+
+        if (KeyLocationIsValid(Location))
+        {
+            u32 KeyStateChunk = State->KeyStates[State->KeyStateIndex][Location.Index];
+            key_state NextState = KeyStateMap[CurrentState][IsDown];
+            CurrentState = (KeyStateChunk >> Location.Shift) & Bits_Per_Key_State_Mask;
+
+            Assert(NextState < key_state_Count);
+
+            u32 UnsetMask = ~(Bits_Per_Key_State_Mask << Location.Shift);
+            u32 NewChunk = (KeyStateChunk & UnsetMask) | (NextState << Location.Shift);
+
+            State->KeyStates[NextKeyStateIndex][Location.Index] = NewChunk;
+        }
+        else
+        {
+            /* NOTE: Error */
+        }
     }
 }
 
@@ -632,11 +605,11 @@ internal void GetNextRandomQuizItem(state *State)
     State->QuizItemIndex = GetRandomQuizItemIndex(State);
     State->ShowAnswer = 0;
 
-    for (s32 I = 0; I <= State->QuizInputBufferIndex; ++I)
+    for (s32 I = 0; I <= State->QuizInputIndex; ++I)
     {
-        State->QuizInputBuffer[I] = 0;
+        State->QuizInput[I] = 0;
     }
-    State->QuizInputBufferIndex = 0;
+    State->QuizInputIndex = 0;
     State->QuizMode = quiz_mode_Typing;
 }
 
@@ -652,7 +625,7 @@ internal void UpdateAndRender(state *State)
     f32 PromptOffset = MeasureText(Prompt, FONT_SIZE) / 2.0f;
     f32 InputOffset = MeasureText(ExpectedAnswer, FONT_SIZE) / 2.0f;
 
-    if (StringsMatch(ExpectedAnswer, State->QuizInputBuffer))
+    if (StringsMatch(ExpectedAnswer, State->QuizInput))
     {
         State->QuizMode = quiz_mode_Correct;
     }
@@ -687,7 +660,7 @@ internal void UpdateAndRender(state *State)
     }
 
     DrawText(Prompt, SCREEN_HALF_WIDTH - PromptOffset, SCREEN_HALF_HEIGHT - 24, FONT_SIZE, FONT_COLOR);
-    DrawText(State->QuizInputBuffer, SCREEN_HALF_WIDTH - InputOffset, SCREEN_HALF_HEIGHT + 24, FONT_SIZE, FONT_COLOR);
+    DrawText(State->QuizInput, SCREEN_HALF_WIDTH - InputOffset, SCREEN_HALF_HEIGHT + 24, FONT_SIZE, FONT_COLOR);
 
 
     EndDrawing();
