@@ -7,37 +7,46 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
+#include <math.h>
 
 #include "../lib/raylib.h"
 
-typedef uint8_t u8;
-typedef uint32_t u32;
-typedef uint64_t u64;
+typedef uint8_t    u8;
+typedef uint32_t   u32;
+typedef uint64_t   u64;
 
-typedef int8_t s8;
-typedef int16_t s16;
-typedef int32_t s32;
-typedef int64_t s64;
+typedef int8_t     s8;
+typedef int16_t    s16;
+typedef int32_t    s32;
+typedef int64_t    s64;
 
-typedef uint8_t b8;
-typedef uint32_t b32;
+typedef uint8_t    b8;
+typedef uint32_t   b32;
 
-typedef float f32;
+typedef float      f32;
 
-typedef size_t size;
+typedef size_t     size;
+
+#define internal static
+#define global_variable static
+#define debug_variable static
+
+#if defined(PLATFORM_WEB)
+#include <emscripten/emscripten.h>
+#include "raylib_defines.c"
+#endif
+
+global_variable int SCREEN_WIDTH = 640;
+global_variable int SCREEN_HEIGHT = 400;
+
+#include "math.c"
+#include "raylib_helpers.h"
 
 #define TEST 0
 
 #define ArrayCount(a) (sizeof(a)/sizeof((a)[0]))
 
 #define IS_UPPER_CASE(c) ((c) >= 65 && (c) <= 90)
-
-#define internal static
-#define global_variable static
-#define debug_variable static
-
-#define SCREEN_WIDTH 640
-#define SCREEN_HEIGHT 400
 
 #define SCREEN_HALF_WIDTH (SCREEN_WIDTH / 2)
 #define SCREEN_HALF_HEIGHT (SCREEN_HEIGHT / 2)
@@ -689,6 +698,10 @@ int main(void)
     Assert(key_state_Count >= (1 << Bits_Per_Key_State) - 1);
     Assert((1 << Key_State_Chunk_Size_Log2) == 8 * sizeof(key_state_chunk));
     Assert((1 << Key_State_Chunk_Count_Log2) == Key_State_Chunk_Count);
+
+#if defined(PLATFORM_WEB)
+    InitRaylibCanvas();
+#endif
 
     int Result = 0;
     state State = {0};
