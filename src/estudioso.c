@@ -622,8 +622,23 @@ internal void UpdateAndRender(state *State)
     char *Prompt = QuizItems[State->QuizItemIndex].Prompt;
     char *ExpectedAnswer = QuizItems[State->QuizItemIndex].ExpectedAnswer;
 
-    f32 PromptOffset = MeasureText(Prompt, FONT_SIZE) / 2.0f;
-    f32 InputOffset = MeasureText(ExpectedAnswer, FONT_SIZE) / 2.0f;
+    f32 PromptWidth = MeasureText(Prompt, FONT_SIZE);
+    f32 AnswerWidth = MeasureText(ExpectedAnswer, FONT_SIZE);
+    f32 InputWidth = MeasureText(State->QuizInput, FONT_SIZE);
+
+    f32 PromptOffsetX = PromptWidth / 2.0f;
+    f32 PromptX = SCREEN_HALF_WIDTH - PromptOffsetX;
+    f32 PromptY = SCREEN_HALF_HEIGHT - 24;
+
+    f32 AnswerOffsetX = AnswerWidth / 2.0f;
+    f32 AnswerX = SCREEN_HALF_WIDTH - AnswerOffsetX;
+    f32 AnswerY = SCREEN_HALF_HEIGHT - 48;
+
+    f32 InputX = SCREEN_HALF_WIDTH - (InputWidth / 2.0f);
+    f32 InputY = SCREEN_HALF_HEIGHT + 48;
+
+    f32 CursorX = SCREEN_HALF_WIDTH + (InputWidth / 2.0f);
+    f32 CursorY = InputY;
 
     if (StringsMatch(ExpectedAnswer, State->QuizInput))
     {
@@ -642,7 +657,7 @@ internal void UpdateAndRender(state *State)
 
     if (State->ShowAnswer)
     {
-        DrawText(ExpectedAnswer, SCREEN_HALF_WIDTH - InputOffset, SCREEN_HALF_HEIGHT - 48, FONT_SIZE, ANSWER_COLOR);
+        DrawText(ExpectedAnswer, AnswerX, AnswerY, FONT_SIZE, ANSWER_COLOR);
     }
 
     if (IsKeyPressed(KEY_RIGHT))
@@ -659,9 +674,14 @@ internal void UpdateAndRender(state *State)
         DrawText(Buff, 20, 48, FONT_SIZE, FONT_COLOR);
     }
 
-    DrawText(Prompt, SCREEN_HALF_WIDTH - PromptOffset, SCREEN_HALF_HEIGHT - 24, FONT_SIZE, FONT_COLOR);
-    DrawText(State->QuizInput, SCREEN_HALF_WIDTH - InputOffset, SCREEN_HALF_HEIGHT + 24, FONT_SIZE, FONT_COLOR);
+    DrawText(Prompt, PromptX, PromptY, FONT_SIZE, FONT_COLOR);
+    DrawText(State->QuizInput, InputX, InputY, FONT_SIZE, FONT_COLOR);
 
+    { /* Draw cursor */
+        Color CursorColor = (Color){130,100,250,255};
+        f32 Spacing = 3.0f;
+        DrawRectangle(CursorX + Spacing, CursorY, 3, FONT_SIZE, CursorColor);
+    }
 
     EndDrawing();
 }
