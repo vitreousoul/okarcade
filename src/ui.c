@@ -221,6 +221,10 @@ b32 DoButton(ui *UI, button *Button)
     {
         UI->Hot = Button->Id;
     }
+    else if (UI->Hot == Button->Id)
+    {
+        UI->Hot = 0;
+    }
 
     if (UI->MouseButtonPressed)
     {

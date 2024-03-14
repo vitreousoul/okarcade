@@ -40,8 +40,11 @@ typedef size_t     size;
 global_variable int SCREEN_WIDTH = 640;
 global_variable int SCREEN_HEIGHT = 400;
 
+#include "../gen/roboto_regular.h"
+
 #include "math.c"
 #include "raylib_helpers.h"
+#include "ui.c"
 
 #define TEST 0
 
@@ -156,6 +159,8 @@ typedef struct
 
     u32 QuizItemIndex;
     quiz_mode QuizMode;
+
+    ui UI;
 } state;
 
 typedef struct
@@ -169,6 +174,14 @@ typedef struct
     char *Prompt;
     char *ExpectedAnswer;
 } quiz_item;
+
+typedef enum
+{
+    ui_NULL,
+    ui_Next,
+    ui_Previous,
+    ui_ShowAnswer,
+} estudioso_ui_ids;
 
 #define Quiz_Item_Max 256
 global_variable quiz_item QuizItems[Quiz_Item_Max];
@@ -466,6 +479,12 @@ internal void HandleUserInput(state *State)
         State->ModifierKeys.Super = IsKeyDown(KEY_LEFT_SUPER) || IsKeyDown(KEY_RIGHT_SUPER);
     }
 
+    {
+        State->UI.MouseButtonPressed = IsMouseButtonPressed(MOUSE_LEFT_BUTTON);
+        State->UI.MouseButtonReleased = IsMouseButtonDown(MOUSE_LEFT_BUTTON);
+        State->UI.MousePosition = GetMousePosition();
+    }
+
     for (u32 I = 0; I < Key_Press_Queue_Size; ++I)
     {
         State->KeyPressQueue[I] = 0;
@@ -640,6 +659,9 @@ internal void UpdateAndRender(state *State)
     f32 CursorX = SCREEN_HALF_WIDTH + (InputWidth / 2.0f);
     f32 CursorY = InputY;
 
+    BeginDrawing();
+    ClearBackground(BACKGROUND_COLOR);
+
     if (StringsMatch(ExpectedAnswer, State->QuizInput))
     {
         State->QuizMode = quiz_mode_Correct;
@@ -665,9 +687,6 @@ internal void UpdateAndRender(state *State)
         GetNextRandomQuizItem(State);
     }
 
-    BeginDrawing();
-    ClearBackground(BACKGROUND_COLOR);
-
     { /* Draw the index of the quiz item. */
         char Buff[16];
         sprintf(Buff, "%d", State->QuizItemIndex);
@@ -681,6 +700,23 @@ internal void UpdateAndRender(state *State)
         Color CursorColor = (Color){130,100,250,255};
         f32 Spacing = 3.0f;
         DrawRectangle(CursorX + Spacing, CursorY, 3, FONT_SIZE, CursorColor);
+    }
+
+    Vector2 NextButtonPosition = V2(SCREEN_WIDTH - FONT_SIZE, SCREEN_HEIGHT - FONT_SIZE);
+    b32 NextPressed = DoButtonWith(&State->UI, ui_Next, (u8 *)"Next", NextButtonPosition, alignment_BottomRight);
+
+    Vector2 PreviousButtonPosition = V2(FONT_SIZE, SCREEN_HEIGHT - FONT_SIZE);
+    b32 PreviousPressed = DoButtonWith(&State->UI, ui_Previous, (u8 *)"Previous", PreviousButtonPosition, alignment_BottomLeft);
+
+    if (NextPressed)
+    {
+        /* Assert(!"Implement next button press handling."); */
+        printf("Implement next button press handling.\n");
+    }
+    else if (PreviousPressed)
+    {
+        /* Assert(!"Implement previous button press handling."); */
+        printf("Implement previous button press handling.\n");
     }
 
     EndDrawing();
@@ -697,14 +733,28 @@ int main(void)
 #endif
 
     int Result = 0;
+
+    InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Estudioso");
+    SetTargetFPS(60);
+
     state State = {0};
+
+    s32 *Chars = 0;
+    s32 GlyphCount = 0;
+    State.UI.Font = LoadFontFromMemory(".ttf", RobotoRegularData, ArrayCount(RobotoRegularData), FONT_SIZE, Chars, GlyphCount);
+    State.UI.FontSize = FONT_SIZE;
 
     State.QuizMode = quiz_mode_Typing;
 
     srand(time(NULL));
 
-    InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Estudioso");
-    SetTargetFPS(60);
+    if (!IsFontReady(State.UI.Font))
+    {
+
+        printf("font not ready\n");
+        return 1;
+    }
+
 
     for (;;)
     {
