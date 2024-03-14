@@ -1,6 +1,5 @@
 /*
     TODO: Allow a history of quiz items, so you can scroll back and view previous answers.
-    TODO: Use font that supports displaying raw accents, including small-tilde "˜" (not the standard tilde "~")
     TODO: Add upside-down question mark
     TODO: Display the cursor!
 */
@@ -641,22 +640,22 @@ internal void UpdateAndRender(state *State)
     char *Prompt = QuizItems[State->QuizItemIndex].Prompt;
     char *ExpectedAnswer = QuizItems[State->QuizItemIndex].ExpectedAnswer;
 
-    f32 PromptWidth = MeasureText(Prompt, FONT_SIZE);
-    f32 AnswerWidth = MeasureText(ExpectedAnswer, FONT_SIZE);
-    f32 InputWidth = MeasureText(State->QuizInput, FONT_SIZE);
+    Vector2 PromptSize = MeasureTextEx(State->UI.Font, Prompt, FONT_SIZE, 1);
+    Vector2 AnswerSize = MeasureTextEx(State->UI.Font, ExpectedAnswer, FONT_SIZE, 1);
+    Vector2 InputSize = MeasureTextEx(State->UI.Font, State->QuizInput, FONT_SIZE, 1);
 
-    f32 PromptOffsetX = PromptWidth / 2.0f;
+    f32 PromptOffsetX = PromptSize.x / 2.0f;
     f32 PromptX = SCREEN_HALF_WIDTH - PromptOffsetX;
     f32 PromptY = SCREEN_HALF_HEIGHT - 24;
 
-    f32 AnswerOffsetX = AnswerWidth / 2.0f;
+    f32 AnswerOffsetX = AnswerSize.x / 2.0f;
     f32 AnswerX = SCREEN_HALF_WIDTH - AnswerOffsetX;
     f32 AnswerY = SCREEN_HALF_HEIGHT - 48;
 
-    f32 InputX = SCREEN_HALF_WIDTH - (InputWidth / 2.0f);
+    f32 InputX = SCREEN_HALF_WIDTH - (InputSize.x / 2.0f);
     f32 InputY = SCREEN_HALF_HEIGHT + 48;
 
-    f32 CursorX = SCREEN_HALF_WIDTH + (InputWidth / 2.0f);
+    f32 CursorX = SCREEN_HALF_WIDTH + (InputSize.x / 2.0f);
     f32 CursorY = InputY;
 
     BeginDrawing();
@@ -667,9 +666,11 @@ internal void UpdateAndRender(state *State)
         State->QuizMode = quiz_mode_Correct;
     }
 
+    int LetterSpacing = 1;
+
     if (State->QuizMode == quiz_mode_Correct)
     {
-        DrawText("Correct", 20, 20, FONT_SIZE, (Color){20, 200, 40, 255});
+        DrawTextEx(State->UI.Font, "Correct", V2(20, 20), State->UI.FontSize, LetterSpacing, (Color){20, 200, 40, 255});
 
         if (IsKeyDown(KEY_ENTER))
         {
@@ -679,22 +680,17 @@ internal void UpdateAndRender(state *State)
 
     if (State->ShowAnswer)
     {
-        DrawText(ExpectedAnswer, AnswerX, AnswerY, FONT_SIZE, ANSWER_COLOR);
-    }
-
-    if (IsKeyPressed(KEY_RIGHT))
-    {
-        GetNextRandomQuizItem(State);
+        DrawTextEx(State->UI.Font, ExpectedAnswer, V2(AnswerX, AnswerY), State->UI.FontSize, LetterSpacing, ANSWER_COLOR);
     }
 
     { /* Draw the index of the quiz item. */
         char Buff[16];
         sprintf(Buff, "%d", State->QuizItemIndex);
-        DrawText(Buff, 20, 48, FONT_SIZE, FONT_COLOR);
+        DrawTextEx(State->UI.Font, Buff, V2(20, 48), State->UI.FontSize, LetterSpacing, FONT_COLOR);
     }
 
-    DrawText(Prompt, PromptX, PromptY, FONT_SIZE, FONT_COLOR);
-    DrawText(State->QuizInput, InputX, InputY, FONT_SIZE, FONT_COLOR);
+    DrawTextEx(State->UI.Font, Prompt, V2(PromptX, PromptY), State->UI.FontSize, LetterSpacing, FONT_COLOR);
+    DrawTextEx(State->UI.Font, State->QuizInput, V2(InputX, InputY), State->UI.FontSize, LetterSpacing, FONT_COLOR);
 
     { /* Draw cursor */
         Color CursorColor = (Color){130,100,250,255};
@@ -704,19 +700,16 @@ internal void UpdateAndRender(state *State)
 
     Vector2 NextButtonPosition = V2(SCREEN_WIDTH - FONT_SIZE, SCREEN_HEIGHT - FONT_SIZE);
     b32 NextPressed = DoButtonWith(&State->UI, ui_Next, (u8 *)"Next", NextButtonPosition, alignment_BottomRight);
+    if (NextPressed)
+    {
+        GetNextRandomQuizItem(State);
+    }
 
     Vector2 PreviousButtonPosition = V2(FONT_SIZE, SCREEN_HEIGHT - FONT_SIZE);
     b32 PreviousPressed = DoButtonWith(&State->UI, ui_Previous, (u8 *)"Previous", PreviousButtonPosition, alignment_BottomLeft);
-
-    if (NextPressed)
+    if (PreviousPressed)
     {
-        /* Assert(!"Implement next button press handling."); */
-        printf("Implement next button press handling.\n");
-    }
-    else if (PreviousPressed)
-    {
-        /* Assert(!"Implement previous button press handling."); */
-        printf("Implement previous button press handling.\n");
+        printf("NOT IMPLEMENTED! We need to add a history feature in order to look at previous quiz items.\n");
     }
 
     EndDrawing();
@@ -739,9 +732,28 @@ int main(void)
 
     state State = {0};
 
-    s32 *Chars = 0;
-    s32 GlyphCount = 0;
-    State.UI.Font = LoadFontFromMemory(".ttf", RobotoRegularData, ArrayCount(RobotoRegularData), FONT_SIZE, Chars, GlyphCount);
+    /* s32 *Chars = 0; */
+    /* s32 GlyphCount = 0; */
+    int CodepointCount = 0;
+    int *Codepoints;
+
+    {
+        char *TextWithAllCodepoints = (
+            "abcdefghijklmnopqrstuvwxyz"
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+            "0123450123456789"
+            "`~!@#$%^&*()-_=+"
+            "[]{}\\|;:'\",.<>/?"
+            "´˜áéíóúÁÉÍÓÚñÑ");
+
+        Codepoints = LoadCodepoints(TextWithAllCodepoints, &CodepointCount);
+
+
+        /* State.UI.Font = LoadFontFromMemory(".ttf", FontData, ArrayCount(FontData), FONT_SIZE, codepointsNoDuplicates, codepointsNoDuplicatesCount); */
+        State.UI.Font = LoadFontFromMemory(".ttf", FontData, ArrayCount(FontData), FONT_SIZE, Codepoints, CodepointCount);
+        UnloadCodepoints(Codepoints);
+    }
+
     State.UI.FontSize = FONT_SIZE;
 
     State.QuizMode = quiz_mode_Typing;
@@ -784,7 +796,7 @@ global_variable quiz_item QuizItems[Quiz_Item_Max] = {
     },
     {
         "He is very cold.",
-        "Él hace mucho frio"
+        "Él hace mucho frio."
     },
     {
         "_ restaurante",

@@ -84,13 +84,13 @@ internal void GenerateFontData(linear_allocator TempString)
     u8 HexData[16] = {};
     u64 BeginningOffset = TempString.Offset;
 
-    u8 *RobotoRegularFilePath = (u8 *)"../assets/Roboto-Regular.ttf";
-    u8 *RobotoRegularDataPath = (u8 *)"../gen/roboto_regular.h";
+    u8 *FontFilePath = (u8 *)"../assets/Roboto-Regular.ttf";
+    u8 *FontDataPath = (u8 *)"../gen/roboto_regular.h";
 
     u8 *DataOutput = GetLinearAllocatorWriteLocation(&TempString);
-    buffer *Buffer = ReadFileIntoBuffer(RobotoRegularFilePath);
+    buffer *Buffer = ReadFileIntoBuffer(FontFilePath);
 
-    PushString(&TempString, (u8 *)"u8 RobotoRegularData[] = {");
+    PushString(&TempString, (u8 *)"u8 FontData[] = {");
 
     for (s32 I = 0; I < Buffer->Size; ++I)
     {
@@ -109,7 +109,7 @@ internal void GenerateFontData(linear_allocator TempString)
     PushString(&TempString, (u8 *)"};\0");
 
     u64 FileSize = TempString.Offset - BeginningOffset;
-    WriteFile(RobotoRegularDataPath, DataOutput, FileSize);
+    WriteFile(FontDataPath, DataOutput, FileSize);
 
     TempString.Offset = BeginningOffset;
 }

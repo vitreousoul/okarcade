@@ -640,7 +640,6 @@ internal void GenerateBlogPages(linear_allocator *TempString, pre_processor *Pre
     {
         File.Size = GetFileSize(CurrentFile->Name);
         File.Data = PushLinearAllocator(TempString, File.Size + 1);
-        u64 BlogPageDataOffset = Preprocessor->OutputAllocator.Offset;
 
         if (File.Data)
         {
