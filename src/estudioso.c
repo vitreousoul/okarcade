@@ -593,7 +593,7 @@ internal b32 StringsMatch(char *A, char *B)
     }
 }
 
-internal inline s32 GetRandomQuizItemIndex(state *State)
+internal inline s32 GetRandomQuizItemIndex(void)
 {
     s32 RandomIndex;
 
@@ -649,7 +649,7 @@ internal void ClearQuizInput(state *State)
 
 internal void GetNextRandomQuizItem(state *State)
 {
-    State->QuizItemIndex = GetRandomQuizItemIndex(State);
+    State->QuizItemIndex = GetRandomQuizItemIndex();
     State->ShowAnswer = 0;
 
     ClearQuizInput(State);
@@ -769,7 +769,7 @@ internal void UpdateAndRender(state *State)
             ClearQuizInput(State);
 
             State->QuizMode = quiz_mode_Typing;
-            State->QuizItemIndex = GetRandomQuizItemIndex(State);
+            State->QuizItemIndex = GetRandomQuizItemIndex();
         }
     }
 
@@ -819,7 +819,7 @@ int main(void)
 
     srand(time(NULL));
 
-    State.QuizItemIndex = GetRandomQuizItemIndex(&State);
+    State.QuizItemIndex = GetRandomQuizItemIndex();
 
     if (!IsFontReady(State.UI.Font))
     {

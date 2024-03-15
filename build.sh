@@ -48,9 +48,8 @@ else
     GRAPHICS_FRAMEWORKS="-framework CoreVideo -framework IOKit -framework Cocoa -framework GLUT -framework OpenGL"
     GRAPHICS_LIB="lib/libraylib.a"
 
-    #SETTINGS="-std=c99 -Wall -Wextra -Wstrict-prototypes -Wold-style-definition -Wmissing-prototypes -Wmissing-declarations -Wno-comment"
-    # TODO: delete line below and use line above again... just remove -Wall to ignroe warning for a bit
-    SETTINGS="-std=c99 -Wextra -Wstrict-prototypes -Wold-style-definition -Wmissing-prototypes -Wmissing-declarations -Wno-comment"
+    SETTINGS="-std=c99 -Wall -Wextra -Wstrict-prototypes -Wold-style-definition -Wno-comment"
+    SETTINGS="$SETTINGS -Wmissing-prototypes -Wmissing-declarations"
     SOURCE_FILE="./src/$TARGET_NAME.c"
 
     gcc $GRAPHICS_FRAMEWORKS $GRAPHICS_LIB $SETTINGS $SOURCE_FILE $TARGET
