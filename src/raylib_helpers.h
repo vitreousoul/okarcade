@@ -1,3 +1,6 @@
+#define TARGET_SCREEN_WIDTH 1280
+#define TARGET_SCREEN_HEIGHT 800
+
 f32 Min(f32 ValueA, f32 ValueB);
 f32 Max(f32 ValueA, f32 ValueB);
 
@@ -46,17 +49,53 @@ inline Rectangle R2(f32 X, f32 Y, f32 Width, f32 Height)
 #if defined(PLATFORM_WEB)
 void InitRaylibCanvas(void);
 
+EM_JS(void, UpdateCanvasDimensions, (f32 TargetWidth, f32 TargetHeight), {
+    var Canvas = document.getElementById("canvas");
+
+    if (Canvas) {
+        var CanvasRect = Canvas.getBoundingClientRect();
+        var CanvasRatio = CanvasRect.width / CanvasRect.height;
+
+        var PixelCount = TargetWidth * TargetHeight;
+        var PixelScale = PixelCount / (CanvasRect.width * CanvasRect.height);
+
+        Canvas.width = Math.sqrt((PixelScale * CanvasRect.width * CanvasRect.height) * CanvasRatio);
+        Canvas.height = Math.sqrt((PixelScale * CanvasRect.width * CanvasRect.height) / CanvasRatio);
+    }
+});
+
+EM_JS(s32, GetCanvasWidth, (), {
+    var canvas = document.getElementById("canvas");
+    if (canvas) {
+        var rect = canvas.getBoundingClientRect();
+        return canvas.width;
+    } else {
+        return -1.0;
+    }
+});
+
+EM_JS(s32, GetCanvasHeight, (), {
+    var canvas = document.getElementById("canvas");
+    if (canvas) {
+        var rect = canvas.getBoundingClientRect();
+        return canvas.height;
+    } else {
+        return -1.0;
+    }
+});
+
 
 void InitRaylibCanvas(void)
 {
-    UpdateCanvasDimensions();
+    UpdateCanvasDimensions(TARGET_SCREEN_WIDTH, TARGET_SCREEN_HEIGHT);
+    f32 CanvasWidth = GetCanvasWidth();
+    f32 CanvasHeight = GetCanvasHeight();
 
-    s32 CanvasWidth = GetCanvasWidth();
-    s32 CanvasHeight = GetCanvasHeight();
     if (CanvasWidth > 0.0f && CanvasHeight > 0.0f)
     {
         SCREEN_WIDTH = CanvasWidth;
         SCREEN_HEIGHT = CanvasHeight;
     }
 }
+
 #endif

@@ -14,10 +14,6 @@ int SCREEN_WIDTH = 1200;
 int SCREEN_HEIGHT = 700;
 #define TARGET_FPS 30
 
-#if defined(PLATFORM_WEB)
-#include "raylib_defines.c"
-#endif
-
 #include "core.c"
 #include "math.c"
 #include "raylib_helpers.h"

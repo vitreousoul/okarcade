@@ -17,7 +17,6 @@ int SCREEN_HEIGHT = 700;
 
 #if defined(PLATFORM_WEB)
 #include <emscripten/emscripten.h>
-#include "raylib_defines.c"
 #endif
 
 #include "../gen/scuba.h"
@@ -2469,7 +2468,7 @@ int main(void)
     s32 FontSize = 32;
     s32 *Chars = 0;
     s32 GlyphCount = 0;
-    Font LoadedFont = LoadFontFromMemory(".ttf", RobotoRegularData, ArrayCount(RobotoRegularData), FontSize, Chars, GlyphCount);
+    Font LoadedFont = LoadFontFromMemory(".ttf", FontData, ArrayCount(FontData), FontSize, Chars, GlyphCount);
 
     Texture2D ScubaTexture = {0};
     b32 TextureError = LoadScubaTexture(&ScubaTexture);

@@ -34,11 +34,20 @@ typedef size_t     size;
 
 #if defined(PLATFORM_WEB)
 #include <emscripten/emscripten.h>
-#include "raylib_defines.c"
 #endif
 
-global_variable int SCREEN_WIDTH = 640;
-global_variable int SCREEN_HEIGHT = 400;
+#ifdef TARGET_SCREEN_WIDTH
+global_variable int SCREEN_WIDTH = TARGET_SCREEN_WIDTH;
+#else
+global_variable int SCREEN_WIDTH = 1280;
+#endif
+
+#ifdef TARGET_SCREEN_HEIGHT
+global_variable int SCREEN_HEIGHT = TARGET_SCREEN_HEIGHT;
+#else
+global_variable int SCREEN_HEIGHT = 800;
+#endif
+
 
 #include "../gen/roboto_regular.h"
 
@@ -55,7 +64,6 @@ global_variable int SCREEN_HEIGHT = 400;
 #define SCREEN_HALF_WIDTH (SCREEN_WIDTH / 2)
 #define SCREEN_HALF_HEIGHT (SCREEN_HEIGHT / 2)
 
-#define FONT_SIZE 24
 #define BACKGROUND_COLOR (Color){40,50,40,255}
 #define FONT_COLOR (Color){250,240,245,255}
 #define ANSWER_COLOR (Color){200,240,205,255}
@@ -676,9 +684,9 @@ internal void UpdateAndRender(state *State)
     char *Prompt = QuizItems[State->QuizItemIndex].Prompt;
     char *ExpectedAnswer = QuizItems[State->QuizItemIndex].ExpectedAnswer;
 
-    Vector2 PromptSize = MeasureTextEx(State->UI.Font, Prompt, FONT_SIZE, 1);
-    Vector2 AnswerSize = MeasureTextEx(State->UI.Font, ExpectedAnswer, FONT_SIZE, 1);
-    Vector2 InputSize = MeasureTextEx(State->UI.Font, State->QuizInput, FONT_SIZE, 1);
+    Vector2 PromptSize = MeasureTextEx(State->UI.Font, Prompt, State->UI.FontSize, 1);
+    Vector2 AnswerSize = MeasureTextEx(State->UI.Font, ExpectedAnswer, State->UI.FontSize, 1);
+    Vector2 InputSize = MeasureTextEx(State->UI.Font, State->QuizInput, State->UI.FontSize, 1);
 
     f32 PromptOffsetX = PromptSize.x / 2.0f;
     f32 PromptX = SCREEN_HALF_WIDTH - PromptOffsetX;
@@ -734,17 +742,17 @@ internal void UpdateAndRender(state *State)
         { /* Draw cursor */
             Color CursorColor = (Color){130,100,250,255};
             f32 Spacing = 3.0f;
-            DrawRectangle(CursorX + Spacing, CursorY, 3, FONT_SIZE, CursorColor);
+            DrawRectangle(CursorX + Spacing, CursorY, 3, State->UI.FontSize, CursorColor);
         }
 
-        Vector2 NextButtonPosition = V2(SCREEN_WIDTH - FONT_SIZE, SCREEN_HEIGHT - FONT_SIZE);
+        Vector2 NextButtonPosition = V2(SCREEN_WIDTH - State->UI.FontSize, SCREEN_HEIGHT - State->UI.FontSize);
         b32 NextPressed = DoButtonWith(&State->UI, ui_Next, (u8 *)"Next", NextButtonPosition, alignment_BottomRight);
         if (NextPressed)
         {
             GetNextRandomQuizItem(State);
         }
 
-        Vector2 PreviousButtonPosition = V2(FONT_SIZE, SCREEN_HEIGHT - FONT_SIZE);
+        Vector2 PreviousButtonPosition = V2(State->UI.FontSize, SCREEN_HEIGHT - State->UI.FontSize);
         b32 PreviousPressed = DoButtonWith(&State->UI, ui_Previous, (u8 *)"Previous", PreviousButtonPosition, alignment_BottomLeft);
         if (PreviousPressed)
         {
@@ -782,6 +790,9 @@ int main(void)
     Assert((1 << Key_State_Chunk_Size_Log2) == 8 * sizeof(key_state_chunk));
     Assert((1 << Key_State_Chunk_Count_Log2) == Key_State_Chunk_Count);
 
+    state State = {0};
+    State.UI.FontSize = 28;
+
 #if defined(PLATFORM_WEB)
     InitRaylibCanvas();
 #endif
@@ -790,8 +801,6 @@ int main(void)
 
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Estudioso");
     SetTargetFPS(60);
-
-    state State = {0};
 
     int CodepointCount = 0;
     int *Codepoints;
@@ -808,12 +817,10 @@ int main(void)
 
         Codepoints = LoadCodepoints(TextWithAllCodepoints, &CodepointCount);
 
-        u32 FontScale = 2;
-        State.UI.Font = LoadFontFromMemory(".ttf", FontData, ArrayCount(FontData), FONT_SIZE*FontScale, Codepoints, CodepointCount);
+        u32 FontScale = 4;
+        State.UI.Font = LoadFontFromMemory(".ttf", FontData, ArrayCount(FontData), State.UI.FontSize*FontScale, Codepoints, CodepointCount);
         UnloadCodepoints(Codepoints);
     }
-
-    State.UI.FontSize = FONT_SIZE;
 
     State.QuizMode = quiz_mode_Typing;
 
