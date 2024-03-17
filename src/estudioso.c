@@ -67,6 +67,7 @@ global_variable int SCREEN_HEIGHT = 800;
 #define BACKGROUND_COLOR (Color){40,50,40,255}
 #define FONT_COLOR (Color){250,240,245,255}
 #define ANSWER_COLOR (Color){200,240,205,255}
+#define CONJUGATION_TYPE_COLOR (Color){240,240,205,255}
 
 #define Is_Utf8_Header_Byte1(b) (((b) & 0x80) == 0x00)
 #define Is_Utf8_Header_Byte2(b) (((b) & 0xE0) == 0xC0)
@@ -172,17 +173,52 @@ typedef struct
     ui UI;
 } state;
 
+typedef enum
+{
+    conjugation_Null,
+    conjugation_Presente,
+    conjugation_Imperfecto,
+    conjugation_Indefinido,
+    conjugation_Futuro,
+    conjugation_Count,
+} conjugation;
+
 typedef struct
 {
     s16 Index;
     s16 Shift;
 } key_location;
 
+typedef enum
+{
+    quiz_item_Null,
+    quiz_item_Text,
+    quiz_item_Conjugation,
+    quiz_item_Count,
+} quiz_item_type;
+
 typedef struct
 {
     char *Prompt;
-    char *ExpectedAnswer;
+    char *Answer;
+} quiz_text;
+
+typedef struct
+{
+    conjugation Conjugation;
+    char *Prompt;
+    char *Answer;
+} quiz_conjugation;
+
+typedef struct
+{
+    quiz_item_type Type;
     b32 Complete;
+    union
+    {
+        quiz_text Text;
+        quiz_conjugation Conjugation;
+    };
 } quiz_item;
 
 typedef enum
@@ -195,6 +231,7 @@ typedef enum
 
 #define Quiz_Item_Max 256
 global_variable quiz_item QuizItems[Quiz_Item_Max];
+global_variable u32 QuizItemCount = 0;
 
 global_variable key_state KeyStateMap[key_state_Count][2] = {
     [key_Up]       =  {key_Up      ,  key_Pressed},
@@ -601,18 +638,37 @@ internal b32 StringsMatch(char *A, char *B)
     }
 }
 
-internal inline s32 GetRandomQuizItemIndex(void)
+internal u32 GetQuizItemCount()
 {
-    s32 RandomIndex;
-
     u32 QuizItemCount;
     for (QuizItemCount = 0; QuizItemCount < Quiz_Item_Max; ++QuizItemCount)
     {
-        if (!QuizItems[QuizItemCount].Prompt || !QuizItems[QuizItemCount].ExpectedAnswer)
+        quiz_item QuizItem = QuizItems[QuizItemCount];
+
+        if (QuizItem.Type == quiz_item_Text)
+        {
+            if (!(QuizItem.Text.Prompt && QuizItem.Text.Answer))
+            {
+                break;
+            }
+        }
+        else if (QuizItem.Type == quiz_item_Conjugation)
+        {
+
+        }
+        else
         {
             break;
         }
     }
+
+    return QuizItemCount;
+}
+
+internal inline s32 GetRandomQuizItemIndex(void)
+{
+    s32 RandomIndex;
+    u32 QuizItemCount = GetQuizItemCount();
 
     RandomIndex = rand() % QuizItemCount;
     s32 LastIndex = -1;
@@ -675,17 +731,34 @@ internal void GetNextRandomQuizItem(state *State)
     }
 }
 
-internal void UpdateAndRender(state *State)
+internal void DrawQuizPrompt(state *State, u32 LetterSpacing)
 {
-    HandleUserInput(State);
+    quiz_item QuizItem = QuizItems[State->QuizItemIndex];
 
-    State->KeyStateIndex = !State->KeyStateIndex;
+    char *Prompt;
+    char *Answer;
 
-    char *Prompt = QuizItems[State->QuizItemIndex].Prompt;
-    char *ExpectedAnswer = QuizItems[State->QuizItemIndex].ExpectedAnswer;
+    switch (QuizItem.Type)
+    {
+    case quiz_item_Text:
+    {
+        Prompt = QuizItems[State->QuizItemIndex].Text.Prompt;
+        Answer = QuizItems[State->QuizItemIndex].Text.Answer;
+    } break;
+    case quiz_item_Conjugation:
+    {
+        Prompt = QuizItems[State->QuizItemIndex].Conjugation.Prompt;
+        Answer = QuizItems[State->QuizItemIndex].Conjugation.Answer;
+    } break;
+    default:
+    {
+        Prompt = "";
+        Answer = "";
+    } break;
+    }
 
     Vector2 PromptSize = MeasureTextEx(State->UI.Font, Prompt, State->UI.FontSize, 1);
-    Vector2 AnswerSize = MeasureTextEx(State->UI.Font, ExpectedAnswer, State->UI.FontSize, 1);
+    Vector2 AnswerSize = MeasureTextEx(State->UI.Font, Answer, State->UI.FontSize, 1);
     Vector2 InputSize = MeasureTextEx(State->UI.Font, State->QuizInput, State->UI.FontSize, 1);
 
     f32 PromptOffsetX = PromptSize.x / 2.0f;
@@ -694,7 +767,7 @@ internal void UpdateAndRender(state *State)
 
     f32 AnswerOffsetX = AnswerSize.x / 2.0f;
     f32 AnswerX = SCREEN_HALF_WIDTH - AnswerOffsetX;
-    f32 AnswerY = SCREEN_HALF_HEIGHT - 48;
+    f32 AnswerY = SCREEN_HALF_HEIGHT - 52;
 
     f32 InputX = SCREEN_HALF_WIDTH - (InputSize.x / 2.0f);
     f32 InputY = SCREEN_HALF_HEIGHT + 48;
@@ -702,48 +775,144 @@ internal void UpdateAndRender(state *State)
     f32 CursorX = SCREEN_HALF_WIDTH + (InputSize.x / 2.0f);
     f32 CursorY = InputY;
 
+    if (State->QuizMode == quiz_mode_Correct)
+    {
+        DrawTextEx(State->UI.Font, "Correct", V2(20, 20), State->UI.FontSize, LetterSpacing, (Color){20, 200, 40, 255});
+
+        if (IsKeyPressed(KEY_ENTER))
+        {
+            GetNextRandomQuizItem(State);
+        }
+    }
+
+    if (QuizItem.Type == quiz_item_Conjugation)
+    {
+        char *ConjugationText = "";
+
+        switch (QuizItems[State->QuizItemIndex].Conjugation.Conjugation)
+        {
+        case conjugation_Presente:    ConjugationText = "Presente"; break;
+        case conjugation_Imperfecto:  ConjugationText = "Imperfecto"; break;
+        case conjugation_Indefinido:  ConjugationText = "Indefinido"; break;
+        case conjugation_Futuro:      ConjugationText = "Futuro"; break;
+        default: break;
+        }
+
+        Vector2 TextSize = MeasureTextEx(State->UI.Font, ConjugationText, State->UI.FontSize, LetterSpacing);
+        Vector2 TextPosition = V2((SCREEN_WIDTH / 2) - (TextSize.x / 2), (SCREEN_HEIGHT / 2) - 82);
+        DrawTextEx(State->UI.Font, ConjugationText, TextPosition, State->UI.FontSize, LetterSpacing, CONJUGATION_TYPE_COLOR);
+    }
+
+    if (State->ShowAnswer)
+    {
+        DrawTextEx(State->UI.Font, Answer, V2(AnswerX, AnswerY), State->UI.FontSize, LetterSpacing, ANSWER_COLOR);
+    }
+
+    { /* Draw the index of the quiz item. */
+        char Buff[16];
+        sprintf(Buff, "%d", State->QuizItemIndex);
+        DrawTextEx(State->UI.Font, Buff, V2(20, 48), State->UI.FontSize, LetterSpacing, FONT_COLOR);
+    }
+
+    DrawTextEx(State->UI.Font, Prompt, V2(PromptX, PromptY), State->UI.FontSize, LetterSpacing, FONT_COLOR);
+    DrawTextEx(State->UI.Font, State->QuizInput, V2(InputX, InputY), State->UI.FontSize, LetterSpacing, FONT_COLOR);
+
+    { /* Draw cursor */
+        Color CursorColor = (Color){130,100,250,255};
+        f32 Spacing = 3.0f;
+        DrawRectangle(CursorX + Spacing, CursorY, 3, State->UI.FontSize, CursorColor);
+    }
+
+    Vector2 NextButtonPosition = V2(SCREEN_WIDTH - State->UI.FontSize, SCREEN_HEIGHT - State->UI.FontSize);
+    b32 NextPressed = DoButtonWith(&State->UI, ui_Next, (u8 *)"Next", NextButtonPosition, alignment_BottomRight);
+    if (NextPressed)
+    {
+        GetNextRandomQuizItem(State);
+    }
+
+    Vector2 PreviousButtonPosition = V2(State->UI.FontSize, SCREEN_HEIGHT - State->UI.FontSize);
+    b32 PreviousPressed = DoButtonWith(&State->UI, ui_Previous, (u8 *)"Previous", PreviousButtonPosition, alignment_BottomLeft);
+    if (PreviousPressed)
+    {
+        printf("NOT IMPLEMENTED! We need to add a history feature in order to look at previous quiz items.\n");
+    }
+}
+
+internal void DisplayWinMessage(state *State, u32 LetterSpacing)
+{
+    char *WinMessage = "Tú ganas!";
+    Vector2 TextSize = MeasureTextEx(State->UI.Font, WinMessage, State->UI.FontSize, LetterSpacing);
+    Vector2 TextPosition = V2((SCREEN_WIDTH / 2) - (TextSize.x / 2), SCREEN_HEIGHT / 2);
+    DrawTextEx(State->UI.Font, WinMessage, TextPosition, State->UI.FontSize, LetterSpacing, FONT_COLOR);
+
+    if (IsKeyPressed(KEY_ENTER))
+    {
+        /* NOTE: reset quiz completion */
+        for (s32 I = 0; I < Quiz_Item_Max; ++I)
+        {
+            QuizItems[I].Complete = 0;
+        }
+        ClearQuizInput(State);
+
+        State->QuizMode = quiz_mode_Typing;
+        State->QuizItemIndex = GetRandomQuizItemIndex();
+    }
+
+}
+
+internal void UpdateAndRender(state *State)
+{
+    HandleUserInput(State);
+
+    State->KeyStateIndex = !State->KeyStateIndex;
+
+    quiz_item QuizItem = QuizItems[State->QuizItemIndex];
+    int LetterSpacing = 1;
+
     BeginDrawing();
     ClearBackground(BACKGROUND_COLOR);
 
-    if (StringsMatch(ExpectedAnswer, State->QuizInput))
+    switch(QuizItem.Type)
     {
-        State->QuizMode = quiz_mode_Correct;
-        QuizItems[State->QuizItemIndex].Complete = 1;
-    }
-
-    int LetterSpacing = 1;
-
-    if (State->QuizMode == quiz_mode_Typing || State->QuizMode == quiz_mode_Correct)
+    case quiz_item_Conjugation:
     {
-        if (State->QuizMode == quiz_mode_Correct)
+        if (StringsMatch(QuizItem.Conjugation.Answer, State->QuizInput))
         {
-            DrawTextEx(State->UI.Font, "Correct", V2(20, 20), State->UI.FontSize, LetterSpacing, (Color){20, 200, 40, 255});
-
-            if (IsKeyPressed(KEY_ENTER))
-            {
-                GetNextRandomQuizItem(State);
-            }
+            State->QuizMode = quiz_mode_Correct;
+            QuizItems[State->QuizItemIndex].Complete = 1;
         }
 
-        if (State->ShowAnswer)
+        if (State->QuizMode == quiz_mode_Typing || State->QuizMode == quiz_mode_Correct)
         {
-            DrawTextEx(State->UI.Font, ExpectedAnswer, V2(AnswerX, AnswerY), State->UI.FontSize, LetterSpacing, ANSWER_COLOR);
+            DrawQuizPrompt(State, LetterSpacing);
+        }
+        else if (State->QuizMode == quiz_mode_Win)
+        {
+            DisplayWinMessage(State, LetterSpacing);
+        }
+    } break;
+    case quiz_item_Text:
+    {
+        char *Answer = QuizItems[State->QuizItemIndex].Text.Answer;
+
+        if (StringsMatch(Answer, State->QuizInput))
+        {
+            State->QuizMode = quiz_mode_Correct;
+            QuizItems[State->QuizItemIndex].Complete = 1;
         }
 
-        { /* Draw the index of the quiz item. */
-            char Buff[16];
-            sprintf(Buff, "%d", State->QuizItemIndex);
-            DrawTextEx(State->UI.Font, Buff, V2(20, 48), State->UI.FontSize, LetterSpacing, FONT_COLOR);
+        if (State->QuizMode == quiz_mode_Typing || State->QuizMode == quiz_mode_Correct)
+        {
+            DrawQuizPrompt(State, LetterSpacing);
         }
-
-        DrawTextEx(State->UI.Font, Prompt, V2(PromptX, PromptY), State->UI.FontSize, LetterSpacing, FONT_COLOR);
-        DrawTextEx(State->UI.Font, State->QuizInput, V2(InputX, InputY), State->UI.FontSize, LetterSpacing, FONT_COLOR);
-
-        { /* Draw cursor */
-            Color CursorColor = (Color){130,100,250,255};
-            f32 Spacing = 3.0f;
-            DrawRectangle(CursorX + Spacing, CursorY, 3, State->UI.FontSize, CursorColor);
+        else if (State->QuizMode == quiz_mode_Win)
+        {
+            DisplayWinMessage(State, LetterSpacing);
         }
+    } break;
+    default:
+    {
+        DrawText("Unknown quiz type\n", 20, 20, 22, (Color){220,100,180,255});
 
         Vector2 NextButtonPosition = V2(SCREEN_WIDTH - State->UI.FontSize, SCREEN_HEIGHT - State->UI.FontSize);
         b32 NextPressed = DoButtonWith(&State->UI, ui_Next, (u8 *)"Next", NextButtonPosition, alignment_BottomRight);
@@ -751,38 +920,13 @@ internal void UpdateAndRender(state *State)
         {
             GetNextRandomQuizItem(State);
         }
-
-        Vector2 PreviousButtonPosition = V2(State->UI.FontSize, SCREEN_HEIGHT - State->UI.FontSize);
-        b32 PreviousPressed = DoButtonWith(&State->UI, ui_Previous, (u8 *)"Previous", PreviousButtonPosition, alignment_BottomLeft);
-        if (PreviousPressed)
-        {
-            printf("NOT IMPLEMENTED! We need to add a history feature in order to look at previous quiz items.\n");
-        }
-
     }
-    else if (State->QuizMode == quiz_mode_Win)
-    {
-        char *WinMessage = "Tú ganas!";
-        Vector2 TextSize = MeasureTextEx(State->UI.Font, WinMessage, State->UI.FontSize, LetterSpacing);
-        Vector2 TextPosition = V2((SCREEN_WIDTH / 2) - (TextSize.x / 2), SCREEN_HEIGHT / 2);
-        DrawTextEx(State->UI.Font, WinMessage, TextPosition, State->UI.FontSize, LetterSpacing, FONT_COLOR);
-
-        if (IsKeyPressed(KEY_ENTER))
-        {
-            /* NOTE: reset quiz completion */
-            for (s32 I = 0; I < Quiz_Item_Max; ++I)
-            {
-                QuizItems[I].Complete = 0;
-            }
-            ClearQuizInput(State);
-
-            State->QuizMode = quiz_mode_Typing;
-            State->QuizItemIndex = GetRandomQuizItemIndex();
-        }
     }
 
     EndDrawing();
 }
+
+internal void InitializeQuizItems(void);
 
 int main(void)
 {
@@ -798,6 +942,7 @@ int main(void)
 #endif
 
     int Result = 0;
+    InitializeQuizItems();
 
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Estudioso");
     SetTargetFPS(60);
@@ -855,172 +1000,237 @@ int main(void)
     return Result;
 }
 
-#define Quiz_Item(p, a) ((quiz_item){p, a, 0})
+internal void AddQuizItem(quiz_item QuizItem)
+{
+    if (QuizItemCount < Quiz_Item_Max)
+    {
+        QuizItems[QuizItemCount] = QuizItem;
+        QuizItemCount += 1;
+    }
+}
 
-global_variable quiz_item QuizItems[Quiz_Item_Max] = {
-    Quiz_Item(
+internal void AddQuizText(char *Prompt, char *Answer)
+{
+    quiz_item QuizItem;
+
+    QuizItem.Type = quiz_item_Text;
+    QuizItem.Complete = 0;
+    QuizItem.Text.Prompt = Prompt;
+    QuizItem.Text.Answer = Answer;
+
+    AddQuizItem(QuizItem);
+}
+
+internal void AddQuizConjugation(conjugation Conjugation, char *Prompt, char *Answer)
+{
+    quiz_item QuizItem;
+
+    QuizItem.Type = quiz_item_Conjugation;
+    QuizItem.Complete = 0;
+    QuizItem.Conjugation.Conjugation = Conjugation;
+    QuizItem.Conjugation.Prompt = Prompt;
+    QuizItem.Conjugation.Answer = Answer;
+
+    AddQuizItem(QuizItem);
+}
+
+
+#define QuizItemText(Prompt, Answer) ((quiz_item){quiz_item_Text,0,(quiz_prompt){{Prompt,Answer}}})
+#define QuizItemConjugation(Conjugation, Prompt, Answer) ((quiz_item){quiz_item_Conjugation,0,(quiz_conjugation){{Conjugation,Prompt,Answer}}})
+
+internal void InitializeQuizItems(void)
+{
+    AddQuizConjugation(conjugation_Presente, "yo [ser]",                 "soy");
+    AddQuizConjugation(conjugation_Presente, "tú [ser]",                 "eres");
+    AddQuizConjugation(conjugation_Presente, "él, ella, usted [ser]",    "es");
+    AddQuizConjugation(conjugation_Presente, "nosotros/-as [ser]",       "somos");
+    AddQuizConjugation(conjugation_Presente, "vosotros/-as [ser]",       "sois");
+    AddQuizConjugation(conjugation_Presente, "ellos/-as, ustedes [ser]", "son");
+
+    AddQuizConjugation(conjugation_Imperfecto, "yo [ser]",                 "era");
+    AddQuizConjugation(conjugation_Imperfecto, "tú [ser]",                 "eras");
+    AddQuizConjugation(conjugation_Imperfecto, "él, ella, usted [ser]",    "era");
+    AddQuizConjugation(conjugation_Imperfecto, "nosotros/-as [ser]",       "éramos");
+    AddQuizConjugation(conjugation_Imperfecto, "vosotros/-as [ser]",       "erais");
+    AddQuizConjugation(conjugation_Imperfecto, "ellos/-as, ustedes [ser]", "eran");
+
+    AddQuizConjugation(conjugation_Indefinido, "yo [ser]",                 "fui");
+    AddQuizConjugation(conjugation_Indefinido, "tú [ser]",                 "fuiste");
+    AddQuizConjugation(conjugation_Indefinido, "él, ella, usted [ser]",    "fue");
+    AddQuizConjugation(conjugation_Indefinido, "nosotros/-as [ser]",       "fuimos");
+    AddQuizConjugation(conjugation_Indefinido, "vosotros/-as [ser]",       "fuisteis");
+    AddQuizConjugation(conjugation_Indefinido, "ellos/-as, ustedes [ser]", "fueron");
+
+    AddQuizConjugation(conjugation_Futuro, "yo [ser]",                 "seré");
+    AddQuizConjugation(conjugation_Futuro, "tú [ser]",                 "serás");
+    AddQuizConjugation(conjugation_Futuro, "él, ella, usted [ser]",    "será");
+    AddQuizConjugation(conjugation_Futuro, "nosotros/-as [ser]",       "seremos");
+    AddQuizConjugation(conjugation_Futuro, "vosotros/-as [ser]",       "seréis");
+    AddQuizConjugation(conjugation_Futuro, "ellos/-as, ustedes [ser]", "serán");
+
+    AddQuizText(
         "In the morning the weather is good in April.",
         "En la mañana hace buen tiempo en abril."
-    ),
-    Quiz_Item(
+    );
+    AddQuizText(
         "He is very cold.",
         "Él hace mucho frio."
-    ),
-    Quiz_Item(
+    );
+    AddQuizText(
         "_ restaurante",
         "el"
-    ),
-    Quiz_Item(
+    );
+    AddQuizText(
         "_ café",
         "el"
-    ),
-    Quiz_Item(
+    );
+    AddQuizText(
         "_ coche",
         "el"
-    ),
-    Quiz_Item(
+    );
+    AddQuizText(
         "_ viaje",
         "el"
-    ),
-    Quiz_Item(
+    );
+    AddQuizText(
         "_ parque",
         "el"
-    ),
-    Quiz_Item(
+    );
+    AddQuizText(
         "_ paquete",
         "el"
-    ),
-    Quiz_Item(
+    );
+    AddQuizText(
         "_ menú",
         "el"
-    ),
-    Quiz_Item(
+    );
+    AddQuizText(
         "_ colibrí",
         "el"
-    ),
-    Quiz_Item(
+    );
+    AddQuizText(
         "_ reloj",
         "el"
-    ),
-    Quiz_Item(
+    );
+    AddQuizText(
         "_ chocolate",
         "el"
-    ),
-    Quiz_Item(
+    );
+    AddQuizText(
         "_ pie",
         "el"
-    ),
-    Quiz_Item(
+    );
+    AddQuizText(
         "_ diente",
         "el"
-    ),
-    Quiz_Item(
+    );
+    AddQuizText(
         "_ noche",
         "la"
-    ),
-    Quiz_Item(
+    );
+    AddQuizText(
         "_ sangre",
         "la"
-    ),
-    Quiz_Item(
+    );
+    AddQuizText(
         "_ nube",
         "la"
-    ),
-    Quiz_Item(
+    );
+    AddQuizText(
         "_ llave",
         "la"
-    ),
-    Quiz_Item(
+    );
+    AddQuizText(
         "_ calle",
         "la"
-    ),
-    Quiz_Item(
+    );
+    AddQuizText(
         "_ gente",
         "la"
-    ),
-    Quiz_Item(
+    );
+    AddQuizText(
         "_ nieve",
         "la"
-    ),
-    Quiz_Item(
+    );
+    AddQuizText(
         "_ leche",
         "la"
-    ),
-    Quiz_Item(
+    );
+    AddQuizText(
         "_ carne",
         "la"
-    ),
-    Quiz_Item(
+    );
+    AddQuizText(
         "_ ley",
         "la"
-    ),
-    Quiz_Item(
+    );
+    AddQuizText(
         "_ imagen",
         "la"
-    ),
-    Quiz_Item(
+    );
+    AddQuizText(
         "Félix and Raúl are tall.",
         "Félix y Raúl son altos."
-    ),
-    Quiz_Item(
+    );
+    AddQuizText(
         "Antón is very nice.",
         "Antón es muy simpático."
-    ),
-    Quiz_Item(
+    );
+    AddQuizText(
         "I am Santiago.",
         "Yo soy Santiago."
-    ),
-    Quiz_Item(
+    );
+    AddQuizText(
         "This is the Royal Theater.",
         "Este es el Teatro Real."
-    ),
-    Quiz_Item(
+    );
+    AddQuizText(
         "Carlos' family is Catholic.",
         "La familia de Carlos es católica."
-    ),
-    Quiz_Item(
+    );
+    AddQuizText(
         "That sheet is from Japan.",
         "Esa lámina es de Japón."
-    ),
-    Quiz_Item(
+    );
+    AddQuizText(
         "Tatiana and Sarai are my sisters.",
         "Tatiana y Sarai son mis hermanas."
-    ),
-    Quiz_Item(
+    );
+    AddQuizText(
         "These are my friends.",
         "Estos son mis amigos."
-    ),
-    Quiz_Item(
+    );
+    AddQuizText(
         "Elisa is my ex-girlfriend.",
         "Elisa es mi exnovia."
-    ),
-    Quiz_Item(
+    );
+    AddQuizText(
         "That umbrella is mine.",
         "Ese paraguas es mío."
-    ),
-    Quiz_Item(
+    );
+    AddQuizText(
         "The soccor game is in Valencia.",
         "El partido de fútbol es en Valencia."
-    ),
-    Quiz_Item(
+    );
+    AddQuizText(
         "The game is on Wednesday.",
         "El partido es el miércoles."
-    ),
-    Quiz_Item(
+    );
+    AddQuizText(
         "Today is Sunday.",
         "Hoy es domingo."
-    ),
-    Quiz_Item(
+    );
+    AddQuizText(
         "Today is April 1.",
         "Hoy es 1 de abril."
-    ),
-    Quiz_Item(
+    );
+    AddQuizText(
         "It's Spring.",
         "Es primavera."
-    ),
-    Quiz_Item(
+    );
+    AddQuizText(
         "What time is it? It's ten o-clock.",
         /* "¿Que hora es? Son las diez." */
         "Que hora es? Son las diez."
-    )
-};
+    );
+}
