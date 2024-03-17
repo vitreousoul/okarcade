@@ -1,8 +1,14 @@
 #!/usr/bin/env sh
 
-# This is just a way to rememeber some of the emscripten compilation setup.
-# These must be run insize the emsdk directory.
+#
+# NOTE: This script assumes that the emsdk source is a sibling directory to okarcade.
+# NOTE: Run using "source" so that the shell session can access environment-variables
+# that are set when calling "emsdk_env.sh".
+#       Ex.
+#           source init_emcc.sh
+#
 
-# echo ./emsdk install latest
-echo ./emsdk activate latest
-echo source ./emsdk_env.sh
+cd ../emsdk
+./emsdk activate latest
+source ./emsdk_env.sh
+cd ../okarcade

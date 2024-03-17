@@ -159,6 +159,7 @@ typedef struct
     b32 AccentMode;
     b32 ShowAnswer;
 
+    b32 InputOccured;
     key_code LastKeyPressed;
     f32 KeyRepeatTime;
     b32 KeyHasRepeated;
@@ -337,6 +338,8 @@ internal void ClearAccentKey(state *State)
 
 internal void HandleKey(state *State, key_code Key)
 {
+    State->InputOccured = 1;
+
     if (PrintableKeys[Key])
     {
         if (State->QuizInputIndex + 1 < Test_Buffer_Count)
@@ -554,6 +557,7 @@ internal void HandleUserInput(state *State)
         if (State->ModifierKeys.Control && Key == KEY_H)
         {
             State->ShowAnswer = 1;
+            State->InputOccured = 1;
         }
         else
         {
@@ -581,6 +585,7 @@ internal void HandleUserInput(state *State)
         {
             State->KeyRepeatTime = 0.0f;
             State->KeyHasRepeated = 1;
+
             HandleKey(State, State->LastKeyPressed);
         }
     }
@@ -600,6 +605,12 @@ internal void HandleUserInput(state *State)
             CurrentState = (KeyStateChunk >> Location.Shift) & Bits_Per_Key_State_Mask;
 
             Assert(NextState < key_state_Count);
+
+            if (CurrentState != key_Up || NextState != key_Up)
+            {
+                /* TODO: do we really want to set InputOccured to 1 here??? */
+                State->InputOccured = 1;
+            }
 
             u32 UnsetMask = ~(Bits_Per_Key_State_Mask << Location.Shift);
             u32 NewChunk = (KeyStateChunk & UnsetMask) | (NextState << Location.Shift);
@@ -711,6 +722,14 @@ internal void ClearQuizInput(state *State)
     State->QuizInputIndex = 0;
 }
 
+debug_variable b32 FrameIndex = 0;
+
+internal inline void SetQuizMode(state *State, quiz_mode Mode)
+{
+    State->QuizMode = Mode;
+    FrameIndex = 0; /* NOTE: Set FrameIndex to 0 to force a redraw. */
+}
+
 internal void GetNextRandomQuizItem(state *State)
 {
     State->QuizItemIndex = GetRandomQuizItemIndex();
@@ -722,12 +741,13 @@ internal void GetNextRandomQuizItem(state *State)
 
     if (State->QuizItemIndex < 0)
     {
-        State->QuizMode = quiz_mode_Win;
+        SetQuizMode(State, quiz_mode_Win);
         State->QuizItemIndex = 0;
     }
     else
     {
-        State->QuizMode = quiz_mode_Typing;
+        SetQuizMode(State, quiz_mode_Typing);
+        FrameIndex = 0;
     }
 }
 
@@ -761,6 +781,7 @@ internal void DrawQuizPrompt(state *State, u32 LetterSpacing)
     Vector2 AnswerSize = MeasureTextEx(State->UI.Font, Answer, State->UI.FontSize, 1);
     Vector2 InputSize = MeasureTextEx(State->UI.Font, State->QuizInput, State->UI.FontSize, 1);
 
+    /* TODO: Scale the text y positions based off of font-size!!! */
     f32 PromptOffsetX = PromptSize.x / 2.0f;
     f32 PromptX = SCREEN_HALF_WIDTH - PromptOffsetX;
     f32 PromptY = SCREEN_HALF_HEIGHT - 24;
@@ -854,79 +875,97 @@ internal void DisplayWinMessage(state *State, u32 LetterSpacing)
         }
         ClearQuizInput(State);
 
-        State->QuizMode = quiz_mode_Typing;
+        SetQuizMode(State, quiz_mode_Typing);
+
         State->QuizItemIndex = GetRandomQuizItemIndex();
     }
 
 }
 
-internal void UpdateAndRender(state *State)
+internal void UpdateAndRender(state *State, b32 ForceDraw)
 {
+    State->InputOccured = ForceDraw;
+
     HandleUserInput(State);
+
+    if (State->InputOccured)
+    {
+        FrameIndex += 1;
+    }
 
     State->KeyStateIndex = !State->KeyStateIndex;
 
     quiz_item QuizItem = QuizItems[State->QuizItemIndex];
     int LetterSpacing = 1;
 
-    BeginDrawing();
-    ClearBackground(BACKGROUND_COLOR);
-
-    switch(QuizItem.Type)
+    if (ForceDraw || State->InputOccured)
     {
-    case quiz_item_Conjugation:
-    {
-        if (StringsMatch(QuizItem.Conjugation.Answer, State->QuizInput))
-        {
-            State->QuizMode = quiz_mode_Correct;
-            QuizItems[State->QuizItemIndex].Complete = 1;
+        BeginDrawing();
+        ClearBackground(BACKGROUND_COLOR);
+
+        { /* DEBUG: Draw frame index */
+            char DebugBuffer[256];
+            sprintf(DebugBuffer, "%d", FrameIndex);
+            DrawText(DebugBuffer, 0, 0, 20, (Color){255,255,255,255});
         }
 
-        if (State->QuizMode == quiz_mode_Typing || State->QuizMode == quiz_mode_Correct)
+        switch(QuizItem.Type)
         {
-            DrawQuizPrompt(State, LetterSpacing);
-        }
-        else if (State->QuizMode == quiz_mode_Win)
+        case quiz_item_Conjugation:
         {
-            DisplayWinMessage(State, LetterSpacing);
-        }
-    } break;
-    case quiz_item_Text:
-    {
-        char *Answer = QuizItems[State->QuizItemIndex].Text.Answer;
+            if (StringsMatch(QuizItem.Conjugation.Answer, State->QuizInput))
+            {
+                SetQuizMode(State, quiz_mode_Correct);
+                QuizItems[State->QuizItemIndex].Complete = 1;
+            }
 
-        if (StringsMatch(Answer, State->QuizInput))
+            if (State->QuizMode == quiz_mode_Typing || State->QuizMode == quiz_mode_Correct)
+            {
+                DrawQuizPrompt(State, LetterSpacing);
+            }
+            else if (State->QuizMode == quiz_mode_Win)
+            {
+                DisplayWinMessage(State, LetterSpacing);
+            }
+        } break;
+        case quiz_item_Text:
         {
-            State->QuizMode = quiz_mode_Correct;
-            QuizItems[State->QuizItemIndex].Complete = 1;
-        }
+            char *Answer = QuizItems[State->QuizItemIndex].Text.Answer;
 
-        if (State->QuizMode == quiz_mode_Typing || State->QuizMode == quiz_mode_Correct)
-        {
-            DrawQuizPrompt(State, LetterSpacing);
-        }
-        else if (State->QuizMode == quiz_mode_Win)
-        {
-            DisplayWinMessage(State, LetterSpacing);
-        }
-    } break;
-    default:
-    {
-        DrawText("Unknown quiz type\n", 20, 20, 22, (Color){220,100,180,255});
+            if (StringsMatch(Answer, State->QuizInput))
+            {
+                SetQuizMode(State, quiz_mode_Correct);
+                QuizItems[State->QuizItemIndex].Complete = 1;
+            }
 
-        Vector2 NextButtonPosition = V2(SCREEN_WIDTH - State->UI.FontSize, SCREEN_HEIGHT - State->UI.FontSize);
-        b32 NextPressed = DoButtonWith(&State->UI, ui_Next, (u8 *)"Next", NextButtonPosition, alignment_BottomRight);
-        if (NextPressed)
+            if (State->QuizMode == quiz_mode_Typing || State->QuizMode == quiz_mode_Correct)
+            {
+                DrawQuizPrompt(State, LetterSpacing);
+            }
+            else if (State->QuizMode == quiz_mode_Win)
+            {
+                DisplayWinMessage(State, LetterSpacing);
+            }
+        } break;
+        default:
         {
-            GetNextRandomQuizItem(State);
+            DrawText("Unknown quiz type\n", 20, 20, 22, (Color){220,100,180,255});
+
+            Vector2 NextButtonPosition = V2(SCREEN_WIDTH - State->UI.FontSize, SCREEN_HEIGHT - State->UI.FontSize);
+            b32 NextPressed = DoButtonWith(&State->UI, ui_Next, (u8 *)"Next", NextButtonPosition, alignment_BottomRight);
+            if (NextPressed)
+            {
+                GetNextRandomQuizItem(State);
+            }
         }
-    }
+        }
     }
 
     EndDrawing();
 }
 
 internal void InitializeQuizItems(void);
+
 
 int main(void)
 {
@@ -935,10 +974,12 @@ int main(void)
     Assert((1 << Key_State_Chunk_Count_Log2) == Key_State_Chunk_Count);
 
     state State = {0};
-    State.UI.FontSize = 28;
 
 #if defined(PLATFORM_WEB)
     InitRaylibCanvas();
+    State.UI.FontSize = 36;
+#else
+    State.UI.FontSize = 28;
 #endif
 
     int Result = 0;
@@ -967,7 +1008,7 @@ int main(void)
         UnloadCodepoints(Codepoints);
     }
 
-    State.QuizMode = quiz_mode_Typing;
+    SetQuizMode(&State, quiz_mode_Typing);
 
     srand(time(NULL));
 
@@ -992,7 +1033,9 @@ int main(void)
             State.LastTime = CurrentTime;
         }
 
-        UpdateAndRender(&State);
+        b32 ForceDraw = FrameIndex == 0;
+
+        UpdateAndRender(&State, ForceDraw);
     }
 
     CloseWindow();
