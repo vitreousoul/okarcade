@@ -4,6 +4,7 @@
     TODO: Allow a history of quiz items, so you can scroll back and view previous answers.
     TODO: Allow moving cursor between characters and splice editing. Currently cursor is always at the end of the input.
     TODO: Display a message showing that save-file has been written. Also, maybe disable the save button for a bit...
+    TODO: Fix web build. Asserts and platform stuff leaked into the web code. Just need to #if out non-web code...
 */
 #include <stdlib.h>
 #include <stdio.h>
