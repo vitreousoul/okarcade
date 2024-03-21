@@ -878,6 +878,8 @@ internal inline void SetQuizMode(state *State, quiz_mode Mode)
     FrameIndex = 0; /* NOTE: Set FrameIndex to 0 to force a redraw. */
 }
 
+debug_variable b32 DEBUGCanHandleEnterKeyInWinMode = 0; /* TODO: Just fix the Enter key-press bug, where the user hits the enter key, gets the last quiz item correct, so the win screen only appears for a single frame. */
+
 internal void GetNextRandomQuizItem(state *State)
 {
     State->QuizItemIndex = GetRandomQuizItemIndex();
@@ -890,6 +892,7 @@ internal void GetNextRandomQuizItem(state *State)
     if (State->QuizItemIndex < 0)
     {
         SetQuizMode(State, quiz_mode_Win);
+        DEBUGCanHandleEnterKeyInWinMode = 0;
         State->QuizItemIndex = 0;
     }
     else
@@ -1010,25 +1013,31 @@ internal void DrawQuizPrompt(state *State, u32 LetterSpacing)
 
 internal void DisplayWinMessage(state *State, u32 LetterSpacing)
 {
-    char *WinMessage = "Tú ganas!";
-    Vector2 TextSize = MeasureTextEx(State->UI.Font, WinMessage, State->UI.FontSize, LetterSpacing);
-    Vector2 TextPosition = V2((SCREEN_WIDTH / 2) - (TextSize.x / 2), SCREEN_HEIGHT / 2);
-    DrawTextEx(State->UI.Font, WinMessage, TextPosition, State->UI.FontSize, LetterSpacing, FONT_COLOR);
-
-    if (IsKeyPressed(KEY_ENTER))
+    if (DEBUGCanHandleEnterKeyInWinMode)
     {
-        /* NOTE: reset quiz completion */
-        for (s32 I = 0; I < Quiz_Item_Max; ++I)
+        char *WinMessage = "Tú ganas!";
+        Vector2 TextSize = MeasureTextEx(State->UI.Font, WinMessage, State->UI.FontSize, LetterSpacing);
+        Vector2 TextPosition = V2((SCREEN_WIDTH / 2) - (TextSize.x / 2), SCREEN_HEIGHT / 2);
+        DrawTextEx(State->UI.Font, WinMessage, TextPosition, State->UI.FontSize, LetterSpacing, FONT_COLOR);
+
+        if (IsKeyPressed(KEY_ENTER))
         {
-            QuizItems[I].Complete = 0;
+            /* NOTE: reset quiz completion */
+            for (s32 I = 0; I < Quiz_Item_Max; ++I)
+            {
+                QuizItems[I].Complete = 0;
+            }
+            ClearQuizInput(State);
+
+            SetQuizMode(State, quiz_mode_Typing);
+
+            State->QuizItemIndex = GetRandomQuizItemIndex();
         }
-        ClearQuizInput(State);
-
-        SetQuizMode(State, quiz_mode_Typing);
-
-        State->QuizItemIndex = GetRandomQuizItemIndex();
     }
-
+    else if (!IsKeyPressed(KEY_ENTER))
+    {
+        DEBUGCanHandleEnterKeyInWinMode = 1;
+    }
 }
 
 internal void HandleQuizItem(state *State, quiz_item *QuizItem, u8 *Answer)
@@ -1458,6 +1467,49 @@ internal void InitializeDefaultQuizItems(void)
         "_ imagen",
         "la"
     );
+    AddQuizText(
+        "En la mañana yo (beber) café con leche.",
+        "bebo"
+    );
+    AddQuizText(
+        "Tú no (comer) carne.",
+        "comes"
+    );
+    AddQuizText(
+        "Nosotros (comprender) español.",
+        "comprendemos"
+    );
+    AddQuizText(
+        "Ellos (correr) en el parque.",
+        "corren"
+    );
+    AddQuizText(
+        "Ella (aprender) español en la Cooperativa.",
+        "aprende"
+    );
+    AddQuizText(
+        "Él (vender) limonada.",
+        "vende"
+    );
+    AddQuizText(
+        "Usted (leer) un nuevo libro.",
+        "lee"
+    );
+    AddQuizText(
+        "María no (beber) café.",
+        "bebe"
+    );
+    AddQuizText(
+        "Carlos y Anita (comer) una hamburguesa.",
+        "comen"
+    );
+    AddQuizText(
+        "Mi hermana (deber) estudiar más.",
+        "debe"
+    );
+
+
+
 #if 0
     AddQuizText(
         "Félix and Raúl are tall.",
