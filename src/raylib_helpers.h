@@ -1,5 +1,5 @@
-#define TARGET_SCREEN_WIDTH 1280
-#define TARGET_SCREEN_HEIGHT 800
+#define TARGET_SCREEN_WIDTH 1080
+#define TARGET_SCREEN_HEIGHT 700
 
 f32 Min(f32 ValueA, f32 ValueB);
 f32 Max(f32 ValueA, f32 ValueB);

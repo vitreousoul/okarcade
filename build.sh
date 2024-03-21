@@ -7,6 +7,10 @@ if [ ! -d "dist" ]; then
     mkdir dist
 fi
 
+if [ ! -d "save" ]; then
+    mkdir save
+fi
+
 if [ -z "$1" ]; then
     echo "Please give an argument... I wish I could tell you more about your options...";
     exit 1
@@ -33,10 +37,6 @@ elif [ $DEBUG -eq 1 ]; then
     TARGET="-g3 -O0 -o dist/$TARGET_NAME.out"
 fi
 
-if [ ! -d "dist" ]; then
-  mkdir dist
-fi
-
 if [ $WEB -eq 1 ]; then
     RAYLIB_LIB="./lib/libraylibweb.a"
     RAYLIB_INCLUDE="-I. -I./lib/raylib.h -L. -L$RAYLIB_LIB"
@@ -49,7 +49,8 @@ else
     GRAPHICS_LIB="lib/libraylib.a"
 
     SETTINGS="-std=c99 -Wall -Wextra -Wstrict-prototypes -Wold-style-definition -Wno-comment"
-    SETTINGS="$SETTINGS -Wmissing-prototypes -Wmissing-declarations"
+    SETTINGS="$SETTINGS -Wno-unused-function"
+    # SETTINGS="$SETTINGS -Wmissing-prototypes -Wmissing-declarations"
     SOURCE_FILE="./src/$TARGET_NAME.c"
 
     gcc $GRAPHICS_FRAMEWORKS $GRAPHICS_LIB $SETTINGS $SOURCE_FILE $TARGET

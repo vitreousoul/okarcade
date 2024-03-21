@@ -1,10 +1,10 @@
 /*
-    TODO: Allow a history of quiz items, so you can scroll back and view previous answers.
-    TODO: Keep track of what quiz-items have occured and don't show repeat items. (related to item history above)
+    TODO: Prevent getting multiple failure counts by repeatidly pressing the Enter key with an incorrect answer.
     TODO: Add upside-down question mark
+    TODO: Allow a history of quiz items, so you can scroll back and view previous answers.
     TODO: Allow moving cursor between characters and splice editing. Currently cursor is always at the end of the input.
+    TODO: Display a message showing that save-file has been written. Also, maybe disable the save button for a bit...
 */
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
@@ -12,29 +12,24 @@
 
 #include "../lib/raylib.h"
 
-typedef uint8_t    u8;
-typedef uint32_t   u32;
-typedef uint64_t   u64;
+#include "../src/types.h"
 
-typedef int8_t     s8;
-typedef int16_t    s16;
-typedef int32_t    s32;
-typedef int64_t    s64;
+#if !defined(PLATFORM_WEB)
+#include "../src/core.c"
+#include "../src/platform.h"
+#endif
 
-typedef uint8_t    b8;
-typedef uint32_t   b32;
-
-typedef float      f32;
-
-typedef size_t     size;
-
-#define internal static
-#define global_variable static
-#define debug_variable static
 
 #if defined(PLATFORM_WEB)
 #include <emscripten/emscripten.h>
 #endif
+
+#include "../gen/roboto_regular.h"
+
+#include "math.c"
+#include "raylib_helpers.h"
+#include "ui.c"
+
 
 #ifdef TARGET_SCREEN_WIDTH
 global_variable int SCREEN_WIDTH = TARGET_SCREEN_WIDTH;
@@ -49,13 +44,9 @@ global_variable int SCREEN_HEIGHT = 800;
 #endif
 
 
-#include "../gen/roboto_regular.h"
-
-#include "math.c"
-#include "raylib_helpers.h"
-#include "ui.c"
-
 #define TEST 0
+#define SAVE_FILE_PATH ((u8 *)"../save/save_file_0.estudioso")
+
 
 #define ArrayCount(a) (sizeof(a)/sizeof((a)[0]))
 
@@ -74,19 +65,6 @@ global_variable int SCREEN_HEIGHT = 800;
 #define Is_Utf8_Header_Byte3(b) (((b) & 0xF0) == 0xE0)
 #define Is_Utf8_Header_Byte4(b) (((b) & 0xF8) == 0xF0)
 #define Is_Utf8_Tail_Byte(b)    (((b) & 0xC0) == 0x80)
-
-internal void Assert_(b32 FailIfThisIsFalse, u32 Line)
-{
-    /* TODO: Change Assert so that it also prints out the location of the assertion. */
-    int *Foo = 0;
-
-    if (!FailIfThisIsFalse)
-    {
-        printf("Assertion failed at line %d.\n", Line);
-        *Foo = *Foo;
-    }
-}
-#define Assert(F) (Assert_(F, __LINE__))
 
 #define Key_State_Chunk_Size_Log2 5
 #define Key_State_Chunk_Size (1 << Key_State_Chunk_Size_Log2)
@@ -200,21 +178,24 @@ typedef enum
 
 typedef struct
 {
-    char *Prompt;
-    char *Answer;
+    u8 *Prompt;
+    u8 *Answer;
 } quiz_text;
 
 typedef struct
 {
     conjugation Conjugation;
-    char *Prompt;
-    char *Answer;
+    u8 *Prompt;
+    u8 *Answer;
 } quiz_conjugation;
 
 typedef struct
 {
     quiz_item_type Type;
     b32 Complete;
+    u16 PassCount;
+    u16 FailCount;
+
     union
     {
         quiz_text Text;
@@ -228,7 +209,20 @@ typedef enum
     ui_Next,
     ui_Previous,
     ui_ShowAnswer,
+    ui_Save,
 } estudioso_ui_ids;
+
+typedef struct
+{
+    u16 MagicNumber;
+    u16 Version; /* TODO: Think about how to represent version in a consise way... */
+    u32 QuizItemCount;
+    u32 FileSize;
+    u32 OffsetToStringData;
+} save_file_header;
+
+#define Save_File_Magic_Number 0xe54d
+#define Save_File_Header_Version 0
 
 #define Quiz_Item_Max 256
 global_variable quiz_item QuizItems[Quiz_Item_Max];
@@ -292,6 +286,165 @@ global_variable b32 PrintableKeys[Total_Number_Of_Keys] = {
     [KEY_GRAVE] = 1,
 };
 
+internal inline b32 IsValidQuizItem(quiz_item *QuizItem)
+{
+    b32 IsValid = 1;
+
+    if (QuizItem->Type == quiz_item_Text)
+    {
+        if (!(QuizItem->Text.Prompt && QuizItem->Text.Answer))
+        {
+            IsValid = 0;
+        }
+    }
+    else if (QuizItem->Type == quiz_item_Conjugation)
+    {
+        if (!(QuizItem->Text.Prompt && QuizItem->Text.Answer))
+        {
+            IsValid = 0;
+        }
+    }
+    else
+    {
+        IsValid = 0;
+    }
+
+    return IsValid;
+}
+
+internal u32 GetQuizItemCount()
+{
+    u32 QuizItemCount;
+    for (QuizItemCount = 0; QuizItemCount < Quiz_Item_Max; ++QuizItemCount)
+    {
+        quiz_item QuizItem = QuizItems[QuizItemCount];
+
+        if (QuizItem.Type == quiz_item_Text)
+        {
+            if (!(QuizItem.Text.Prompt && QuizItem.Text.Answer))
+            {
+                break;
+            }
+        }
+        else if (QuizItem.Type == quiz_item_Conjugation)
+        {
+
+        }
+        else
+        {
+            break;
+        }
+    }
+
+    return QuizItemCount;
+}
+
+internal u8 *GetStringFromSaveFile(buffer *SaveFile, u64 StringOffset)
+{
+    save_file_header *Header = (save_file_header *)SaveFile->Data;
+    u8 *Text = &SaveFile->Data[Header->OffsetToStringData + StringOffset];
+
+    return Text;
+}
+
+/*
+   TODO: We reserve space solely for the save file because the web
+   platform doesn't yet have an api for arena-style allocators.
+*/
+#define Max_Bytes_For_Save_File 4000
+global_variable u8 SaveFileBuffer[Max_Bytes_For_Save_File];
+
+internal u64 PrepareSaveFile(void)
+{
+    b32 FileSize = 0;
+    u32 HeaderSize = sizeof(save_file_header);
+
+    u8 *SaveFileQuizItemsLocation = SaveFileBuffer + HeaderSize;
+    u32 QuizItemCount = GetQuizItemCount();
+    u32 QuizItemSize = sizeof(quiz_item) * QuizItemCount;
+
+    u32 FreeSpaceForStringData = Max_Bytes_For_Save_File - (QuizItemSize + HeaderSize);
+
+    save_file_header SaveHeader;
+    SaveHeader.MagicNumber = Save_File_Magic_Number;
+    SaveHeader.Version = Save_File_Header_Version;
+    SaveHeader.QuizItemCount = QuizItemCount;
+    SaveHeader.OffsetToStringData = HeaderSize + QuizItemSize;
+
+    u8 *StringLocation = (u8 *)(SaveFileBuffer + SaveHeader.OffsetToStringData);
+    u8 *StringStart = StringLocation;
+
+    CopyMemory((u8 *)QuizItems, SaveFileQuizItemsLocation, QuizItemSize);
+
+    for (u32 I = 0; I < Quiz_Item_Max; ++I)
+    {
+        quiz_item *SaveFileQuizItem = (quiz_item *)SaveFileQuizItemsLocation + I;
+
+        if(!IsValidQuizItem(SaveFileQuizItem))
+        {
+            break;
+        }
+
+        u8 **Prompt = 0;
+        u8 **Answer = 0;
+
+        switch (SaveFileQuizItem->Type) {
+        case quiz_item_Text:
+        {
+            Prompt = (u8 **)&SaveFileQuizItem->Text.Prompt;
+            Answer = (u8 **)&SaveFileQuizItem->Text.Answer;
+        } break;
+        case quiz_item_Conjugation:
+        {
+            Prompt = (u8 **)&SaveFileQuizItem->Conjugation.Prompt;
+            Answer = (u8 **)&SaveFileQuizItem->Conjugation.Answer;
+        } break;
+        default: break;
+        }
+
+        u32 PromptLength = GetStringLength(*Prompt) + 1;
+        u32 AnswerLength = GetStringLength(*Answer) + 1;
+        u32 FullLength = PromptLength + AnswerLength;
+
+        if (FreeSpaceForStringData - FullLength > 0)
+        {
+            FreeSpaceForStringData -= FullLength;
+
+            CopyMemory(*Prompt, StringLocation, PromptLength);
+            *(StringLocation + PromptLength) = 0; /* NOTE: Null terminate */
+            u64 PromptOffset = (u64)StringLocation - (u64)StringStart;
+            *Prompt = (u8 *)(0xffff & PromptOffset);
+            StringLocation += PromptLength;
+
+            CopyMemory(*Answer, StringLocation, AnswerLength);
+            *(StringLocation + AnswerLength) = 0; /* NOTE: Null terminate */
+            u64 AnswerOffset = (u64)StringLocation - (u64)StringStart;
+            *Answer = (u8 *)(0xffff & AnswerOffset);
+            StringLocation += AnswerLength;
+        }
+        else
+        {
+            printf("Overwrote the save-file buffer!\n");
+            return 0;
+        }
+    }
+
+    FileSize = StringLocation - SaveFileBuffer;
+    SaveHeader.FileSize = FileSize;
+
+    CopyMemory((u8 *)&SaveHeader, SaveFileBuffer, HeaderSize);
+
+    return FileSize;
+}
+
+internal void WriteQuizItemsToFile(u8 *FilePath)
+{
+    FILE *File = fopen((char *)FilePath, "wb");
+
+    u64 FileSize = PrepareSaveFile();
+
+    fwrite(SaveFileBuffer, 1, FileSize, File);
+}
 
 internal inline key_location GetKeyLocation(u32 KeyNumber)
 {
@@ -649,65 +802,59 @@ internal b32 StringsMatch(char *A, char *B)
     }
 }
 
-internal u32 GetQuizItemCount()
-{
-    u32 QuizItemCount;
-    for (QuizItemCount = 0; QuizItemCount < Quiz_Item_Max; ++QuizItemCount)
-    {
-        quiz_item QuizItem = QuizItems[QuizItemCount];
-
-        if (QuizItem.Type == quiz_item_Text)
-        {
-            if (!(QuizItem.Text.Prompt && QuizItem.Text.Answer))
-            {
-                break;
-            }
-        }
-        else if (QuizItem.Type == quiz_item_Conjugation)
-        {
-
-        }
-        else
-        {
-            break;
-        }
-    }
-
-    return QuizItemCount;
-}
-
 internal inline s32 GetRandomQuizItemIndex(void)
 {
     s32 RandomIndex;
     u32 QuizItemCount = GetQuizItemCount();
 
+    if (!QuizItemCount)
+    {
+        return -1;
+    }
+
     RandomIndex = rand() % QuizItemCount;
     s32 LastIndex = -1;
 
-    /* u32 RandomIndex = (LastIndex + 1) % QuizItemCount; */
-    for (;;)
+    b32 DoLinearSearch = 1;
+
+    for (u32 I = 0; I < 1000; ++I)
     {
+        RandomIndex = rand() % QuizItemCount;
+
         if (!QuizItems[RandomIndex].Complete)
         {
-            /* RandomIndex = RandomIndex; */
+            DoLinearSearch = 0;
             break;
         }
-        else if (RandomIndex == LastIndex)
-        {
-            RandomIndex = -1;
-            break;
-        }
+    }
 
-        if (LastIndex == -1)
+    /* u32 RandomIndex = (LastIndex + 1) % QuizItemCount; */
+    if (DoLinearSearch)
+    {
+        for (;;)
         {
-            /* NOTE: Do this to avoid hitting the (RandomIndex == LastIndex) case on the first iteration...... */
-            LastIndex = RandomIndex;
-        }
+            if (!QuizItems[RandomIndex].Complete)
+            {
+                /* RandomIndex = RandomIndex; */
+                break;
+            }
+            else if (RandomIndex == LastIndex)
+            {
+                RandomIndex = -1;
+                break;
+            }
 
-        /* NOTE: Our random guess collided with a complete quiz-item,
-           so search for a non-complete quiz-item.
-        */
-        RandomIndex = (RandomIndex + 1) % QuizItemCount;
+            if (LastIndex == -1)
+            {
+                /* NOTE: Do this to avoid hitting the (RandomIndex == LastIndex) case on the first iteration...... */
+                LastIndex = RandomIndex;
+            }
+
+            /* NOTE: Our random guess collided with a complete quiz-item,
+               so search for a non-complete quiz-item.
+            */
+            RandomIndex = (RandomIndex + 1) % QuizItemCount;
+        }
     }
 
     return RandomIndex;
@@ -755,8 +902,8 @@ internal void DrawQuizPrompt(state *State, u32 LetterSpacing)
 {
     quiz_item QuizItem = QuizItems[State->QuizItemIndex];
 
-    char *Prompt;
-    char *Answer;
+    u8 *Prompt;
+    u8 *Answer;
 
     switch (QuizItem.Type)
     {
@@ -772,13 +919,19 @@ internal void DrawQuizPrompt(state *State, u32 LetterSpacing)
     } break;
     default:
     {
-        Prompt = "";
-        Answer = "";
+        Prompt = (u8 *)"";
+        Answer = (u8 *)"";
     } break;
     }
 
-    Vector2 PromptSize = MeasureTextEx(State->UI.Font, Prompt, State->UI.FontSize, 1);
-    Vector2 AnswerSize = MeasureTextEx(State->UI.Font, Answer, State->UI.FontSize, 1);
+    { /* DEBUG: Draw pass/fail counts */
+        char Buff[32];
+        sprintf(Buff, "P:%d F:%d", QuizItem.PassCount, QuizItem.FailCount);
+        DrawTextEx(State->UI.Font, Buff, V2(20, 78), State->UI.FontSize, LetterSpacing, FONT_COLOR);
+    }
+
+    Vector2 PromptSize = MeasureTextEx(State->UI.Font, (char *)Prompt, State->UI.FontSize, 1);
+    Vector2 AnswerSize = MeasureTextEx(State->UI.Font, (char *)Answer, State->UI.FontSize, 1);
     Vector2 InputSize = MeasureTextEx(State->UI.Font, State->QuizInput, State->UI.FontSize, 1);
 
     /* TODO: Scale the text y positions based off of font-size!!! */
@@ -799,11 +952,6 @@ internal void DrawQuizPrompt(state *State, u32 LetterSpacing)
     if (State->QuizMode == quiz_mode_Correct)
     {
         DrawTextEx(State->UI.Font, "Correct", V2(20, 20), State->UI.FontSize, LetterSpacing, (Color){20, 200, 40, 255});
-
-        if (IsKeyPressed(KEY_ENTER))
-        {
-            GetNextRandomQuizItem(State);
-        }
     }
 
     if (QuizItem.Type == quiz_item_Conjugation)
@@ -826,7 +974,7 @@ internal void DrawQuizPrompt(state *State, u32 LetterSpacing)
 
     if (State->ShowAnswer)
     {
-        DrawTextEx(State->UI.Font, Answer, V2(AnswerX, AnswerY), State->UI.FontSize, LetterSpacing, ANSWER_COLOR);
+        DrawTextEx(State->UI.Font, (char *)Answer, V2(AnswerX, AnswerY), State->UI.FontSize, LetterSpacing, ANSWER_COLOR);
     }
 
     { /* Draw the index of the quiz item. */
@@ -835,7 +983,7 @@ internal void DrawQuizPrompt(state *State, u32 LetterSpacing)
         DrawTextEx(State->UI.Font, Buff, V2(20, 48), State->UI.FontSize, LetterSpacing, FONT_COLOR);
     }
 
-    DrawTextEx(State->UI.Font, Prompt, V2(PromptX, PromptY), State->UI.FontSize, LetterSpacing, FONT_COLOR);
+    DrawTextEx(State->UI.Font, (char *)Prompt, V2(PromptX, PromptY), State->UI.FontSize, LetterSpacing, FONT_COLOR);
     DrawTextEx(State->UI.Font, State->QuizInput, V2(InputX, InputY), State->UI.FontSize, LetterSpacing, FONT_COLOR);
 
     { /* Draw cursor */
@@ -882,6 +1030,41 @@ internal void DisplayWinMessage(state *State, u32 LetterSpacing)
 
 }
 
+internal void HandleQuizItem(state *State, quiz_item *QuizItem, u8 *Answer)
+{
+    int LetterSpacing = 1;
+
+    if (IsKeyPressed(KEY_ENTER))
+    {
+        if (State->QuizMode == quiz_mode_Typing)
+        {
+            if (StringsMatch((char *)Answer, State->QuizInput))
+            {
+                SetQuizMode(State, quiz_mode_Correct);
+                QuizItem->Complete = 1;
+                QuizItem->PassCount += 1;
+            }
+            else
+            {
+                QuizItem->FailCount += 1;
+            }
+        }
+        else if (State->QuizMode == quiz_mode_Correct)
+        {
+            GetNextRandomQuizItem(State);
+        }
+    }
+
+    if (State->QuizMode == quiz_mode_Typing || State->QuizMode == quiz_mode_Correct)
+    {
+        DrawQuizPrompt(State, LetterSpacing);
+    }
+    else if (State->QuizMode == quiz_mode_Win)
+    {
+        DisplayWinMessage(State, LetterSpacing);
+    }
+}
+
 internal void UpdateAndRender(state *State, b32 ForceDraw)
 {
     State->InputOccured = ForceDraw;
@@ -895,57 +1078,31 @@ internal void UpdateAndRender(state *State, b32 ForceDraw)
 
     State->KeyStateIndex = !State->KeyStateIndex;
 
-    quiz_item QuizItem = QuizItems[State->QuizItemIndex];
-    int LetterSpacing = 1;
+    quiz_item *QuizItem = QuizItems + State->QuizItemIndex;
 
-    if (ForceDraw || State->InputOccured)
+    BeginDrawing();
+
+    if (/* TODO: Fix and reintroduce lazy-drawing */1 || ForceDraw || State->InputOccured)
     {
-        BeginDrawing();
         ClearBackground(BACKGROUND_COLOR);
 
+#if 0
         { /* DEBUG: Draw frame index */
             char DebugBuffer[256];
             sprintf(DebugBuffer, "%d", FrameIndex);
             DrawText(DebugBuffer, 0, 0, 20, (Color){255,255,255,255});
         }
+#endif
 
-        switch(QuizItem.Type)
+        switch(QuizItem->Type)
         {
         case quiz_item_Conjugation:
         {
-            if (StringsMatch(QuizItem.Conjugation.Answer, State->QuizInput))
-            {
-                SetQuizMode(State, quiz_mode_Correct);
-                QuizItems[State->QuizItemIndex].Complete = 1;
-            }
-
-            if (State->QuizMode == quiz_mode_Typing || State->QuizMode == quiz_mode_Correct)
-            {
-                DrawQuizPrompt(State, LetterSpacing);
-            }
-            else if (State->QuizMode == quiz_mode_Win)
-            {
-                DisplayWinMessage(State, LetterSpacing);
-            }
+            HandleQuizItem(State, QuizItem, QuizItem->Conjugation.Answer);
         } break;
         case quiz_item_Text:
         {
-            char *Answer = QuizItems[State->QuizItemIndex].Text.Answer;
-
-            if (StringsMatch(Answer, State->QuizInput))
-            {
-                SetQuizMode(State, quiz_mode_Correct);
-                QuizItems[State->QuizItemIndex].Complete = 1;
-            }
-
-            if (State->QuizMode == quiz_mode_Typing || State->QuizMode == quiz_mode_Correct)
-            {
-                DrawQuizPrompt(State, LetterSpacing);
-            }
-            else if (State->QuizMode == quiz_mode_Win)
-            {
-                DisplayWinMessage(State, LetterSpacing);
-            }
+            HandleQuizItem(State, QuizItem, QuizItem->Text.Answer);
         } break;
         default:
         {
@@ -959,13 +1116,94 @@ internal void UpdateAndRender(state *State, b32 ForceDraw)
             }
         }
         }
+
+        { /* NOTE: Overlay graphics on top of all view types. */
+            f32 Spacing = State->UI.FontSize;
+            Vector2 ButtonPosition = V2(SCREEN_WIDTH - Spacing, Spacing);
+            b32 SavePressed = DoButtonWith(&State->UI, ui_Save, (u8 *)"Save", ButtonPosition, alignment_TopRight);
+
+            if (SavePressed)
+            {
+                WriteQuizItemsToFile(SAVE_FILE_PATH);
+            }
+        }
     }
 
     EndDrawing();
 }
 
-internal void InitializeQuizItems(void);
+internal void InitializeDefaultQuizItems(void);
 
+internal b32 TryToLoadSaveFile(void)
+{
+    b32 SaveFileHasLoaded = 0;
+
+    /* quiz_item *QuizItemsFromFile = ReadQuizItemsFromFile(SAVE_FILE_PATH); */
+    buffer *Buffer = ReadFileIntoBuffer(SAVE_FILE_PATH);
+    s32 HeaderSize = sizeof(save_file_header);
+
+    if (Buffer)
+    {
+        if (Buffer->Size > HeaderSize)
+        {
+            save_file_header *Header = (save_file_header *)Buffer->Data;
+            u32 QuizItemSize = Header->QuizItemCount * sizeof(quiz_item);
+            u32 StringDataSize = Buffer->Size - (HeaderSize + QuizItemSize);
+            Assert(Buffer->Size == (s32)(HeaderSize + QuizItemSize + StringDataSize));
+            Assert((u32)Buffer->Size == Header->FileSize);
+
+            for (u32 I = 0; I < Header->QuizItemCount; ++I)
+            {
+                quiz_item *Item = (quiz_item *)(Buffer->Data + HeaderSize) + I;
+
+                switch (Item->Type)
+                {
+                case quiz_item_Text:
+                {
+                    Item->Text.Prompt = GetStringFromSaveFile(Buffer, (u64)Item->Text.Prompt);
+                    Item->Text.Answer = GetStringFromSaveFile(Buffer, (u64)Item->Text.Answer);
+                } break;
+                case quiz_item_Conjugation:
+                {
+                    Item->Conjugation.Prompt = GetStringFromSaveFile(Buffer, (u64)Item->Conjugation.Prompt);
+                    Item->Conjugation.Answer = GetStringFromSaveFile(Buffer, (u64)Item->Conjugation.Answer);
+                } break;
+                default: break;
+                }
+            }
+
+            if (Header->QuizItemCount)
+            {
+                u64 Size = Header->QuizItemCount * sizeof(quiz_item);
+                CopyMemory(Buffer->Data + HeaderSize, (u8 *)QuizItems, Size);
+
+                SaveFileHasLoaded = 1;
+            }
+        }
+    }
+
+    return SaveFileHasLoaded;
+}
+
+internal void InitializeQuizItems(void)
+{
+    b32 SaveFileHasLoaded = TryToLoadSaveFile();
+
+    if (!SaveFileHasLoaded)
+    {
+        InitializeDefaultQuizItems();
+    }
+    else
+    {
+        u32 Count = GetQuizItemCount();
+
+        /* NOTE: Set all complete fields to 0, just in case they were saved as Complete=1 */
+        for (u32 I = 0; I < Count; ++I)
+        {
+            QuizItems[I].Complete = 0;
+        }
+    }
+}
 
 int main(void)
 {
@@ -983,9 +1221,14 @@ int main(void)
 #endif
 
     int Result = 0;
+#if !defined(PLATFORM_WEB)
     InitializeQuizItems();
+#endif
 
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Estudioso");
+#if !defined(PLATFORM_WEB)
+    SetWindowPosition(0, 0);
+#endif
     SetTargetFPS(60);
 
     int CodepointCount = 0;
@@ -1058,8 +1301,10 @@ internal void AddQuizText(char *Prompt, char *Answer)
 
     QuizItem.Type = quiz_item_Text;
     QuizItem.Complete = 0;
-    QuizItem.Text.Prompt = Prompt;
-    QuizItem.Text.Answer = Answer;
+    QuizItem.PassCount = 0;
+    QuizItem.FailCount = 0;
+    QuizItem.Text.Prompt = (u8 *)Prompt;
+    QuizItem.Text.Answer = (u8 *)Answer;
 
     AddQuizItem(QuizItem);
 }
@@ -1070,19 +1315,19 @@ internal void AddQuizConjugation(conjugation Conjugation, char *Prompt, char *An
 
     QuizItem.Type = quiz_item_Conjugation;
     QuizItem.Complete = 0;
+    QuizItem.PassCount = 0;
+    QuizItem.FailCount = 0;
     QuizItem.Conjugation.Conjugation = Conjugation;
-    QuizItem.Conjugation.Prompt = Prompt;
-    QuizItem.Conjugation.Answer = Answer;
+    QuizItem.Conjugation.Prompt = (u8 *)Prompt;
+    QuizItem.Conjugation.Answer = (u8 *)Answer;
 
     AddQuizItem(QuizItem);
 }
 
 
-#define QuizItemText(Prompt, Answer) ((quiz_item){quiz_item_Text,0,(quiz_prompt){{Prompt,Answer}}})
-#define QuizItemConjugation(Conjugation, Prompt, Answer) ((quiz_item){quiz_item_Conjugation,0,(quiz_conjugation){{Conjugation,Prompt,Answer}}})
-
-internal void InitializeQuizItems(void)
+internal void InitializeDefaultQuizItems(void)
 {
+#if 0
     AddQuizConjugation(conjugation_Presente, "yo [ser]",                 "soy");
     AddQuizConjugation(conjugation_Presente, "tú [ser]",                 "eres");
     AddQuizConjugation(conjugation_Presente, "él, ella, usted [ser]",    "es");
@@ -1119,6 +1364,7 @@ internal void InitializeQuizItems(void)
         "He is very cold.",
         "Él hace mucho frio."
     );
+#endif
     AddQuizText(
         "_ restaurante",
         "el"
@@ -1211,6 +1457,7 @@ internal void InitializeQuizItems(void)
         "_ imagen",
         "la"
     );
+#if 0
     AddQuizText(
         "Félix and Raúl are tall.",
         "Félix y Raúl son altos."
@@ -1276,4 +1523,5 @@ internal void InitializeQuizItems(void)
         /* "¿Que hora es? Son las diez." */
         "Que hora es? Son las diez."
     );
+#endif
 }

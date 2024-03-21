@@ -12,6 +12,8 @@ gen/
 # "site" is where the actual site files go, there should _only_ be files in "site" that are intended to be served
 site/
 
+# "save" is where we store various save-files for things that want permanent storage.
+save/
 
 # I think the gch extension is from using emscripten?
 *.gch
