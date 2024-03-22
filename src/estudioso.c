@@ -1,10 +1,12 @@
 /*
-    TODO: Prevent getting multiple failure counts by repeatidly pressing the Enter key with an incorrect answer.
     TODO: Add upside-down question mark
+    TODO: Prevent getting multiple failure counts by repeatidly pressing the Enter key with an incorrect answer.
     TODO: Allow a history of quiz items, so you can scroll back and view previous answers.
     TODO: Allow moving cursor between characters and splice editing. Currently cursor is always at the end of the input.
     TODO: Display a message showing that save-file has been written. Also, maybe disable the save button for a bit...
     TODO: Fix web build. Asserts and platform stuff leaked into the web code. Just need to #if out non-web code...
+    TODO: Should we ignore whitespace in the user input (like trailing space after an answer)
+    TODO: How do we merge an existing save with a version of the app with new quiz-items? Should save file versions line up with versions of the app, so to upgrade a version of the save file is to upgrade save file itself? (For this to work, we would need an update function that can take any version of a save-file and convert it to the newest version)
 */
 #include <stdlib.h>
 #include <stdio.h>
@@ -352,7 +354,7 @@ internal u8 *GetStringFromSaveFile(buffer *SaveFile, u64 StringOffset)
    TODO: We reserve space solely for the save file because the web
    platform doesn't yet have an api for arena-style allocators.
 */
-#define Max_Bytes_For_Save_File 4000
+#define Max_Bytes_For_Save_File 16000
 global_variable u8 SaveFileBuffer[Max_Bytes_For_Save_File];
 
 internal u64 PrepareSaveFile(void)
@@ -364,7 +366,13 @@ internal u64 PrepareSaveFile(void)
     u32 QuizItemCount = GetQuizItemCount();
     u32 QuizItemSize = sizeof(quiz_item) * QuizItemCount;
 
-    u32 FreeSpaceForStringData = Max_Bytes_For_Save_File - (QuizItemSize + HeaderSize);
+    s32 FreeSpaceForStringData = Max_Bytes_For_Save_File - (QuizItemSize + HeaderSize);
+
+    if (FreeSpaceForStringData <= 0)
+    {
+        printf("Not enough space in save file for quiz-items and header (not to speak of string data).");
+        return 0;
+    }
 
     save_file_header SaveHeader;
     SaveHeader.MagicNumber = Save_File_Magic_Number;
@@ -432,6 +440,7 @@ internal u64 PrepareSaveFile(void)
 
     FileSize = StringLocation - SaveFileBuffer;
     SaveHeader.FileSize = FileSize;
+    printf("FileSize %d\n", FileSize);
 
     CopyMemory((u8 *)&SaveHeader, SaveFileBuffer, HeaderSize);
 
@@ -444,7 +453,14 @@ internal void WriteQuizItemsToFile(u8 *FilePath)
 
     u64 FileSize = PrepareSaveFile();
 
-    fwrite(SaveFileBuffer, 1, FileSize, File);
+    if (FileSize && FileSize < Max_Bytes_For_Save_File)
+    {
+        fwrite(SaveFileBuffer, 1, FileSize, File);
+    }
+    else
+    {
+        Assert(0);
+    }
 }
 
 internal inline key_location GetKeyLocation(u32 KeyNumber)
@@ -1161,6 +1177,7 @@ internal b32 TryToLoadSaveFile(void)
             u32 StringDataSize = Buffer->Size - (HeaderSize + QuizItemSize);
             Assert(Buffer->Size == (s32)(HeaderSize + QuizItemSize + StringDataSize));
             Assert((u32)Buffer->Size == Header->FileSize);
+            printf("StringDataSize %d\n", StringDataSize);
 
             for (u32 I = 0; I < Header->QuizItemCount; ++I)
             {
@@ -1251,7 +1268,7 @@ int main(void)
             "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
             "0123450123456789"
             "`~!@#$%^&*()-_=+"
-            "[]{}\\|;:'\",.<>/?"
+            "[]{}\\|;:'\",.<>/?¿"
             "´˜áéíóúÁÉÍÓÚñÑ");
 
         Codepoints = LoadCodepoints(TextWithAllCodepoints, &CodepointCount);
@@ -1337,44 +1354,7 @@ internal void AddQuizConjugation(conjugation Conjugation, char *Prompt, char *An
 
 internal void InitializeDefaultQuizItems(void)
 {
-#if 0
-    AddQuizConjugation(conjugation_Presente, "yo [ser]",                 "soy");
-    AddQuizConjugation(conjugation_Presente, "tú [ser]",                 "eres");
-    AddQuizConjugation(conjugation_Presente, "él, ella, usted [ser]",    "es");
-    AddQuizConjugation(conjugation_Presente, "nosotros/-as [ser]",       "somos");
-    AddQuizConjugation(conjugation_Presente, "vosotros/-as [ser]",       "sois");
-    AddQuizConjugation(conjugation_Presente, "ellos/-as, ustedes [ser]", "son");
-
-    AddQuizConjugation(conjugation_Imperfecto, "yo [ser]",                 "era");
-    AddQuizConjugation(conjugation_Imperfecto, "tú [ser]",                 "eras");
-    AddQuizConjugation(conjugation_Imperfecto, "él, ella, usted [ser]",    "era");
-    AddQuizConjugation(conjugation_Imperfecto, "nosotros/-as [ser]",       "éramos");
-    AddQuizConjugation(conjugation_Imperfecto, "vosotros/-as [ser]",       "erais");
-    AddQuizConjugation(conjugation_Imperfecto, "ellos/-as, ustedes [ser]", "eran");
-
-    AddQuizConjugation(conjugation_Indefinido, "yo [ser]",                 "fui");
-    AddQuizConjugation(conjugation_Indefinido, "tú [ser]",                 "fuiste");
-    AddQuizConjugation(conjugation_Indefinido, "él, ella, usted [ser]",    "fue");
-    AddQuizConjugation(conjugation_Indefinido, "nosotros/-as [ser]",       "fuimos");
-    AddQuizConjugation(conjugation_Indefinido, "vosotros/-as [ser]",       "fuisteis");
-    AddQuizConjugation(conjugation_Indefinido, "ellos/-as, ustedes [ser]", "fueron");
-
-    AddQuizConjugation(conjugation_Futuro, "yo [ser]",                 "seré");
-    AddQuizConjugation(conjugation_Futuro, "tú [ser]",                 "serás");
-    AddQuizConjugation(conjugation_Futuro, "él, ella, usted [ser]",    "será");
-    AddQuizConjugation(conjugation_Futuro, "nosotros/-as [ser]",       "seremos");
-    AddQuizConjugation(conjugation_Futuro, "vosotros/-as [ser]",       "seréis");
-    AddQuizConjugation(conjugation_Futuro, "ellos/-as, ustedes [ser]", "serán");
-
-    AddQuizText(
-        "In the morning the weather is good in April.",
-        "En la mañana hace buen tiempo en abril."
-    );
-    AddQuizText(
-        "He is very cold.",
-        "Él hace mucho frio."
-    );
-#endif
+#if 1
     AddQuizText(
         "_ restaurante",
         "el"
@@ -1467,6 +1447,88 @@ internal void InitializeDefaultQuizItems(void)
         "_ imagen",
         "la"
     );
+    /* 006_gustar_homework */
+    AddQuizText(
+        "A María no le (gustar) este libro.",
+        "gusta"
+    );
+    AddQuizText(
+        "A mí me (gustar) mucho escribir composiciones.",
+        "gusta"
+    );
+    AddQuizText(
+        "A ellos no les (gustar) el clima de Alaska.",
+        "gusta"
+    );
+    AddQuizText(
+        "A este joven le (gustar) todas las muchachas del club.",
+        "gustan"
+    );
+    AddQuizText(
+        "A los animales les (gustar) la carne cruda.",
+        "gusta"
+    );
+    AddQuizText(
+        "A Eneida no le (gustar) los perros.",
+        "gustan"
+    );
+    AddQuizText(
+        "No nos (gustar) las ciudades que visitamos ayer.",
+        "gustan"
+    );
+    AddQuizText(
+        "A mis primas les (gustar) mucho ir a los bailes.",
+        "gusta"
+    );
+    AddQuizText(
+        "¿Te (gustar) a ti las clases de español?",
+        "gustan"
+    );
+    AddQuizText(
+        "A nosotros no nos (gustar) los exámenes.",
+        "gustan"
+    );
+    AddQuizText(
+        "No me (gustar) estudiar los sábados.",
+        "gusta"
+    );
+    AddQuizText(
+        "A mis vecinos les (gustar) mucho viajar.",
+        "gusta"
+    );
+    AddQuizText(
+        "A nosotros no nos (gustar) los viajes muy largos.",
+        "gustan"
+    );
+    AddQuizText(
+        "Al maestro le (gustar) escribir los ejercicios en la pizarra.",
+        "gusta"
+    );
+    AddQuizText(
+        "¿Le (gustar) a Enrique trabajar en esa tienda?",
+        "gusta"
+    );
+    AddQuizText(
+        "A mi médico le (gustar) escribir los ejercicios en la pizarra.",
+        "gusta"
+    );
+    AddQuizText(
+        "A mí me (gustar) mucho la película de anoche.",
+        "gusta"
+    );
+    AddQuizText(
+        "A mi madre le (gustar) sembrar flores.",
+        "gusta"
+    );
+    AddQuizText(
+        "No me (gustar) el discurso del señor Gómez en la reunión de ayer.",
+        "gusta"
+    );
+    AddQuizText(
+        "A ellos no les (gustar) el paseo de la semana pasada.",
+        "gusta"
+    );
+    /* 008_mas_verbos_homework EJERCICIO A (1 Singular) */
     AddQuizText(
         "En la mañana yo (beber) café con leche.",
         "bebo"
@@ -1507,74 +1569,46 @@ internal void InitializeDefaultQuizItems(void)
         "Mi hermana (deber) estudiar más.",
         "debe"
     );
-
-
-
-#if 0
+    /* 008_mas_verbos_homework EJERCICIO A (2 Plurares) */
     AddQuizText(
-        "Félix and Raúl are tall.",
-        "Félix y Raúl son altos."
+        "Yo (asistir) a la escuela todos los días.",
+        "asisto"
     );
     AddQuizText(
-        "Antón is very nice.",
-        "Antón es muy simpático."
+        "Mis padres (vivir) en un pueblo pequeño.",
+        "viven"
     );
     AddQuizText(
-        "I am Santiago.",
-        "Yo soy Santiago."
+        "Yo (recibir) muchas cartas de los amigos.",
+        "recibo"
     );
     AddQuizText(
-        "This is the Royal Theater.",
-        "Este es el Teatro Real."
+        "Yo (escribir) a mis amigos.",
+        "escribo"
     );
     AddQuizText(
-        "Carlos' family is Catholic.",
-        "La familia de Carlos es católica."
+        "Tú (abrir) las ventanas.",
+        "abres"
     );
     AddQuizText(
-        "That sheet is from Japan.",
-        "Esa lámina es de Japón."
+        "El fin de semana nosotros (subir) las montañas.",
+        "subimos"
     );
     AddQuizText(
-        "Tatiana and Sarai are my sisters.",
-        "Tatiana y Sarai son mis hermanas."
-    );
-    AddQuizText(
-        "These are my friends.",
-        "Estos son mis amigos."
-    );
-    AddQuizText(
-        "Elisa is my ex-girlfriend.",
-        "Elisa es mi exnovia."
-    );
-    AddQuizText(
-        "That umbrella is mine.",
-        "Ese paraguas es mío."
-    );
-    AddQuizText(
-        "The soccor game is in Valencia.",
-        "El partido de fútbol es en Valencia."
-    );
-    AddQuizText(
-        "The game is on Wednesday.",
-        "El partido es el miércoles."
-    );
-    AddQuizText(
-        "Today is Sunday.",
-        "Hoy es domingo."
-    );
-    AddQuizText(
-        "Today is April 1.",
-        "Hoy es 1 de abril."
-    );
-    AddQuizText(
-        "It's Spring.",
-        "Es primavera."
-    );
-    AddQuizText(
-        "What time is it? It's ten o-clock.",
-        /* "¿Que hora es? Son las diez." */
-        "Que hora es? Son las diez."
+        "Yo (compartir) mi casa con mi hermano.",
+        "comparto"
     );
 #endif
+    AddQuizText(
+        "Él (insistir) en viajar a Guatemala.",
+        "insiste"
+    );
+    AddQuizText(
+        "Yo (partir) la próxima semana.",
+        "parto"
+    );
+    AddQuizText(
+        "En Guatemala (existir) muchos lugares bonitos.",
+        "existen"
+    );
 }
