@@ -9,6 +9,7 @@
     TODO: Should we ignore whitespace in the user input (like trailing space after an answer)
     TODO: How do we merge an existing save with a version of the app with new quiz-items? Should save file versions line up with versions of the app, so to upgrade a version of the save file is to upgrade save file itself? (For this to work, we would need an update function that can take any version of a save-file and convert it to the newest version)
     TODO: Implement line break for long lines, especially now that our quiz sentences are getting longer.
+    TODO: Improve the quality of fonts on web? They look pixellated but I'm not sure why :(
 */
 #include <stdlib.h>
 #include <stdio.h>
@@ -1144,6 +1145,7 @@ internal void UpdateAndRender(state *State, b32 ForceDraw)
         }
         }
 
+#ifndef PLATFORM_WEB
         { /* NOTE: Overlay graphics on top of all view types. */
             f32 Spacing = State->UI.FontSize;
             Vector2 ButtonPosition = V2(SCREEN_WIDTH - Spacing, Spacing);
@@ -1154,6 +1156,7 @@ internal void UpdateAndRender(state *State, b32 ForceDraw)
                 WriteQuizItemsToFile(SAVE_FILE_PATH);
             }
         }
+#endif
     }
 
     EndDrawing();
@@ -1233,6 +1236,7 @@ internal void InitializeQuizItems(void)
             QuizItems[I].Complete = 0;
         }
     }
+    printf("quiz item count %d\n", QuizItemCount);
 }
 
 int main(void)
@@ -1251,9 +1255,7 @@ int main(void)
 #endif
 
     int Result = 0;
-#if !defined(PLATFORM_WEB)
     InitializeQuizItems();
-#endif
 
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Estudioso");
 #if !defined(PLATFORM_WEB)
