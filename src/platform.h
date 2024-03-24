@@ -10,12 +10,6 @@
 
 typedef struct
 {
-    s32 Size;
-    u8 *Data;
-} buffer;
-
-typedef struct
-{
     u8 *Name;
     buffer *Buffer;
 } file_data;
@@ -58,7 +52,6 @@ u64 GetLinearAllocatorFreeSpace(linear_allocator *LinearAllocator);
 void FreeLinearAllocator(linear_allocator LinearAllocator);
 
 void CopyString(u8 *Source, u8 *Destination, s32 DestinationSize);
-s32 GetStringLength(u8 *String);
 
 date GetDate(void);
 
@@ -229,13 +222,6 @@ void CopyString(u8 *Source, u8 *Destination, s32 DestinationSize)
 
         I += 1;
     }
-}
-
-s32 GetStringLength(u8 *String)
-{
-    s32 StringLength = -1;
-    while (String[++StringLength]);
-    return StringLength;
 }
 
 date GetDate(void)

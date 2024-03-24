@@ -1,4 +1,5 @@
 /*
+    TODO: Create a lookup table to use to sort and permutate quiz-items.
     TODO: Add upside-down question mark
     TODO: Prevent getting multiple failure counts by repeatidly pressing the Enter key with an incorrect answer.
     TODO: Allow a history of quiz items, so you can scroll back and view previous answers.
@@ -7,6 +8,7 @@
     TODO: Fix web build. Asserts and platform stuff leaked into the web code. Just need to #if out non-web code...
     TODO: Should we ignore whitespace in the user input (like trailing space after an answer)
     TODO: How do we merge an existing save with a version of the app with new quiz-items? Should save file versions line up with versions of the app, so to upgrade a version of the save file is to upgrade save file itself? (For this to work, we would need an update function that can take any version of a save-file and convert it to the newest version)
+    TODO: Implement line break for long lines, especially now that our quiz sentences are getting longer.
 */
 #include <stdlib.h>
 #include <stdio.h>
@@ -17,8 +19,8 @@
 
 #include "../src/types.h"
 
-#if !defined(PLATFORM_WEB)
 #include "../src/core.c"
+#if !defined(PLATFORM_WEB)
 #include "../src/platform.h"
 #endif
 
@@ -28,11 +30,6 @@
 #endif
 
 #include "../gen/roboto_regular.h"
-
-#include "math.c"
-#include "raylib_helpers.h"
-#include "ui.c"
-
 
 #ifdef TARGET_SCREEN_WIDTH
 global_variable int SCREEN_WIDTH = TARGET_SCREEN_WIDTH;
@@ -45,6 +42,10 @@ global_variable int SCREEN_HEIGHT = TARGET_SCREEN_HEIGHT;
 #else
 global_variable int SCREEN_HEIGHT = 800;
 #endif
+
+#include "math.c"
+#include "raylib_helpers.h"
+#include "ui.c"
 
 
 #define TEST 0
@@ -1163,6 +1164,7 @@ internal void InitializeDefaultQuizItems(void);
 internal b32 TryToLoadSaveFile(void)
 {
     b32 SaveFileHasLoaded = 0;
+#ifndef PLATFORM_WEB
 
     /* quiz_item *QuizItemsFromFile = ReadQuizItemsFromFile(SAVE_FILE_PATH); */
     buffer *Buffer = ReadFileIntoBuffer(SAVE_FILE_PATH);
@@ -1209,6 +1211,7 @@ internal b32 TryToLoadSaveFile(void)
         }
     }
 
+#endif
     return SaveFileHasLoaded;
 }
 
@@ -1355,6 +1358,10 @@ internal void AddQuizConjugation(conjugation Conjugation, char *Prompt, char *An
 internal void InitializeDefaultQuizItems(void)
 {
 #if 1
+    AddQuizText(
+        "_ tarea",
+        "la"
+    );
     AddQuizText(
         "_ restaurante",
         "el"
