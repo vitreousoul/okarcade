@@ -1449,84 +1449,84 @@ internal void InitializeDefaultQuizItems(void)
     );
     /* 006_gustar_homework */
     AddQuizText(
-        "A María no le (gustar) este libro.",
-        "gusta"
+        "A María no (me/te/le/nos/les gustar) este libro.",
+        "le gusta"
     );
     AddQuizText(
-        "A mí me (gustar) mucho escribir composiciones.",
-        "gusta"
+        "A mí (me/te/le/nos/les gustar) mucho escribir composiciones.",
+        "me gusta"
     );
     AddQuizText(
-        "A ellos no les (gustar) el clima de Alaska.",
-        "gusta"
+        "A ellos no (me/te/le/nos/les gustar) el clima de Alaska.",
+        "les gusta"
     );
     AddQuizText(
-        "A este joven le (gustar) todas las muchachas del club.",
-        "gustan"
+        "A este joven (me/te/le/nos/les gustar) todas las muchachas del club.",
+        "le gustan"
     );
     AddQuizText(
-        "A los animales les (gustar) la carne cruda.",
-        "gusta"
+        "A los animales (me/te/le/nos/les gustar) la carne cruda.",
+        "les gusta"
     );
     AddQuizText(
-        "A Eneida no le (gustar) los perros.",
-        "gustan"
+        "A Eneida no (me/te/le/nos/les gustar) los perros.",
+        "le gustan"
     );
     AddQuizText(
-        "No nos (gustar) las ciudades que visitamos ayer.",
-        "gustan"
+        "No (me/te/le/nos/les gustar) las ciudades que visitamos ayer.",
+        "nos gustan"
     );
     AddQuizText(
-        "A mis primas les (gustar) mucho ir a los bailes.",
-        "gusta"
+        "A mis primas (me/te/le/nos/les gustar) mucho ir a los bailes.",
+        "les gusta"
     );
     AddQuizText(
-        "¿Te (gustar) a ti las clases de español?",
-        "gustan"
+        "¿(me/te/le/nos/les gustar) a ti las clases de español?",
+        "Te gustan"
     );
     AddQuizText(
-        "A nosotros no nos (gustar) los exámenes.",
-        "gustan"
+        "A nosotros no (me/te/le/nos/les gustar) los exámenes.",
+        "nos gustan"
     );
     AddQuizText(
-        "No me (gustar) estudiar los sábados.",
-        "gusta"
+        "No (me/te/le/nos/les gustar) estudiar los sábados.",
+        "me gusta"
     );
     AddQuizText(
-        "A mis vecinos les (gustar) mucho viajar.",
-        "gusta"
+        "A mis vecinos (me/te/le/nos/les gustar) mucho viajar.",
+        "les gusta"
     );
     AddQuizText(
-        "A nosotros no nos (gustar) los viajes muy largos.",
-        "gustan"
+        "A nosotros no (me/te/le/nos/les gustar) los viajes muy largos.",
+        "nos gustan"
     );
     AddQuizText(
-        "Al maestro le (gustar) escribir los ejercicios en la pizarra.",
-        "gusta"
+        "Al maestro (me/te/le/nos/les gustar) escribir los ejercicios en la pizarra.",
+        "le gusta"
     );
     AddQuizText(
-        "¿Le (gustar) a Enrique trabajar en esa tienda?",
-        "gusta"
+        "¿(me/te/le/nos/les gustar) a Enrique trabajar en esa tienda?",
+        "Le gusta"
     );
     AddQuizText(
-        "A mi médico le (gustar) escribir los ejercicios en la pizarra.",
-        "gusta"
+        "A mi médico (me/te/le/nos/les gustar) escribir los ejercicios en la pizarra.",
+        "le gusta"
     );
     AddQuizText(
-        "A mí me (gustar) mucho la película de anoche.",
-        "gusta"
+        "A mí (me/te/le/nos/les gustar) mucho la película de anoche.",
+        "me gusta"
     );
     AddQuizText(
-        "A mi madre le (gustar) sembrar flores.",
-        "gusta"
+        "A mi madre (me/te/le/nos/les gustar) sembrar flores.",
+        "le gusta"
     );
     AddQuizText(
-        "No me (gustar) el discurso del señor Gómez en la reunión de ayer.",
-        "gusta"
+        "No (me/te/le/nos/les gustar) el discurso del señor Gómez en la reunión de ayer.",
+        "me gusta"
     );
     AddQuizText(
-        "A ellos no les (gustar) el paseo de la semana pasada.",
-        "gusta"
+        "A ellos no (me/te/le/nos/les gustar) el paseo de la semana pasada.",
+        "les gusta"
     );
     /* 008_mas_verbos_homework EJERCICIO A (1 Singular) */
     AddQuizText(
@@ -1610,5 +1610,122 @@ internal void InitializeDefaultQuizItems(void)
     AddQuizText(
         "En Guatemala (existir) muchos lugares bonitos.",
         "existen"
+    );
+    AddQuizText(
+        "Yo (hablar) español en la escuela.",
+        "hablo"
+    );
+    AddQuizText(
+        "En San Pedro yo no (necesitar) mucho dinero.",
+        "necesito"
+    );
+    AddQuizText(
+        "Yo (viajar) solo.",
+        "viajo"
+    );
+    AddQuizText(
+        "Tú (ayudar) a tu hermano.",
+        "ayudas"
+    );
+    AddQuizText(
+        "Tú (cocinar) mucha comida.",
+        "cocinas"
+    );
+    AddQuizText(
+        "Nosotros (visitar) muchas partes de Guatemala.",
+        "visitamos"
+    );
+    AddQuizText(
+        "En la tarde ellos (descansar) por una hora.",
+        "descansan"
+    );
+    AddQuizText(
+        "Cuando yo (tomar) cerveza, yo fumo (fumar) mucho.",
+        "tomo"
+    );
+    AddQuizText(
+        "Él (regresar) a su país la próxima semana.",
+        "regresa"
+    );
+    AddQuizText(
+        "Ella (lavar) su ropa cada semana.",
+        "lava"
+    );
+    AddQuizText(
+        "Yo (pagar) veinticinco quetzales por una comida.",
+        "pago"
+    );
+    AddQuizText(
+        "Ellos (desear) estudiar español.",
+        "desean"
+    );
+    AddQuizText(
+        "Yo (estudiar) español en la Cooperativa.",
+        "estudio"
+    );
+    AddQuizText(
+        "Mi padre (trabajar) ocho horas cada día.",
+        "trabaja"
+    );
+    /* 007_verbos_homework EJERCICIO A */
+    AddQuizText(
+        "Yo (hablar) español en la escuela.",
+        "hablo"
+    );
+    AddQuizText(
+        "En San Pedro yo no (necesitar) mucho dinero.",
+        "necesito"
+    );
+    AddQuizText(
+        "Yo (viajar) solo.",
+        "viajo"
+    );
+    AddQuizText(
+        "Tú (ayudar) a tu hermano.",
+        "ayudas"
+    );
+    AddQuizText(
+        "Tú (cocinar) mucha comida.",
+        "cocinas"
+    );
+    AddQuizText(
+        "Nosotros (visitar) muchas partes de Guatemala.",
+        "visitamos"
+    );
+    AddQuizText(
+        "En la tarde ellos (descansar) por una hora.",
+        "descansan"
+    );
+    AddQuizText(
+        "Cuando yo (tomar) cerveza, yo (fumar) mucho.",
+        "tomo fumo"
+    );
+    AddQuizText(
+        "Él (regresar) a su país la próxima semana.",
+        "regresa"
+    );
+    AddQuizText(
+        "Ella (lavar) su ropa cada semana.",
+        "lava"
+    );
+    AddQuizText(
+        "Yo (pagar) veinticinco quetzales por una comida.",
+        "pago"
+    );
+    AddQuizText(
+        "Ellos (desear) estudiar español.",
+        "desean"
+    );
+    AddQuizText(
+        "Yo (estudiar) español en la Cooperativa.",
+        "estudio"
+    );
+    AddQuizText(
+        "Mi padre (trabajar) ocho horas cada día.",
+        "trabaja"
+    );
+    AddQuizText(
+        "Yo (mirar) una película cada semana en la escuela.",
+        "miro"
     );
 }
