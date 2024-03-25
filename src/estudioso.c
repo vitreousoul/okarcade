@@ -1,11 +1,16 @@
 /*
+    ==============================
+    ¡Estudioso!
+    ==============================
+
+    A flash-card typing game for learning Spanish.
+
+    TODO: Create some UI to toggle different modes, or at least filter-out/select quiz-items.
     TODO: Create a lookup table to use to sort and permutate quiz-items.
-    TODO: Add upside-down question mark
     TODO: Prevent getting multiple failure counts by repeatidly pressing the Enter key with an incorrect answer.
     TODO: Allow a history of quiz items, so you can scroll back and view previous answers.
     TODO: Allow moving cursor between characters and splice editing. Currently cursor is always at the end of the input.
     TODO: Display a message showing that save-file has been written. Also, maybe disable the save button for a bit...
-    TODO: Fix web build. Asserts and platform stuff leaked into the web code. Just need to #if out non-web code...
     TODO: Should we ignore whitespace in the user input (like trailing space after an answer)
     TODO: How do we merge an existing save with a version of the app with new quiz-items? Should save file versions line up with versions of the app, so to upgrade a version of the save file is to upgrade save file itself? (For this to work, we would need an update function that can take any version of a save-file and convert it to the newest version)
     TODO: Implement line break for long lines, especially now that our quiz sentences are getting longer.
@@ -19,14 +24,11 @@
 #include "../lib/raylib.h"
 
 #include "../src/types.h"
-
 #include "../src/core.c"
+
 #if !defined(PLATFORM_WEB)
 #include "../src/platform.h"
-#endif
-
-
-#if defined(PLATFORM_WEB)
+#else
 #include <emscripten/emscripten.h>
 #endif
 
@@ -582,7 +584,7 @@ internal void HandleKey(state *State, key_code Key)
                 {
                     if (State->QuizInputIndex + 2 < Test_Buffer_Count)
                     {
-                        /* NOTE: Acute accent */
+                        /* NOTE: Acute accent '´' */
                         State->QuizInput[State->QuizInputIndex] = 0xC2;
                         State->QuizInput[State->QuizInputIndex+1] = 0xB4;
                         State->AccentMode = 1;
@@ -593,14 +595,24 @@ internal void HandleKey(state *State, key_code Key)
                 {
                     if (State->QuizInputIndex + 2 < Test_Buffer_Count)
                     {
-                        /* NOTE: Tilde */
+                        /* NOTE: Tilde '˜' */
                         /* State->QuizInput[State->QuizInputIndex] = '~'; */
                         State->QuizInput[State->QuizInputIndex] = 0xCB;
                         State->QuizInput[State->QuizInputIndex+1] = 0x9C;
                         State->AccentMode = 1;
                         State->CurrentAccent = accent_Tilde;
                     }
-
+                } break;
+                case KEY_SLASH:
+                {
+                    if (State->ModifierKeys.Shift &&
+                        State->QuizInputIndex + 2 < Test_Buffer_Count)
+                    {
+                        /* NOTE: Inverted question mark '¿' */
+                        State->QuizInput[State->QuizInputIndex] = 0xC2;
+                        State->QuizInput[State->QuizInputIndex+1] = 0xBF;
+                        State->QuizInputIndex = State->QuizInputIndex + 2;
+                    }
                 } break;
                 }
             }
@@ -1649,8 +1661,8 @@ internal void InitializeDefaultQuizItems(void)
         "descansan"
     );
     AddQuizText(
-        "Cuando yo (tomar) cerveza, yo fumo (fumar) mucho.",
-        "tomo"
+        "Cuando yo (tomar) cerveza, yo (fumar) mucho.",
+        "tomo fumo"
     );
     AddQuizText(
         "Él (regresar) a su país la próxima semana.",
@@ -1737,4 +1749,172 @@ internal void InitializeDefaultQuizItems(void)
         "Yo (mirar) una película cada semana en la escuela.",
         "miro"
     );
+
+
+
+
+
+    /* 009_y_mas_verbos_homework */
+#if 0 /* TODO: Validate these answers, then remove #if to add the quiz-items. */
+    AddQuizText(
+        "Yo (salir) a las doce de la escuela.",
+        "salgo"
+    );
+    AddQuizText(
+        "Yo (hacer) la tarea todas las tardes.",
+        "hago"
+    );
+    AddQuizText(
+        "Yo (traer) libros a la escuela.",
+        "traigo"
+    );
+    AddQuizText(
+        "Yo (poner) mis libros en la mesa.",
+        "pongo"
+    );
+    AddQuizText(
+        "Yo (saber) hablar poco español.",
+        "sé"
+    );
+    AddQuizText(
+        "Yo (dar) la tarea al profesor.",
+        "doy"
+    );
+    AddQuizText(
+        "Yo (hacer) ejercicios físicos.",
+        "hago"
+    );
+    AddQuizText(
+        "Yo (ver) un programa interesante.",
+        "veo"
+    );
+    AddQuizText(
+        "Yo no (salir) en este espacio.",
+        "salgo"
+    );
+    AddQuizText(
+        "Yo (salir) la próxima semana.",
+        "salgo"
+    );
+    AddQuizText(
+        "¿Qué tipo de música (oír) tú?",
+        "oyes"
+    );
+    AddQuizText(
+        "Yo (venir) a la escuela.",
+        "vengo"
+    );
+    AddQuizText(
+        "Cuando yo salgo de la casa (decir) adiós.",
+        "digo"
+    );
+    AddQuizText(
+        "Yo (oír) las noticias en la radio.",
+        "oigo"
+    );
+    AddQuizText(
+        "Mis amigos no (venir) a la escuela hoy.",
+        "vienen"
+    );
+    AddQuizText(
+        "¿Qué (decir) tú cuando recibes un regalo?",
+        "dices"
+    );
+    AddQuizText(
+        "Yo (decir) gracias.",
+        "digo"
+    );
+    AddQuizText(
+        "Nosotros (venir) temprano a la escuela.",
+        "venimos"
+    );
+    AddQuizText(
+        "Cuando él (venir) a la escuela, siempre (oír) música.",
+        "viene oye"
+    );
+    AddQuizText(
+        "Ellos (oír) el pronóstico del tiempo.",
+        "oyen"
+    );
+    AddQuizText(
+        "Cerca de mi casa yo (oír) mucho ruido.",
+        "oigo"
+    );
+    AddQuizText(
+        "¿A qué hora (venir) tú a la casa?",
+        "vienes"
+    );
+    AddQuizText(
+        "Mis amigos y yo siempre (decir) la verdad.",
+        "decimos"
+    );
+    AddQuizText(
+        "Cuando yo estoy en el centro del pueblo (oír) mucho ruido.",
+        "oigo"
+    );
+    AddQuizText(
+        "El maestro (oír) mis respuestas con atención.",
+        "oye"
+    );
+    AddQuizText(
+        "Yo (poder) hablar alemán.",
+        ""
+    );
+    AddQuizText(
+        "Nosotros no (recordar) mucho.",
+        ""
+    );
+    AddQuizText(
+        "Mi hermano (dormir) ocho horas cada día.",
+        ""
+    );
+    AddQuizText(
+        "¿Dónde (almorzar) tú normalmente?",
+        ""
+    );
+    AddQuizText(
+        "Yo (volver) a las cuatro del trabajo.",
+        ""
+    );
+    AddQuizText(
+        "Mi mejor amigo (jugar) fútbol.",
+        ""
+    );
+    AddQuizText(
+        "¿Te (acordar) (tú) de la fecha de la fiesta?",
+        ""
+    );
+    AddQuizText(
+        "¿Cuántas horas (volar) (tú) desde Europa hasta América?",
+        ""
+    );
+    AddQuizText(
+        "¿A qué hora (almorzar) tu familia normalmente?",
+        ""
+    );
+    AddQuizText(
+        "Los estudiantes (devolver) los libros a la escuela.",
+        ""
+    );
+    AddQuizText(
+        "¿Cuánto (costar) una cámara digital?",
+        ""
+    );
+    AddQuizText(
+        "Mi abuelo (contar) sus experiencias.",
+        ""
+    );
+    AddQuizText(
+        "Muchas plantas (morir) en verano.",
+        ""
+    );
+    AddQuizText(
+        "Nosotros (mostrar) las fotos a nuestros amigos.",
+        ""
+    );
+    AddQuizText(
+        "En invierno (llover) mucho.",
+        ""
+    );
+#endif
 }
