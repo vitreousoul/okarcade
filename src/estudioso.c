@@ -6,7 +6,6 @@
     A flash-card typing game for learning Spanish.
 
     TODO: Create some UI to toggle different modes, or at least filter-out/select quiz-items.
-    TODO: DOING: Create a lookup table to use to sort and permutate quiz-items.
     TODO: Prevent getting multiple failure counts by repeatidly pressing the Enter key with an incorrect answer.
     TODO: Allow a history of quiz items, so you can scroll back and view previous answers.
     TODO: Allow moving cursor between characters and splice editing. Currently cursor is always at the end of the input.
