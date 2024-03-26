@@ -117,13 +117,13 @@ internal s32 StringMatchLength(u8 *StringA, u8 *StringB, u64 MaxBytes)
     return I;
 }
 
-internal u8 *GetPreprocessVariable(pre_processor *Preprocessor, u8 *Key)
+internal u8 *GetPreprocessVariable(pre_processor *PreProcessor, u8 *Key)
 {
     u8 *Value = 0;
 
     for (s32 I = 0; I < PRE_PROCESSOR_VARIABLE_MAX; ++I)
     {
-        pre_processor_variable Variable = Preprocessor->Variables[I];
+        pre_processor_variable Variable = PreProcessor->Variables[I];
 
         if (Variable.Key)
         {
@@ -141,7 +141,7 @@ internal u8 *GetPreprocessVariable(pre_processor *Preprocessor, u8 *Key)
     return Value;
 }
 
-internal b32 SetPreprocessVariable(pre_processor *Preprocessor, u8 *Key, u8 *Value)
+internal b32 SetPreprocessVariable(pre_processor *PreProcessor, u8 *Key, u8 *Value)
 {
     b32 ErrorCode = 0;
     b32 HasSet = 0;
@@ -149,7 +149,7 @@ internal b32 SetPreprocessVariable(pre_processor *Preprocessor, u8 *Key, u8 *Val
 
     for (s32 I = 0; I < PRE_PROCESSOR_VARIABLE_MAX; ++I)
     {
-        pre_processor_variable *Variable = &Preprocessor->Variables[I];
+        pre_processor_variable *Variable = &PreProcessor->Variables[I];
 
         if (Variable->Key)
         {
@@ -168,8 +168,8 @@ internal b32 SetPreprocessVariable(pre_processor *Preprocessor, u8 *Key, u8 *Val
 
     if (!HasSet && FirstOpenIndex >= 0)
     {
-        Preprocessor->Variables[FirstOpenIndex].Key = Key;
-        Preprocessor->Variables[FirstOpenIndex].Value = Value;
+        PreProcessor->Variables[FirstOpenIndex].Key = Key;
+        PreProcessor->Variables[FirstOpenIndex].Value = Value;
         HasSet = 1;
     }
 
@@ -345,7 +345,7 @@ internal b32 HandlePreProcessCommand(pre_processor *PreProcessor, buffer *Buffer
     }
     else
     {
-        printf("Preprocessor command: \"%s\"\n", Buffer->Data);
+        printf("PreProcessor command: \"%s\"\n", Buffer->Data);
         LogError("unknown preprocessor command");
     }
 
@@ -608,7 +608,168 @@ internal b32 HandleBlogLine(linear_allocator *HtmlOutput, buffer *BlogBuffer, s3
     return ShouldContinue;
 }
 
-internal void GenerateBlogPages(linear_allocator *TempString, pre_processor *Preprocessor, u8 *SiteBlogDirectory)
+internal s32 CompareString(u8 *StringA, u8 *StringB)
+{
+    s32 Result = 0;
+    s32 I = 0;
+
+    for (;;)
+    {
+        if (StringA[I] < StringB[I])
+        {
+            Result = -1;
+            break;
+        }
+        else if (StringB[I] < StringA[I])
+        {
+            Result = 1;
+            break;
+        }
+
+        if (!(StringA[I] && StringB[I]))
+        {
+            break;
+        }
+
+        I += 1;
+    }
+
+    return Result;
+}
+
+internal file_list *SortFileList(file_list *Files)
+{
+    file_list *UnsortedFiles = Files->Next;
+    file_list *SortedFiles = Files;
+    SortedFiles->Next = 0;
+
+    while (UnsortedFiles)
+    {
+        file_list *CurrentSortedFile = SortedFiles;
+        file_list *PreviousSortedFile = 0;
+
+        while (CurrentSortedFile)
+        {
+            s32 CompareResult = CompareString(UnsortedFiles->Name, CurrentSortedFile->Name);
+
+            if (CompareResult < 0)
+            {
+                if (!PreviousSortedFile)
+                {
+                    /* current sorted file is head of list */
+                    file_list *NextUnsortedFile = UnsortedFiles->Next;
+                    UnsortedFiles->Next = CurrentSortedFile;
+                    SortedFiles = UnsortedFiles;
+                    UnsortedFiles = NextUnsortedFile;
+                }
+                else
+                {
+                    file_list *NextUnsortedFile = UnsortedFiles->Next;
+                    PreviousSortedFile->Next = UnsortedFiles;
+                    UnsortedFiles->Next = CurrentSortedFile;
+                    UnsortedFiles = NextUnsortedFile;
+                }
+
+                break;
+            }
+            else if (!CurrentSortedFile->Next)
+            {
+                /* unsorted file is greater than all sorted files */
+                file_list *NextUnsortedFile = UnsortedFiles->Next;
+                CurrentSortedFile->Next = UnsortedFiles;
+                UnsortedFiles->Next = 0;
+                UnsortedFiles = NextUnsortedFile;
+                break;
+            }
+            else
+            {
+                PreviousSortedFile = CurrentSortedFile;
+                CurrentSortedFile = CurrentSortedFile->Next;
+            }
+        }
+
+
+    }
+
+    return SortedFiles;
+}
+
+internal void PushNullTerminator(linear_allocator *Allocator)
+{
+    Allocator->Data[Allocator->Offset] = 0;
+    Allocator->Offset += 1;
+}
+
+internal buffer GetOutputHtmlPath(linear_allocator *TempString, u8 *OldRootPath, u8 *NewRootPath, u8 *CodePagePath, b32 ExcludePathExtension, b32 AddHtmlExtension)
+{
+    u8 *Extension = (u8 *)".html";
+
+    buffer Buffer;
+    Buffer.Size = 0;
+    Buffer.Data = TempString->Data + TempString->Offset;
+
+    s32 BeginOffset = TempString->Offset;
+    s32 I = 0;
+
+    /* We want to replace the source code path prefix "../src" with the "../gen" prefix.
+       This loop increments an offset until the source/code paths don't match.
+    */
+    for (;;)
+    {
+        b32 SomethingIsNull = !(OldRootPath[I] && CodePagePath[I]);
+        b32 CharsNotEqual = OldRootPath[I] != CodePagePath[I];
+
+        if (SomethingIsNull || CharsNotEqual)
+        {
+            break;
+        }
+
+        ++I;
+    }
+
+    s32 CodePagePathOffset = I;
+
+    if (NewRootPath)
+    {
+        PushString(TempString, NewRootPath);
+    }
+
+    if (ExcludePathExtension)
+    {
+        s32 End = CodePagePathOffset;
+
+        while (CodePagePath[End])
+        {
+            if (CodePagePath[End] == '.')
+            {
+                break;
+            }
+
+            End += 1;
+        }
+
+        s32 Size = End - CodePagePathOffset;
+        WriteLinearAllocator(TempString, CodePagePath + CodePagePathOffset, Size);
+    }
+    else
+    {
+        PushString(TempString, CodePagePath + CodePagePathOffset);
+    }
+
+    if (AddHtmlExtension)
+    {
+        PushString(TempString, Extension);
+    }
+
+    PushNullTerminator(TempString);
+
+    Buffer.Size = TempString->Offset - BeginOffset;
+    CopyMemory(TempString->Data + BeginOffset, Buffer.Data, Buffer.Size);
+
+    return Buffer;
+}
+
+internal void GenerateBlogPages(linear_allocator *TempString, pre_processor *PreProcessor, u8 *SiteBlogDirectory)
 {
     u8 *BlogDirectory = (u8 *)"../blog";
     u8 *BlogPageTemplateFilePath = (u8 *)"../src/layout/blog.html";
@@ -633,7 +794,7 @@ internal void GenerateBlogPages(linear_allocator *TempString, pre_processor *Pre
     BlogPageTemplate.Data[BlogPageTemplate.Size] = 0; /* null terminate */
 
     u64 TempStringOffset = TempString->Offset;
-    u64 BlogListingOffset = Preprocessor->OutputAllocator.Offset;
+    u64 BlogListingOffset = PreProcessor->OutputAllocator.Offset;
 
     /* write each blog page */
     for (file_list *CurrentFile = SortedFileList; CurrentFile; CurrentFile = CurrentFile->Next)
@@ -661,7 +822,7 @@ internal void GenerateBlogPages(linear_allocator *TempString, pre_processor *Pre
 
             buffer BlogOutputPath = GetOutputHtmlPath(TempString, BlogDirectory, SiteBlogDirectory, CurrentFile->Name, 1, 1);
 
-            b32 Error = PreprocessBuffer(Preprocessor, TempString, &BlogHtmlBuffer, BlogOutputPath.Data);
+            b32 Error = PreprocessBuffer(PreProcessor, TempString, &BlogHtmlBuffer, BlogOutputPath.Data);
 
             if (Error)
             {
@@ -677,8 +838,8 @@ internal void GenerateBlogPages(linear_allocator *TempString, pre_processor *Pre
     }
 
     { /* write blog listing page */
-        linear_allocator *OutputAllocator = &Preprocessor->OutputAllocator;
-        u64 OutputOffset = Preprocessor->OutputAllocator.Offset;
+        linear_allocator *OutputAllocator = &PreProcessor->OutputAllocator;
+        u64 OutputOffset = PreProcessor->OutputAllocator.Offset;
 
         for (file_list *CurrentFile = SortedFileList; CurrentFile; CurrentFile = CurrentFile->Next)
         {
@@ -695,6 +856,280 @@ internal void GenerateBlogPages(linear_allocator *TempString, pre_processor *Pre
         u64 Size = OutputAllocator->Offset - BlogListingOffset;
         WriteFile(BlogListingFilePath, BlogListingData, Size);
         OutputAllocator->Offset = OutputOffset;
+    }
+
+    FreeLinearAllocator(FileAllocator);
+}
+
+internal buffer EscapeHtmlString(linear_allocator *TempString, u8 *HtmlString, s32 Length)
+{
+    s32 HtmlStringBegin = 0;
+    s32 InitialOffset = TempString->Offset;
+    s32 I;
+
+    buffer Buffer;
+    Buffer.Size = 0;
+    Buffer.Data = TempString->Data + TempString->Offset;
+
+    for (I = 0; I < Length; I++)
+    {
+        u8 *EscapeString = 0;
+
+        switch(HtmlString[I])
+        {
+        case '<': EscapeString = (u8 *)"&lt;"; break;
+        case '>': EscapeString = (u8 *)"&gt;"; break;
+        default:
+            break;
+        }
+
+        if (EscapeString)
+        {
+            u8 *BeginData = HtmlString + HtmlStringBegin;
+            s32 Size = I - HtmlStringBegin;
+            u8 *Data = PushLinearAllocator(TempString, Size);
+
+            CopyMemory(BeginData, Data, Size);
+            PushString(TempString, EscapeString);
+            HtmlStringBegin = I + 1;
+        }
+    }
+
+    s32 RemainingLength = I - HtmlStringBegin;
+
+    if (RemainingLength)
+    {
+        WriteLinearAllocator(TempString, HtmlString + HtmlStringBegin, RemainingLength);
+    }
+
+    Buffer.Size = TempString->Offset - InitialOffset;
+
+    return Buffer;
+}
+
+#define FILE_TREE_DEPTH_MAX 16
+
+typedef struct
+{
+    u8 *Path[FILE_TREE_DEPTH_MAX];
+} file_tree;
+
+typedef struct
+{
+    u8 *Parts[FILE_TREE_DEPTH_MAX];
+    u8 *Name;
+} path_parts;
+
+internal path_parts GetPathParts(linear_allocator *TempString, u8 *Path)
+{
+    path_parts PathParts = {0};
+
+    u64 Begin = 0;
+    s32 PathPartIndex = 0;
+    u64 I = 0;
+
+    for (;;)
+    {
+        if (!Path[I])
+        {
+            u64 PathStringSize = I - Begin + 1; /* NOTE: Add one, and assume that Path is null-terminated. */
+            u8 *WriteLocation = GetLinearAllocatorWriteLocation(TempString);
+            s32 WriteError = WriteLinearAllocator(TempString, Path + Begin, PathStringSize);
+
+            if (WriteError)
+            {
+                LogError("writing name to temp-string");
+            }
+            else
+            {
+                PathParts.Name = WriteLocation;
+            }
+
+            break;
+        }
+        else if (Path[I] == PATH_SEPARATOR)
+        {
+            u64 Size = I - Begin + 1;
+
+            u8 *WriteLocation = GetLinearAllocatorWriteLocation(TempString);
+            s32 WriteError = WriteLinearAllocator(TempString, Path + Begin, Size);
+
+            if (WriteError)
+            {
+                LogError("writing to temp-string");
+                break;
+            }
+            else if (PathPartIndex >= FILE_TREE_DEPTH_MAX)
+            {
+                printf("PathPartIndex out of max (%d/%d)", PathPartIndex, FILE_TREE_DEPTH_MAX);
+                LogError("path part index max exceeded");
+            }
+
+            PathParts.Parts[PathPartIndex] = WriteLocation;
+            PathPartIndex += 1;
+            TempString->Data[TempString->Offset - 1] = 0;
+
+            Begin = I + 1;
+        }
+
+        I += 1;
+    }
+
+    return PathParts;
+}
+
+internal u8 *GetFileNameFromPath(linear_allocator *Allocator, u8 *Path)
+{
+    s32 FileNameOffset = 0;
+    s32 I = 0;
+
+    for (I = 0; Path[I]; ++I)
+    {
+        if (Path[I] == '/')
+        {
+            FileNameOffset = I + 1;
+        }
+
+        /* if (Path[I] == '.') */
+        /* { */
+        /*     DotOffset = I; */
+        /* } */
+    }
+
+    s32 Length = I - FileNameOffset;
+    Assert(Length > 0);
+    u8 *FileName = GetLinearAllocatorWriteLocation(Allocator);
+    WriteLinearAllocator(Allocator, Path + FileNameOffset, Length);
+    PushNullTerminator(Allocator);
+
+    return FileName;
+}
+
+void GenerateCodePages(linear_allocator *TempString)
+{
+    u8 *SourceCodePath = (u8 *)"../src";
+    u8 *GenCodePagesPath = (u8 *)"../gen/code_pages";
+
+    linear_allocator FileAllocator = WalkDirectory(SourceCodePath);
+    linear_allocator CodePage = CreateLinearAllocator(Gigabytes(1));
+
+    file_list *FileList = (file_list *)FileAllocator.Data;
+    file_list *SortedFileList = SortFileList(FileList);
+
+    { /* Print out html for file-tree */
+        u8 *CodePageListingPath = (u8 *)"../gen/code_page_links.html";
+        file_tree Tree = {0};
+
+        for (file_list *CurrentFile = SortedFileList; CurrentFile; CurrentFile = CurrentFile->Next)
+        {
+            buffer FileOutputName = GetOutputHtmlPath(TempString, SourceCodePath, 0, CurrentFile->Name, 0, 0);
+            path_parts PathParts = GetPathParts(TempString, CurrentFile->Name);
+            s32 LeadingSpaceCount = 0;
+
+            PushString(&CodePage, (u8 *)"<div>");
+
+            for (s32 I = 0; I < FILE_TREE_DEPTH_MAX; ++I)
+            {
+                u8 *PathPart = PathParts.Parts[I];
+
+                if (PathPart)
+                {
+                    if (Tree.Path[I] && StringsEqual(PathPart, Tree.Path[I]))
+                    {
+                        LeadingSpaceCount += 1;
+                    }
+                    else
+                    {
+                        for (s32 J = 0; J < I - 1; ++J)
+                        {
+                            PushString(&CodePage, (u8 *)"<div class=\"spacer\"></div>");
+                        }
+
+                        if (I > 0)
+                        {
+                            PushString(&CodePage, (u8 *)"<div class=\"spacer\"></div>");
+                        }
+
+                        PushString(&CodePage, PathPart);
+                        PushString(&CodePage, (u8 *)"<br>");
+                        LeadingSpaceCount = I + 1;
+                        /* We found a new path-part, so we overwrite old path parts.
+                           We should keep any part of the path at the start where both Tree.Path
+                           and PathPart match.
+                        */
+                        Tree.Path[I] = PathPart;
+                    }
+                }
+                else
+                {
+                    break;
+                }
+            }
+
+            for (s32 J = 0; J < LeadingSpaceCount - 1; ++J)
+            {
+                PushString(&CodePage, (u8 *)"<div class=\"spacer\"></div>");
+            }
+
+            PushString(&CodePage, (u8 *)"<div class=\"spacer\"></div>");
+
+            PushString(&CodePage, (u8 *)"<a href=\"");
+            PushString(&CodePage, FileOutputName.Data);
+            PushString(&CodePage, (u8 *)".html\">");
+            PushString(&CodePage, PathParts.Name);
+            PushString(&CodePage, (u8 *)"</a>");
+
+            PushString(&CodePage, (u8 *)"</div>");
+        }
+
+        WriteFile(CodePageListingPath, CodePage.Data, CodePage.Offset);
+        CodePage.Offset = 0;
+    }
+
+    { /* inidividual code page docs */
+        for (file_list *CurrentFile = SortedFileList; CurrentFile; CurrentFile = CurrentFile->Next)
+        {
+            buffer Buffer = GetOutputHtmlPath(TempString, SourceCodePath, GenCodePagesPath, CurrentFile->Name, 0, 1);
+            EnsurePathDirectoriesExist(Buffer.Data);
+
+            PushString(&CodePage, (u8 *)(
+                "<!doctype html>"                                                          \
+                "<html lang=\"en-us\">"                                                    \
+                    "<head>"                                                               \
+                        "{" "| include ../src/layout/head_common.html |" "}"               \
+                        "<style>"                                                          \
+                            "{" "| include ../src/layout/code_page_style.css |" "}"        \
+                        "</style>"                                                         \
+                    "</head>"                                                              \
+                    "<body>"                                                               \
+                /* TODO: move hard-coded style */
+                        "<div style=\"padding: 1rem\">"                                    \
+                            "{" "| include ../src/layout/navigation_header.html |" "}"     \
+                                "<h2>"));
+
+            PushString(&CodePage, CurrentFile->Name);
+
+            PushString(&CodePage, (u8 *)(
+                                "</h2>"                                                    \
+                                "<pre>"                                                    \
+                                    "{" "|" "#HERE" "DOC \n"));
+
+
+            buffer *CodePageBuffer = ReadFileIntoBuffer(CurrentFile->Name);
+            buffer EscapedHtmlBuffer = EscapeHtmlString(TempString, CodePageBuffer->Data, CodePageBuffer->Size);
+
+            u8 *CodePageData = PushLinearAllocator(&CodePage, EscapedHtmlBuffer.Size);
+            CopyMemory(EscapedHtmlBuffer.Data, CodePageData, EscapedHtmlBuffer.Size);
+
+            PushString(&CodePage, (u8 *)"HERE" "DOC</pre></div></body></html>");
+
+            WriteFile(Buffer.Data, CodePage.Data, CodePage.Offset);
+            FreeBuffer(CodePageBuffer);
+
+            CodePage.Offset = 0;
+            TempString->Offset = 0;
+        }
+
     }
 
     FreeLinearAllocator(FileAllocator);
@@ -747,21 +1182,70 @@ void GenerateSite(linear_allocator *TempString)
         TempString->Offset = OldAllocatorOffset;
     }
 
-    GenerateCodePages(TempString);
-
     pre_processor PreProcessor = CreatePreProcessor(Bra, Ket);
     AddPreProcessorCommand(&PreProcessor, pre_processor_command_Include, (u8 *)"include");
     AddPreProcessorCommand(&PreProcessor, pre_processor_command_Docgen, (u8 *)"docgen");
 
-    linear_allocator FileAllocator = WalkDirectory(CodePagesDirectory);
-    file_list *FileList = (file_list *)FileAllocator.Data;
-    file_list *SortedFileList = SortFileList(FileList);
+    GenerateCodePages(TempString);
 
-    for (file_list *CurrentFile = SortedFileList; CurrentFile; CurrentFile = CurrentFile->Next)
     {
-        buffer Buffer = GetOutputHtmlPath(TempString, CodePagesDirectory, SiteDirectory, CurrentFile->Name, 0, 0);
-        EnsurePathDirectoriesExist(Buffer.Data);
-        PreprocessFile(&PreProcessor, *TempString, CurrentFile->Name, Buffer.Data);
+        linear_allocator FileAllocator = WalkDirectory(CodePagesDirectory);
+        file_list *FileList = (file_list *)FileAllocator.Data;
+        file_list *SortedFileList = SortFileList(FileList);
+
+        for (file_list *CurrentFile = SortedFileList; CurrentFile; CurrentFile = CurrentFile->Next)
+        {
+            buffer OutputHtmlPath = GetOutputHtmlPath(TempString, CodePagesDirectory, SiteDirectory, CurrentFile->Name, 0, 0);
+            EnsurePathDirectoriesExist(OutputHtmlPath.Data);
+
+            u8 FileName[256];
+            {
+                s32 FileNameLength = GetStringLength(CurrentFile->Name);
+                s32 Offset = 0;
+
+                /* NOTE: Check if path begins with relative-up-path "../" and ignore if it is there. */
+                if (FileNameLength >= 3)
+                {
+                    u8 *Name = CurrentFile->Name;
+                    if (Name[0] == '.' && Name[1] == '.' && Name[2] == '/')
+                    {
+                        Offset = 3;
+                    }
+                }
+
+                u32 DotCount = 0;
+                s32 I;
+                for (I = 0; I < 256; ++I)
+                {
+                    u8 Char = OutputHtmlPath.Data[I + Offset];
+
+                    if ((I + Offset) >= FileNameLength)
+                    {
+                        break;
+                    }
+
+                    if (Char == '.')
+                    {
+                        DotCount += 1;
+
+                        if (DotCount == 2)
+                        {
+                            break;
+                        }
+                    }
+
+                    FileName[I] = Char;
+                }
+                FileName[I] = 0;
+                printf("file name %s\n", FileName);
+            }
+
+            SetPreprocessVariable(&PreProcessor, (u8 *)"FileName", FileName);
+
+            PreprocessFile(&PreProcessor, *TempString, CurrentFile->Name, OutputHtmlPath.Data);
+        }
+
+        FreeLinearAllocator(FileAllocator);
     }
 
     TempString->Offset = 0;
@@ -775,5 +1259,4 @@ void GenerateSite(linear_allocator *TempString)
     PreprocessFile(&PreProcessor, *TempString, ScubaIn, ScubaOut);
     PreprocessFile(&PreProcessor, *TempString, EstudiosoIn, EstudiosoOut);
 
-    FreeLinearAllocator(FileAllocator);
 }

@@ -5,6 +5,7 @@
 
     A flash-card typing game for learning Spanish.
 
+    TODO: Base line-height of text off of font-size. Right now, the web version uses a larger font size, which messes up the text layout.
     TODO: Create some UI to toggle different modes, or at least filter-out/select quiz-items.
     TODO: Prevent getting multiple failure counts by repeatidly pressing the Enter key with an incorrect answer.
     TODO: Allow a history of quiz items, so you can scroll back and view previous answers.
