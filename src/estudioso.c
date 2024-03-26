@@ -206,8 +206,9 @@ typedef struct
 
 #define Quiz_Item_Max 256
     quiz_item QuizItems[Quiz_Item_Max];
+    s32 QuizItemsLookup[Quiz_Item_Max];
     u32 QuizItemCount;
-    s32 QuizItemIndex;
+    s32 QuizLookupIndex;
     quiz_mode QuizMode;
 
     ui UI;
@@ -833,64 +834,6 @@ internal b32 StringsMatch(char *A, char *B)
     }
 }
 
-internal inline s32 GetRandomQuizItemIndex(state *State)
-{
-    s32 RandomIndex;
-    u32 QuizItemCount = GetQuizItemCount(State);
-
-    if (!QuizItemCount)
-    {
-        return -1;
-    }
-
-    RandomIndex = rand() % QuizItemCount;
-    s32 LastIndex = -1;
-
-    b32 DoLinearSearch = 1;
-
-    for (u32 I = 0; I < 1000; ++I)
-    {
-        RandomIndex = rand() % QuizItemCount;
-
-        if (!State->QuizItems[RandomIndex].Complete)
-        {
-            DoLinearSearch = 0;
-            break;
-        }
-    }
-
-    /* u32 RandomIndex = (LastIndex + 1) % QuizItemCount; */
-    if (DoLinearSearch)
-    {
-        for (;;)
-        {
-            if (!State->QuizItems[RandomIndex].Complete)
-            {
-                /* RandomIndex = RandomIndex; */
-                break;
-            }
-            else if (RandomIndex == LastIndex)
-            {
-                RandomIndex = -1;
-                break;
-            }
-
-            if (LastIndex == -1)
-            {
-                /* NOTE: Do this to avoid hitting the (RandomIndex == LastIndex) case on the first iteration...... */
-                LastIndex = RandomIndex;
-            }
-
-            /* NOTE: Our random guess collided with a complete quiz-item,
-               so search for a non-complete quiz-item.
-            */
-            RandomIndex = (RandomIndex + 1) % QuizItemCount;
-        }
-    }
-
-    return RandomIndex;
-}
-
 internal void ClearQuizInput(state *State)
 {
     for (s32 I = 0; I <= State->QuizInputIndex; ++I)
@@ -912,18 +855,18 @@ debug_variable b32 DEBUGCanHandleEnterKeyInWinMode = 0; /* TODO: Just fix the En
 
 internal void GetNextRandomQuizItem(state *State)
 {
-    State->QuizItemIndex = GetRandomQuizItemIndex(State);
+    State->QuizLookupIndex = (State->QuizLookupIndex + 1);
     State->ShowAnswer = 0;
 
     ClearQuizInput(State);
 
     State->QuizInputIndex = 0;
 
-    if (State->QuizItemIndex < 0)
+    if (State->QuizLookupIndex >= (s32)State->QuizItemCount)
     {
         SetQuizMode(State, quiz_mode_Win);
         DEBUGCanHandleEnterKeyInWinMode = 0;
-        State->QuizItemIndex = 0;
+        State->QuizLookupIndex = 0;
     }
     else
     {
@@ -932,24 +875,32 @@ internal void GetNextRandomQuizItem(state *State)
     }
 }
 
+internal quiz_item *GetActiveQuizItem(state *State)
+{
+    u32 Index = State->QuizItemsLookup[State->QuizLookupIndex];
+    quiz_item *Item = State->QuizItems + Index;
+
+    return Item;
+}
+
 internal void DrawQuizPrompt(state *State, u32 LetterSpacing)
 {
-    quiz_item QuizItem = State->QuizItems[State->QuizItemIndex];
+    quiz_item *QuizItem = GetActiveQuizItem(State);
 
     u8 *Prompt;
     u8 *Answer;
 
-    switch (QuizItem.Type)
+    switch (QuizItem->Type)
     {
     case quiz_item_Text:
     {
-        Prompt = State->QuizItems[State->QuizItemIndex].Text.Prompt;
-        Answer = State->QuizItems[State->QuizItemIndex].Text.Answer;
+        Prompt = QuizItem->Text.Prompt;
+        Answer = QuizItem->Text.Answer;
     } break;
     case quiz_item_Conjugation:
     {
-        Prompt = State->QuizItems[State->QuizItemIndex].Conjugation.Prompt;
-        Answer = State->QuizItems[State->QuizItemIndex].Conjugation.Answer;
+        Prompt = QuizItem->Conjugation.Prompt;
+        Answer = QuizItem->Conjugation.Answer;
     } break;
     default:
     {
@@ -960,7 +911,7 @@ internal void DrawQuizPrompt(state *State, u32 LetterSpacing)
 
     { /* DEBUG: Draw pass/fail counts */
         char Buff[32];
-        sprintf(Buff, "P:%d F:%d", QuizItem.PassCount, QuizItem.FailCount);
+        sprintf(Buff, "P:%d F:%d", QuizItem->PassCount, QuizItem->FailCount);
         DrawTextEx(State->UI.Font, Buff, V2(20, 78), State->UI.FontSize, LetterSpacing, FONT_COLOR);
     }
 
@@ -988,11 +939,11 @@ internal void DrawQuizPrompt(state *State, u32 LetterSpacing)
         DrawTextEx(State->UI.Font, "Correct", V2(20, 20), State->UI.FontSize, LetterSpacing, (Color){20, 200, 40, 255});
     }
 
-    if (QuizItem.Type == quiz_item_Conjugation)
+    if (QuizItem->Type == quiz_item_Conjugation)
     {
         char *ConjugationText = "";
 
-        switch (State->QuizItems[State->QuizItemIndex].Conjugation.Conjugation)
+        switch (QuizItem->Conjugation.Conjugation)
         {
         case conjugation_Presente:    ConjugationText = "Presente"; break;
         case conjugation_Imperfecto:  ConjugationText = "Imperfecto"; break;
@@ -1012,8 +963,8 @@ internal void DrawQuizPrompt(state *State, u32 LetterSpacing)
     }
 
     { /* Draw the index of the quiz item. */
-        char Buff[16];
-        sprintf(Buff, "%d", State->QuizItemIndex);
+        char Buff[64];
+        sprintf(Buff, "%d/%d  index=%d", State->QuizLookupIndex, State->QuizItemCount, State->QuizItemsLookup[State->QuizLookupIndex]);
         DrawTextEx(State->UI.Font, Buff, V2(20, 48), State->UI.FontSize, LetterSpacing, FONT_COLOR);
     }
 
@@ -1041,6 +992,122 @@ internal void DrawQuizPrompt(state *State, u32 LetterSpacing)
     }
 }
 
+internal b32 TryToLoadSaveFile(state *State)
+{
+    b32 SaveFileHasLoaded = 0;
+#ifndef PLATFORM_WEB
+
+    /* quiz_item *QuizItemsFromFile = ReadQuizItemsFromFile(SAVE_FILE_PATH); */
+    buffer *Buffer = ReadFileIntoBuffer(SAVE_FILE_PATH);
+    s32 HeaderSize = sizeof(save_file_header);
+
+    if (Buffer)
+    {
+        if (Buffer->Size > HeaderSize)
+        {
+            save_file_header *Header = (save_file_header *)Buffer->Data;
+            u32 QuizItemSize = Header->QuizItemCount * sizeof(quiz_item);
+            u32 StringDataSize = Buffer->Size - (HeaderSize + QuizItemSize);
+            Assert(Buffer->Size == (s32)(HeaderSize + QuizItemSize + StringDataSize));
+            Assert((u32)Buffer->Size == Header->FileSize);
+            printf("StringDataSize %d\n", StringDataSize);
+
+            for (u32 I = 0; I < Header->QuizItemCount; ++I)
+            {
+                quiz_item *Item = (quiz_item *)(Buffer->Data + HeaderSize) + I;
+
+                switch (Item->Type)
+                {
+                case quiz_item_Text:
+                {
+                    Item->Text.Prompt = GetStringFromSaveFile(Buffer, (u64)Item->Text.Prompt);
+                    Item->Text.Answer = GetStringFromSaveFile(Buffer, (u64)Item->Text.Answer);
+                } break;
+                case quiz_item_Conjugation:
+                {
+                    Item->Conjugation.Prompt = GetStringFromSaveFile(Buffer, (u64)Item->Conjugation.Prompt);
+                    Item->Conjugation.Answer = GetStringFromSaveFile(Buffer, (u64)Item->Conjugation.Answer);
+                } break;
+                default: break;
+                }
+            }
+
+            if (Header->QuizItemCount)
+            {
+                u64 Size = Header->QuizItemCount * sizeof(quiz_item);
+                CopyMemory(Buffer->Data + HeaderSize, (u8 *)State->QuizItems, Size);
+
+                SaveFileHasLoaded = 1;
+            }
+        }
+    }
+
+#endif
+    return SaveFileHasLoaded;
+}
+
+internal void InitializeDefaultQuizItems(state *State);
+
+internal void InitializeQuizItems(state *State)
+{
+    b32 SaveFileHasLoaded = TryToLoadSaveFile(State);
+    State->QuizLookupIndex = 0;
+
+    if (!SaveFileHasLoaded)
+    {
+        InitializeDefaultQuizItems(State);
+    }
+    else
+    {
+        /* NOTE: Set all complete fields to 0, just in case they were saved as Complete=1 */
+        for (u32 I = 0; I < State->QuizItemCount; ++I)
+        {
+            State->QuizItems[I].Complete = 0;
+        }
+    }
+    printf("quiz item count %d\n", State->QuizItemCount);
+
+    { /* NOTE: Permute the lookup table */
+        s32 PermutationCount = State->QuizItemCount; /* TODO: What value should permutation-count be? */
+
+        for (u32 I = 0; I < State->QuizItemCount; ++I)
+        {
+            State->QuizItemsLookup[I] = I;
+        }
+
+        for (s32 I = 0; I < PermutationCount; ++I)
+        {
+            s32 RandomIndex = rand() % State->QuizItemCount;
+
+            /* NOTE: Swap the quiz item indices */
+            s32 Temp = State->QuizItemsLookup[I];
+            State->QuizItemsLookup[I] = State->QuizItemsLookup[RandomIndex];
+            State->QuizItemsLookup[RandomIndex] = Temp;
+        }
+
+#if 1
+        { /* DEBUG: Test that the list does not contain duplicates */
+            for (u32 I = 0; I < State->QuizItemCount; ++I)
+            {
+                printf("%d %d\n", I, State->QuizItemsLookup[I]);
+            }
+
+            for (s32 I = 0; I < PermutationCount; ++I)
+            {
+                for (s32 J = 0; J < PermutationCount; ++J)
+                {
+                    if (I != J)
+                    {
+                        Assert(State->QuizItemsLookup[I] != State->QuizItemsLookup[J]);
+                    }
+                }
+            }
+        }
+#endif
+    }
+
+}
+
 internal void DisplayWinMessage(state *State, u32 LetterSpacing)
 {
     if (DEBUGCanHandleEnterKeyInWinMode)
@@ -1061,7 +1128,7 @@ internal void DisplayWinMessage(state *State, u32 LetterSpacing)
 
             SetQuizMode(State, quiz_mode_Typing);
 
-            State->QuizItemIndex = GetRandomQuizItemIndex(State);
+            InitializeQuizItems(State);
         }
     }
     else if (!IsKeyPressed(KEY_ENTER))
@@ -1118,7 +1185,7 @@ internal void UpdateAndRender(state *State, b32 ForceDraw)
 
     State->KeyStateIndex = !State->KeyStateIndex;
 
-    quiz_item *QuizItem = State->QuizItems + State->QuizItemIndex;
+    quiz_item *QuizItem = GetActiveQuizItem(State);
 
     BeginDrawing();
 
@@ -1174,83 +1241,6 @@ internal void UpdateAndRender(state *State, b32 ForceDraw)
     EndDrawing();
 }
 
-internal void InitializeDefaultQuizItems(state *State);
-
-internal b32 TryToLoadSaveFile(state *State)
-{
-    b32 SaveFileHasLoaded = 0;
-#ifndef PLATFORM_WEB
-
-    /* quiz_item *QuizItemsFromFile = ReadQuizItemsFromFile(SAVE_FILE_PATH); */
-    buffer *Buffer = ReadFileIntoBuffer(SAVE_FILE_PATH);
-    s32 HeaderSize = sizeof(save_file_header);
-
-    if (Buffer)
-    {
-        if (Buffer->Size > HeaderSize)
-        {
-            save_file_header *Header = (save_file_header *)Buffer->Data;
-            u32 QuizItemSize = Header->QuizItemCount * sizeof(quiz_item);
-            u32 StringDataSize = Buffer->Size - (HeaderSize + QuizItemSize);
-            Assert(Buffer->Size == (s32)(HeaderSize + QuizItemSize + StringDataSize));
-            Assert((u32)Buffer->Size == Header->FileSize);
-            printf("StringDataSize %d\n", StringDataSize);
-
-            for (u32 I = 0; I < Header->QuizItemCount; ++I)
-            {
-                quiz_item *Item = (quiz_item *)(Buffer->Data + HeaderSize) + I;
-
-                switch (Item->Type)
-                {
-                case quiz_item_Text:
-                {
-                    Item->Text.Prompt = GetStringFromSaveFile(Buffer, (u64)Item->Text.Prompt);
-                    Item->Text.Answer = GetStringFromSaveFile(Buffer, (u64)Item->Text.Answer);
-                } break;
-                case quiz_item_Conjugation:
-                {
-                    Item->Conjugation.Prompt = GetStringFromSaveFile(Buffer, (u64)Item->Conjugation.Prompt);
-                    Item->Conjugation.Answer = GetStringFromSaveFile(Buffer, (u64)Item->Conjugation.Answer);
-                } break;
-                default: break;
-                }
-            }
-
-            if (Header->QuizItemCount)
-            {
-                u64 Size = Header->QuizItemCount * sizeof(quiz_item);
-                CopyMemory(Buffer->Data + HeaderSize, (u8 *)State->QuizItems, Size);
-
-                SaveFileHasLoaded = 1;
-            }
-        }
-    }
-
-#endif
-    return SaveFileHasLoaded;
-}
-
-internal void InitializeQuizItems(state *State)
-{
-    b32 SaveFileHasLoaded = TryToLoadSaveFile(State);
-
-    if (!SaveFileHasLoaded)
-    {
-        InitializeDefaultQuizItems(State);
-    }
-    else
-    {
-        u32 Count = GetQuizItemCount(State);
-
-        /* NOTE: Set all complete fields to 0, just in case they were saved as Complete=1 */
-        for (u32 I = 0; I < Count; ++I)
-        {
-            State->QuizItems[I].Complete = 0;
-        }
-    }
-    printf("quiz item count %d\n", State->QuizItemCount);
-}
-
 int main(void)
 {
     Assert(key_state_Count >= (1 << Bits_Per_Key_State) - 1);
@@ -1267,6 +1257,8 @@ int main(void)
 #endif
 
     int Result = 0;
+
+    srand(time(NULL));
     InitializeQuizItems(&State);
 
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Estudioso");
@@ -1285,7 +1277,7 @@ int main(void)
             "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
             "0123450123456789"
             "`~!@#$%^&*()-_=+"
-            "[]{}\\|;:'\",.<>/?¿"
+            "[]{}\\|;:'\",.<>/?¿¡"
             "´˜áéíóúÁÉÍÓÚñÑ");
 
         Codepoints = LoadCodepoints(TextWithAllCodepoints, &CodepointCount);
@@ -1296,10 +1288,6 @@ int main(void)
     }
 
     SetQuizMode(&State, quiz_mode_Typing);
-
-    srand(time(NULL));
-
-    State.QuizItemIndex = GetRandomQuizItemIndex(&State);
 
     if (!IsFontReady(State.UI.Font))
     {
@@ -1757,7 +1745,6 @@ internal void InitializeDefaultQuizItems(state *State)
 
 
     /* 009_y_mas_verbos_homework */
-#if 0 /* TODO: Validate these answers, then remove #if to add the quiz-items. */
     AddQuizText(
         "Yo (salir) a las doce de la escuela.",
         "salgo"
@@ -1860,63 +1847,62 @@ internal void InitializeDefaultQuizItems(state *State)
     );
     AddQuizText(
         "Yo (poder) hablar alemán.",
-        ""
+        "puedo"
     );
     AddQuizText(
         "Nosotros no (recordar) mucho.",
-        ""
+        "recordamos"
     );
     AddQuizText(
         "Mi hermano (dormir) ocho horas cada día.",
-        ""
+        "duerme"
     );
     AddQuizText(
         "¿Dónde (almorzar) tú normalmente?",
-        ""
+        "almuerzas"
     );
     AddQuizText(
         "Yo (volver) a las cuatro del trabajo.",
-        ""
+        "vuelvo"
     );
     AddQuizText(
         "Mi mejor amigo (jugar) fútbol.",
-        ""
+        "juega"
     );
     AddQuizText(
         "¿Te (acordar) (tú) de la fecha de la fiesta?",
-        ""
+        "acuerdas"
     );
     AddQuizText(
         "¿Cuántas horas (volar) (tú) desde Europa hasta América?",
-        ""
+        "vuelas"
     );
     AddQuizText(
         "¿A qué hora (almorzar) tu familia normalmente?",
-        ""
+        "almuerza"
     );
     AddQuizText(
         "Los estudiantes (devolver) los libros a la escuela.",
-        ""
+        "devuelven"
     );
     AddQuizText(
         "¿Cuánto (costar) una cámara digital?",
-        ""
+        "cuesta"
     );
     AddQuizText(
         "Mi abuelo (contar) sus experiencias.",
-        ""
+        "cuenta"
     );
     AddQuizText(
         "Muchas plantas (morir) en verano.",
-        ""
+        "mueren"
     );
     AddQuizText(
         "Nosotros (mostrar) las fotos a nuestros amigos.",
-        ""
+        "mostramos"
     );
     AddQuizText(
         "En invierno (llover) mucho.",
-        ""
+        "llueve"
     );
-#endif
 }
