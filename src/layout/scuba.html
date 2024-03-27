@@ -12,7 +12,9 @@
   <body>
     {| include ../src/layout/game_header.html |}
 
-    <canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex=-1></canvas>
+    <div class="canvas-wrapper">
+      <canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex=-1></canvas>
+    </div>
 
     <script type='text/javascript'>
       {| include ../src/layout/raylib_app.js |}

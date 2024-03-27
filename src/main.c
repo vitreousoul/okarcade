@@ -1,5 +1,4 @@
 /*
-    TODO: Add file-name to each code page
     TODO: Update palette for website!!!!
     TODO: Improve the colors for code pages! The green background is pretty rough :(
     TODO: Remove the empty line at the start of all code-pages (in the pre element in the code-page html)
