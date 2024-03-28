@@ -1,3 +1,7 @@
+/*
+    TODO: Detect if mouse position is unchanged during drag, if so, keep drawing so the tree fills out more as you drag.
+*/
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>

@@ -9,6 +9,7 @@
     TODO: Create some UI to toggle different modes, or at least filter-out/select quiz-items.
     TODO: Prevent getting multiple failure counts by repeatidly pressing the Enter key with an incorrect answer.
     TODO: Allow a history of quiz items, so you can scroll back and view previous answers.
+    TODO: Allow marking a quiz-item as inaccurate or in need of a review. This would be helpful when using the app and noticing typos or other errors in the item content.
     TODO: Allow moving cursor between characters and splice editing. Currently cursor is always at the end of the input.
     TODO: Display a message showing that save-file has been written. Also, maybe disable the save button for a bit...
     TODO: Should we ignore whitespace in the user input (like trailing space after an answer)
@@ -1361,6 +1362,125 @@ internal void AddQuizConjugation_(state *State, conjugation Conjugation, char *P
 
 internal void InitializeDefaultQuizItems(state *State)
 {
+    /* 003_hacer_y_tener */
+    AddQuizText(
+        "Qué tiempo (hacer)?",
+        "hace"
+    );
+    AddQuizText(
+        "Él (hacer) un poco de frío.",
+        "hace"
+    );
+    AddQuizText(
+        "En la mañana (hacer) buen tiempo en abril.",
+        "hace"
+    );
+    AddQuizText(
+        "Él (hacer) mucho frio.",
+        "hace"
+    );
+    AddQuizText(
+        "Ella (hacer) mucho calor.",
+        "hace"
+    );
+    AddQuizText(
+        "En el verano (hacer) sol.",
+        "hace"
+    );
+    AddQuizText(
+        "Tú estudias español (hacer) una semana.",
+        "hace"
+    );
+    AddQuizText(
+        "Ella (hacer) una pregunta a su amigo.",
+        "hace"
+    );
+    AddQuizText(
+        "Él (hacer) una visita a su amigo.",
+        "hace"
+    );
+    AddQuizText(
+        "Él (hacer) una visita a Guatemala.",
+        "hace"
+    );
+    AddQuizText(
+        "Yo (hacer) un viaje a la playa.",
+        "hago"
+    );
+    AddQuizText(
+        "Nosotros (hacer) un viaje a las montañas.",
+        "hacemos"
+    );
+
+    AddQuizText(
+        "Yo (tener) 28 veintiocho años.",
+        "tengo"
+    );
+    AddQuizText(
+        "Yo (tener) poca sed.",
+        "tengo"
+    );
+    AddQuizText(
+        "Ella (tener) sed después de jugar.",
+        "tiene"
+    );
+    AddQuizText(
+        "Ella (tener) mucho frio.",
+        "tiene"
+    );
+    AddQuizText(
+        "El niño (tener) cuidado cuando él juega soccer.",
+        "tiene"
+    );
+    AddQuizText(
+        "Ellos (tener) prisa todos los días.",
+        "tienen"
+    );
+    AddQuizText(
+        "Yo no quiero (tener) prisa hoy.",
+        "tener"
+    );
+    AddQuizText(
+        "Después del trabajo yo (tener) mucho sueño.",
+        "tengo"
+    );
+    AddQuizText(
+        "La niña (tener) miedo de la oscuridad.",
+        "tiene"
+    );
+    AddQuizText(
+        "El niño no (tener) razón en la respuesta.",
+        "tiene"
+    );
+    AddQuizText(
+        "Yo (tener) razón en el argumento (asunto).",
+        "tengo"
+    );
+    AddQuizText(
+        "Ella (tener) suerte en el juego.",
+        "tiene"
+    );
+    AddQuizText(
+        "Él (tener) éxito en la vida.",
+        "tiene"
+    );
+    AddQuizText(
+        "Ellos (tener) ganas de comer una pizza.",
+        "tienen"
+    );
+    AddQuizText(
+        "Ella (tener) dolor de cabeza.",
+        "tiene"
+    );
+    AddQuizText(
+        "Ellos (tener) dolor de espalda.",
+        "tienen"
+    );
+    AddQuizText(
+        "Él (tener) que preparar la cena hoy",
+        "tiene"
+    );
+
 #if 1
     AddQuizText(
         "_ tarea",
@@ -1621,62 +1741,6 @@ internal void InitializeDefaultQuizItems(state *State)
     AddQuizText(
         "En Guatemala (existir) muchos lugares bonitos.",
         "existen"
-    );
-    AddQuizText(
-        "Yo (hablar) español en la escuela.",
-        "hablo"
-    );
-    AddQuizText(
-        "En San Pedro yo no (necesitar) mucho dinero.",
-        "necesito"
-    );
-    AddQuizText(
-        "Yo (viajar) solo.",
-        "viajo"
-    );
-    AddQuizText(
-        "Tú (ayudar) a tu hermano.",
-        "ayudas"
-    );
-    AddQuizText(
-        "Tú (cocinar) mucha comida.",
-        "cocinas"
-    );
-    AddQuizText(
-        "Nosotros (visitar) muchas partes de Guatemala.",
-        "visitamos"
-    );
-    AddQuizText(
-        "En la tarde ellos (descansar) por una hora.",
-        "descansan"
-    );
-    AddQuizText(
-        "Cuando yo (tomar) cerveza, yo (fumar) mucho.",
-        "tomo fumo"
-    );
-    AddQuizText(
-        "Él (regresar) a su país la próxima semana.",
-        "regresa"
-    );
-    AddQuizText(
-        "Ella (lavar) su ropa cada semana.",
-        "lava"
-    );
-    AddQuizText(
-        "Yo (pagar) veinticinco quetzales por una comida.",
-        "pago"
-    );
-    AddQuizText(
-        "Ellos (desear) estudiar español.",
-        "desean"
-    );
-    AddQuizText(
-        "Yo (estudiar) español en la Cooperativa.",
-        "estudio"
-    );
-    AddQuizText(
-        "Mi padre (trabajar) ocho horas cada día.",
-        "trabaja"
     );
     /* 007_verbos_homework EJERCICIO A */
     AddQuizText(
