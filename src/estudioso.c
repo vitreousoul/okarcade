@@ -1604,7 +1604,7 @@ internal void InitializeDefaultQuizItems(state *State)
         "le gustan"
     );
     AddQuizText(
-        "No (me/te/le/nos/les gustar) las ciudades que visitamos ayer.",
+        "A nosotros no (me/te/le/nos/les gustar) las ciudades que visitamos ayer.",
         "nos gustan"
     );
     AddQuizText(
@@ -1620,7 +1620,7 @@ internal void InitializeDefaultQuizItems(state *State)
         "nos gustan"
     );
     AddQuizText(
-        "No (me/te/le/nos/les gustar) estudiar los sábados.",
+        "A mí no (me/te/le/nos/les gustar) estudiar los sábados.",
         "me gusta"
     );
     AddQuizText(
@@ -1652,7 +1652,7 @@ internal void InitializeDefaultQuizItems(state *State)
         "le gusta"
     );
     AddQuizText(
-        "No (me/te/le/nos/les gustar) el discurso del señor Gómez en la reunión de ayer.",
+        "A mi no (me/te/le/nos/les gustar) el discurso del señor Gómez en la reunión de ayer.",
         "me gusta"
     );
     AddQuizText(
