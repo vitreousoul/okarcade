@@ -5,7 +5,6 @@
 
     A flash-card typing game for learning Spanish.
 
-    TODO: Base line-height of text off of font-size. Right now, the web version uses a larger font size, which messes up the text layout.
     TODO: Create some UI to toggle different modes, or at least filter-out/select quiz-items.
     TODO: Prevent getting multiple failure counts by repeatidly pressing the Enter key with an incorrect answer.
     TODO: Allow a history of quiz items, so you can scroll back and view previous answers.
@@ -891,6 +890,10 @@ internal void DrawQuizPrompt(state *State, u32 LetterSpacing)
     u8 *Prompt;
     u8 *Answer;
 
+    f32 BorderPadding = 18.0f;
+    f32 TextPadding = 4.0f;
+    f32 LineHeight = TextPadding + State->UI.FontSize;
+
     switch (QuizItem->Type)
     {
     case quiz_item_Text:
@@ -913,7 +916,7 @@ internal void DrawQuizPrompt(state *State, u32 LetterSpacing)
     { /* DEBUG: Draw pass/fail counts */
         char Buff[32];
         sprintf(Buff, "P:%d F:%d", QuizItem->PassCount, QuizItem->FailCount);
-        DrawTextEx(State->UI.Font, Buff, V2(20, 78), State->UI.FontSize, LetterSpacing, FONT_COLOR);
+        DrawTextEx(State->UI.Font, Buff, V2(BorderPadding, BorderPadding), State->UI.FontSize, LetterSpacing, FONT_COLOR);
     }
 
     Vector2 PromptSize = MeasureTextEx(State->UI.Font, (char *)Prompt, State->UI.FontSize, 1);
@@ -923,21 +926,28 @@ internal void DrawQuizPrompt(state *State, u32 LetterSpacing)
     /* TODO: Scale the text y positions based off of font-size!!! */
     f32 PromptOffsetX = PromptSize.x / 2.0f;
     f32 PromptX = SCREEN_HALF_WIDTH - PromptOffsetX;
-    f32 PromptY = SCREEN_HALF_HEIGHT - 24;
+    f32 PromptY = SCREEN_HALF_HEIGHT - (2 * LineHeight);
 
     f32 AnswerOffsetX = AnswerSize.x / 2.0f;
     f32 AnswerX = SCREEN_HALF_WIDTH - AnswerOffsetX;
-    f32 AnswerY = SCREEN_HALF_HEIGHT - 52;
+    f32 AnswerY = SCREEN_HALF_HEIGHT + (1 * LineHeight);
 
     f32 InputX = SCREEN_HALF_WIDTH - (InputSize.x / 2.0f);
-    f32 InputY = SCREEN_HALF_HEIGHT + 48;
+    f32 InputY = SCREEN_HALF_HEIGHT;
 
     f32 CursorX = SCREEN_HALF_WIDTH + (InputSize.x / 2.0f);
     f32 CursorY = InputY;
 
     if (State->QuizMode == quiz_mode_Correct)
     {
-        DrawTextEx(State->UI.Font, "Correct", V2(20, 20), State->UI.FontSize, LetterSpacing, (Color){20, 200, 40, 255});
+        char *CorrectString = "Correct";
+        f32 CorrectFontSize = 1.6f * State->UI.FontSize;
+        f32 CorrectLineHeight = TextPadding + CorrectFontSize;
+        Vector2 CorrectSize = MeasureTextEx(State->UI.Font, CorrectString, CorrectFontSize, 1);
+        Vector2 CorrectPosition = V2((SCREEN_WIDTH - CorrectSize.x) / 2.0f,
+                                     SCREEN_HALF_HEIGHT - (3 * LineHeight + CorrectLineHeight));
+
+        DrawTextEx(State->UI.Font, CorrectString, CorrectPosition, CorrectFontSize, LetterSpacing, (Color){20, 200, 40, 255});
     }
 
     if (QuizItem->Type == quiz_item_Conjugation)
@@ -954,7 +964,7 @@ internal void DrawQuizPrompt(state *State, u32 LetterSpacing)
         }
 
         Vector2 TextSize = MeasureTextEx(State->UI.Font, ConjugationText, State->UI.FontSize, LetterSpacing);
-        Vector2 TextPosition = V2((SCREEN_WIDTH / 2) - (TextSize.x / 2), (SCREEN_HEIGHT / 2) - 82);
+        Vector2 TextPosition = V2((SCREEN_WIDTH / 2) - (TextSize.x / 2), (SCREEN_HEIGHT / 2) - (LineHeight));
         DrawTextEx(State->UI.Font, ConjugationText, TextPosition, State->UI.FontSize, LetterSpacing, CONJUGATION_TYPE_COLOR);
     }
 
@@ -966,7 +976,7 @@ internal void DrawQuizPrompt(state *State, u32 LetterSpacing)
     { /* Draw the index of the quiz item. */
         char Buff[64];
         sprintf(Buff, "%d/%d  index=%d", State->QuizLookupIndex, State->QuizItemCount, State->QuizItemsLookup[State->QuizLookupIndex]);
-        DrawTextEx(State->UI.Font, Buff, V2(20, 48), State->UI.FontSize, LetterSpacing, FONT_COLOR);
+        DrawTextEx(State->UI.Font, Buff, V2(BorderPadding, BorderPadding + LineHeight), State->UI.FontSize, LetterSpacing, FONT_COLOR);
     }
 
     DrawTextEx(State->UI.Font, (char *)Prompt, V2(PromptX, PromptY), State->UI.FontSize, LetterSpacing, FONT_COLOR);
@@ -978,14 +988,14 @@ internal void DrawQuizPrompt(state *State, u32 LetterSpacing)
         DrawRectangle(CursorX + Spacing, CursorY, 3, State->UI.FontSize, CursorColor);
     }
 
-    Vector2 NextButtonPosition = V2(SCREEN_WIDTH - State->UI.FontSize, SCREEN_HEIGHT - State->UI.FontSize);
+    Vector2 NextButtonPosition = V2(SCREEN_WIDTH - BorderPadding, SCREEN_HEIGHT - BorderPadding);
     b32 NextPressed = DoButtonWith(&State->UI, ui_Next, (u8 *)"Next", NextButtonPosition, alignment_BottomRight);
     if (NextPressed)
     {
         GetNextRandomQuizItem(State);
     }
 
-    Vector2 PreviousButtonPosition = V2(State->UI.FontSize, SCREEN_HEIGHT - State->UI.FontSize);
+    Vector2 PreviousButtonPosition = V2(BorderPadding, SCREEN_HEIGHT - BorderPadding);
     b32 PreviousPressed = DoButtonWith(&State->UI, ui_Previous, (u8 *)"Previous", PreviousButtonPosition, alignment_BottomLeft);
     if (PreviousPressed)
     {
@@ -1194,14 +1204,6 @@ internal void UpdateAndRender(state *State, b32 ForceDraw)
     {
         ClearBackground(BACKGROUND_COLOR);
 
-#if 0
-        { /* DEBUG: Draw frame index */
-            char DebugBuffer[256];
-            sprintf(DebugBuffer, "%d", FrameIndex);
-            DrawText(DebugBuffer, 0, 0, 20, (Color){255,255,255,255});
-        }
-#endif
-
         switch(QuizItem->Type)
         {
         case quiz_item_Conjugation:
@@ -1261,6 +1263,8 @@ int main(void)
 
     srand(time(NULL));
     InitializeQuizItems(&State);
+    /* TODO: Check if any anti-aliasing flags (like FLAG_MSAA_4X_HINT) affect the web-platform text quality. */
+    /* SetConfigFlags(FLAG_MSAA_4X_HINT); */
 
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Estudioso");
 #if !defined(PLATFORM_WEB)
