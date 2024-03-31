@@ -1,3 +1,7 @@
+/*
+    TODO: Create a debug toggle button, to show/hide debug overlay.
+    TODO: When using keyboard controls for the UI, the active button always snaps back to the first button.
+*/
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>

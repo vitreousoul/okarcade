@@ -1457,7 +1457,7 @@ internal void InitializeDefaultQuizItems(state *State)
         "tiene"
     );
     AddQuizText(
-        "Yo (tener) razón en el argumento (asunto).",
+        "Yo (tener) razón en el argumento.",
         "tengo"
     );
     AddQuizText(
@@ -1938,11 +1938,11 @@ internal void InitializeDefaultQuizItems(state *State)
         "juega"
     );
     AddQuizText(
-        "¿Te (acordar) (tú) de la fecha de la fiesta?",
+        "¿Te (acordar) tú de la fecha de la fiesta?",
         "acuerdas"
     );
     AddQuizText(
-        "¿Cuántas horas (volar) (tú) desde Europa hasta América?",
+        "¿Cuántas horas (volar) tú desde Europa hasta América?",
         "vuelas"
     );
     AddQuizText(
