@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 
+COMPILER="gcc"
 WEB=0
 DEBUG=1
 
@@ -53,5 +54,5 @@ else
     # SETTINGS="$SETTINGS -Wmissing-prototypes -Wmissing-declarations"
     SOURCE_FILE="./src/$TARGET_NAME.c"
 
-    gcc $GRAPHICS_FRAMEWORKS $GRAPHICS_LIB $SETTINGS $SOURCE_FILE $TARGET
+    $COMPILER $GRAPHICS_FRAMEWORKS $GRAPHICS_LIB $SETTINGS $SOURCE_FILE $TARGET
 fi
