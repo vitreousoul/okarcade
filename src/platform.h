@@ -29,7 +29,7 @@ typedef struct
     u64 Offset;
     u64 Capacity;
     u8 *Data;
-} linear_allocator;
+} arena;
 
 typedef struct
 {
@@ -44,12 +44,12 @@ void *AllocateVirtualMemory(size Size);
 
 void GetResourceUsage(void);
 
-linear_allocator CreateLinearAllocator(u64 Size);
-void *PushLinearAllocator(linear_allocator *LinearAllocator, u64 Size);
-s32 WriteLinearAllocator(linear_allocator *LinearAllocator, u8 *Data, u64 Size);
-u8 *GetLinearAllocatorWriteLocation(linear_allocator *LinearAllocator);
-u64 GetLinearAllocatorFreeSpace(linear_allocator *LinearAllocator);
-void FreeLinearAllocator(linear_allocator LinearAllocator);
+arena CreateArena(u64 Size);
+void *PushArena(arena *Arena, u64 Size);
+s32 WriteArena(arena *Arena, u8 *Data, u64 Size);
+u8 *GetArenaWriteLocation(arena *Arena);
+u64 GetArenaFreeSpace(arena *Arena);
+void FreeArena(arena Arena);
 
 void CopyString(u8 *Source, u8 *Destination, s32 DestinationSize);
 
@@ -58,14 +58,14 @@ date GetDate(void);
 buffer *ReadFileIntoBuffer(u8 *FilePath);
 u64 GetFileSize(u8 *FilePath);
 u64 ReadFileIntoData(u8 *FilePath, u8 *Bytes, u64 MaxBytes);
-u64 ReadFileIntoAllocator(linear_allocator *LinearAllocator, u8 *FilePath);
+u64 ReadFileIntoAllocator(arena *Arena, u8 *FilePath);
 void FreeBuffer(buffer *Buffer);
 void WriteFile(u8 *FilePath, u8 *Data, size Size);
 void WriteFileFromBuffer(u8 *FilePath, buffer *Buffer);
 void EnsureDirectoryExists(u8 *DirectoryPath);
 void EnsurePathDirectoriesExist(u8 *Path);
 
-linear_allocator WalkDirectory(u8 *Path);
+arena WalkDirectory(u8 *Path);
 
 void *AllocateMemory(u64 Size)
 {
@@ -132,41 +132,41 @@ void GetResourceUsage(void)
     }
 }
 
-/*| v Linear Allocator v |*/
-linear_allocator CreateLinearAllocator(u64 Size)
+/*| v Arena Allocator v |*/
+arena CreateArena(u64 Size)
 {
-    linear_allocator LinearAllocator;
+    arena Arena;
 
-    LinearAllocator.Offset = 0;
-    LinearAllocator.Capacity = Size;
-    LinearAllocator.Data = AllocateVirtualMemory(Size);
+    Arena.Offset = 0;
+    Arena.Capacity = Size;
+    Arena.Data = AllocateVirtualMemory(Size);
 
-    return LinearAllocator;
+    return Arena;
 }
 
-void *PushLinearAllocator(linear_allocator *LinearAllocator, u64 Size)
+void *PushArena(arena *Arena, u64 Size)
 {
     u8 *Result = 0;
 
-    if ((Size + LinearAllocator->Offset) > LinearAllocator->Capacity)
+    if ((Size + Arena->Offset) > Arena->Capacity)
     {
-        printf("Error in PushLinearAllocator: allocator is full\n");
+        printf("Error in PushArena: allocator is full\n");
     }
     else
     {
-        Result = &LinearAllocator->Data[LinearAllocator->Offset];
-        LinearAllocator->Offset += Size;
+        Result = &Arena->Data[Arena->Offset];
+        Arena->Offset += Size;
     }
 
     return Result;
 }
 
 
-s32 WriteLinearAllocator(linear_allocator *LinearAllocator, u8 *Data, u64 Size)
+s32 WriteArena(arena *Arena, u8 *Data, u64 Size)
 {
     s32 ErrorCode = 0;
 
-    u8 *WhereToWrite = PushLinearAllocator(LinearAllocator, Size);
+    u8 *WhereToWrite = PushArena(Arena, Size);
 
     if (WhereToWrite)
     {
@@ -180,24 +180,24 @@ s32 WriteLinearAllocator(linear_allocator *LinearAllocator, u8 *Data, u64 Size)
     return ErrorCode;
 }
 
-u8 *GetLinearAllocatorWriteLocation(linear_allocator *LinearAllocator)
+u8 *GetArenaWriteLocation(arena *Arena)
 {
-    u8 *WriteLocation = LinearAllocator->Data + LinearAllocator->Offset;
+    u8 *WriteLocation = Arena->Data + Arena->Offset;
     return WriteLocation;
 }
 
-u64 GetLinearAllocatorFreeSpace(linear_allocator *LinearAllocator)
+u64 GetArenaFreeSpace(arena *Arena)
 {
-    Assert(LinearAllocator->Capacity > LinearAllocator->Offset);
-    u64 FreeSpace = LinearAllocator->Capacity - LinearAllocator->Offset;
+    Assert(Arena->Capacity > Arena->Offset);
+    u64 FreeSpace = Arena->Capacity - Arena->Offset;
     return FreeSpace;
 }
 
-void FreeLinearAllocator(linear_allocator LinearAllocator)
+void FreeArena(arena Arena)
 {
-    munmap(LinearAllocator.Data, LinearAllocator.Capacity);
+    munmap(Arena.Data, Arena.Capacity);
 }
-/*| ^ Linear Allocator ^ |*/
+/*| ^ Arena Allocator ^ |*/
 
 void CopyString(u8 *Source, u8 *Destination, s32 DestinationSize)
 {
@@ -240,9 +240,9 @@ date GetDate(void)
 }
 
 #define PushString(a, s) PushString_((a), (s), GetStringLength(s))
-internal u8 *PushString_(linear_allocator *LinearAllocator, u8 *String, s32 StringLength)
+internal u8 *PushString_(arena *Arena, u8 *String, s32 StringLength)
 {
-    u8 *WhereToWrite = PushLinearAllocator(LinearAllocator, StringLength);
+    u8 *WhereToWrite = PushArena(Arena, StringLength);
     CopyMemory(String, WhereToWrite, StringLength);
     return WhereToWrite;
 }
@@ -311,7 +311,7 @@ u64 ReadFileIntoData(u8 *FilePath, u8 *Bytes, u64 MaxBytes)
     return FileSize;
 }
 
-u64 ReadFileIntoAllocator(linear_allocator *Allocator, u8 *FilePath)
+u64 ReadFileIntoAllocator(arena *Allocator, u8 *FilePath)
 {
     u64 BytesWritten = 0;
     u64 FileSize = GetFileSize(FilePath);
@@ -428,9 +428,9 @@ internal b32 IsWalkableFile(u8 *FileName)
 }
 
 /* TODO: pass in allocator, to give caller more control */
-linear_allocator WalkDirectory(u8 *Path)
+arena WalkDirectory(u8 *Path)
 {
-    linear_allocator Allocator = CreateLinearAllocator(Gigabytes(1));
+    arena Allocator = CreateArena(Gigabytes(1));
     /* NOTE: we call the variable "Paths", but it's only every inteded to contain 1 path. */
     char *Paths[] = { (char *)Path, 0 };
     u32 FtsFlags = FTS_PHYSICAL | FTS_NOCHDIR | FTS_XDEV;
@@ -458,7 +458,7 @@ linear_allocator WalkDirectory(u8 *Path)
                     b32 IsFirstAllocation = Allocator.Offset == 0;
                     s32 FilePathLength = strlen((char *)FilePath);
                     size FileItemSize = sizeof(file_list) + FilePathLength + 1;
-                    file_list *FileItem = PushLinearAllocator(&Allocator, FileItemSize);
+                    file_list *FileItem = PushArena(&Allocator, FileItemSize);
 
                     CopyMemory(FilePath, FileItem->Name, FilePathLength);
                     FileItem->Name[FileItemSize] = 0;

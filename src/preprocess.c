@@ -33,8 +33,8 @@ typedef struct
     pre_processor_variable Variables[PRE_PROCESSOR_VARIABLE_MAX];
     s32 CommandCount;
 
-    linear_allocator StringAllocator;
-    linear_allocator OutputAllocator;
+    arena StringAllocator;
+    arena OutputAllocator;
 } pre_processor;
 
 typedef enum
@@ -58,8 +58,8 @@ typedef enum
 } blog_line_type;
 
 
-b32 PreprocessFile(pre_processor *PreProcessor, linear_allocator TempString, u8 *FilePath, u8 *OutputFilePath);
-void GenerateSite(linear_allocator *TempString);
+b32 PreprocessFile(pre_processor *PreProcessor, arena TempString, u8 *FilePath, u8 *OutputFilePath);
+void GenerateSite(arena *TempString);
 
 u8 *BlogPageTemplateOpen =
     (u8 *)"<!doctype html>"                        \
@@ -204,13 +204,13 @@ internal pre_processor CreatePreProcessor(u8 *Bra, u8 *Ket)
         u64 OutputBufferVirtualSize = Gigabytes(1);
         u64 TotalVirtualSize = StringAllocatorVirtualSize + OutputBufferVirtualSize;
 
-        PreProcessor.StringAllocator = CreateLinearAllocator(TotalVirtualSize);
+        PreProcessor.StringAllocator = CreateArena(TotalVirtualSize);
         PreProcessor.StringAllocator.Capacity = StringAllocatorVirtualSize;
 
-        /* TODO Do _not_ call CreateLinearAllocator twice here, just set one of the
+        /* TODO Do _not_ call CreateArena twice here, just set one of the
            allocator's data to the first allocator's data plus an offset.
         */
-        PreProcessor.OutputAllocator = CreateLinearAllocator(Gigabytes(1));
+        PreProcessor.OutputAllocator = CreateArena(Gigabytes(1));
         PreProcessor.OutputAllocator.Capacity = OutputBufferVirtualSize;
     }
 
@@ -268,10 +268,10 @@ internal buffer GetCommandToken(pre_processor *PreProcessor, buffer *Buffer, s32
 
         if (IsKet || IsSpace)
         {
-            linear_allocator *StringAllocator = &PreProcessor->StringAllocator;
+            arena *StringAllocator = &PreProcessor->StringAllocator;
             TokenBuffer.Data = StringAllocator->Data + StringAllocator->Offset;
 
-            b32 WriteError = WriteLinearAllocator(StringAllocator, Buffer->Data + Offset, TokenBuffer.Size + 1);
+            b32 WriteError = WriteArena(StringAllocator, Buffer->Data + Offset, TokenBuffer.Size + 1);
 
             if (!WriteError)
             {
@@ -289,7 +289,7 @@ internal b32 HandlePreProcessCommand(pre_processor *PreProcessor, buffer *Buffer
     s32 Index = Offset;
     s32 MaxIndex = Offset + CommandSize;
     u8 *IncludeName = (u8 *)"include";
-    linear_allocator *OutputAllocator = &PreProcessor->OutputAllocator;
+    arena *OutputAllocator = &PreProcessor->OutputAllocator;
     b32 CommandWasHandled = 0;
 
     SkipSpace(Buffer, &Index);
@@ -328,7 +328,7 @@ internal b32 HandlePreProcessCommand(pre_processor *PreProcessor, buffer *Buffer
 
             if (Buffer)
             {
-                b32 WriteError = WriteLinearAllocator(OutputAllocator, Buffer->Data, Buffer->Size);
+                b32 WriteError = WriteArena(OutputAllocator, Buffer->Data, Buffer->Size);
                 FreeBuffer(Buffer);
 
                 if (WriteError)
@@ -352,9 +352,9 @@ internal b32 HandlePreProcessCommand(pre_processor *PreProcessor, buffer *Buffer
     return CommandWasHandled;
 }
 
-internal b32 PreprocessBuffer(pre_processor *PreProcessor, linear_allocator *TempString, buffer *Buffer, u8 *OutputFilePath)
+internal b32 PreprocessBuffer(pre_processor *PreProcessor, arena *TempString, buffer *Buffer, u8 *OutputFilePath)
 {
-    linear_allocator *OutputAllocator = &PreProcessor->OutputAllocator;
+    arena *OutputAllocator = &PreProcessor->OutputAllocator;
 
     b32 Error = 0;
     s32 WriteIndex = 0;
@@ -384,7 +384,7 @@ internal b32 PreprocessBuffer(pre_processor *PreProcessor, linear_allocator *Tem
             /* Set up the heredoc label, which is used to scan for the end of the heredoc. */
             s32 HereDocLabelSize = I - Begin + 1;
             u8 *HereDocLabel = TempString->Data + TempString->Offset;
-            s32 WriteError = WriteLinearAllocator(TempString, Buffer->Data + Begin, HereDocLabelSize);
+            s32 WriteError = WriteArena(TempString, Buffer->Data + Begin, HereDocLabelSize);
 
             if (WriteError)
             {
@@ -402,7 +402,7 @@ internal b32 PreprocessBuffer(pre_processor *PreProcessor, linear_allocator *Tem
                 if (CheckIfStringIsPrefix(HereDocLabel, Buffer, J))
                 {
                     s32 PreDataSize = HereDocCharOffset - PreProcessor->BraCount - WriteIndex;
-                    b32 WriteError = WriteLinearAllocator(OutputAllocator, Buffer->Data + WriteIndex, PreDataSize);
+                    b32 WriteError = WriteArena(OutputAllocator, Buffer->Data + WriteIndex, PreDataSize);
 
                     if (WriteError)
                     {
@@ -413,7 +413,7 @@ internal b32 PreprocessBuffer(pre_processor *PreProcessor, linear_allocator *Tem
                     s32 HereDocDataSize = J - HereDocDataBegin;
                     u8 *DataBegin = Buffer->Data + HereDocDataBegin;
 
-                    WriteError = WriteLinearAllocator(OutputAllocator, DataBegin, HereDocDataSize);
+                    WriteError = WriteArena(OutputAllocator, DataBegin, HereDocDataSize);
 
                     if (WriteError)
                     {
@@ -443,7 +443,7 @@ internal b32 PreprocessBuffer(pre_processor *PreProcessor, linear_allocator *Tem
                     s32 OldI = I;
                     s32 OldWriteIndex = WriteIndex;
 
-                    b32 WriteError = WriteLinearAllocator(OutputAllocator, BufferStart, Size);
+                    b32 WriteError = WriteArena(OutputAllocator, BufferStart, Size);
 
                     if (WriteError)
                     {
@@ -477,7 +477,7 @@ internal b32 PreprocessBuffer(pre_processor *PreProcessor, linear_allocator *Tem
         */
         s32 Size = Buffer->Size - WriteIndex;
         u8 *DataBegin = Buffer->Data + WriteIndex;
-        b32 WriteError = WriteLinearAllocator(OutputAllocator, DataBegin, Size);
+        b32 WriteError = WriteArena(OutputAllocator, DataBegin, Size);
 
         if (WriteError)
         {
@@ -492,7 +492,7 @@ internal b32 PreprocessBuffer(pre_processor *PreProcessor, linear_allocator *Tem
     return Error;
 }
 
-b32 PreprocessFile(pre_processor *PreProcessor, linear_allocator TempString, u8 *FilePath, u8 *OutputFilePath)
+b32 PreprocessFile(pre_processor *PreProcessor, arena TempString, u8 *FilePath, u8 *OutputFilePath)
 {
     buffer *Buffer = ReadFileIntoBuffer(FilePath);
     b32 Error = PreprocessBuffer(PreProcessor, &TempString, Buffer, OutputFilePath);
@@ -546,7 +546,7 @@ internal s32 GetBytesUntilNewline(u8 *Bytes, s32 MaxBytes)
     return BytesUntilNewline;
 }
 
-internal b32 HandleBlogLine(linear_allocator *HtmlOutput, buffer *BlogBuffer, s32 *I)
+internal b32 HandleBlogLine(arena *HtmlOutput, buffer *BlogBuffer, s32 *I)
 {
     b32 ShouldContinue = 0;
 
@@ -596,7 +596,7 @@ internal b32 HandleBlogLine(linear_allocator *HtmlOutput, buffer *BlogBuffer, s3
             if (BytesUntilNewline > 0)
             {
                 PushString(HtmlOutput, OpenTagName);
-                WriteLinearAllocator(HtmlOutput, StartOfText, BytesUntilNewline);
+                WriteArena(HtmlOutput, StartOfText, BytesUntilNewline);
                 PushString(HtmlOutput, CloseTagName);
                 PushString(HtmlOutput, (u8 *)"\n");
 
@@ -694,13 +694,13 @@ internal file_list *SortFileList(file_list *Files)
     return SortedFiles;
 }
 
-internal void PushNullTerminator(linear_allocator *Allocator)
+internal void PushNullTerminator(arena *Allocator)
 {
     Allocator->Data[Allocator->Offset] = 0;
     Allocator->Offset += 1;
 }
 
-internal buffer GetOutputHtmlPath(linear_allocator *TempString, u8 *OldRootPath, u8 *NewRootPath, u8 *CodePagePath, b32 ExcludePathExtension, b32 AddHtmlExtension)
+internal buffer GetOutputHtmlPath(arena *TempString, u8 *OldRootPath, u8 *NewRootPath, u8 *CodePagePath, b32 ExcludePathExtension, b32 AddHtmlExtension)
 {
     u8 *Extension = (u8 *)".html";
 
@@ -749,7 +749,7 @@ internal buffer GetOutputHtmlPath(linear_allocator *TempString, u8 *OldRootPath,
         }
 
         s32 Size = End - CodePagePathOffset;
-        WriteLinearAllocator(TempString, CodePagePath + CodePagePathOffset, Size);
+        WriteArena(TempString, CodePagePath + CodePagePathOffset, Size);
     }
     else
     {
@@ -769,20 +769,20 @@ internal buffer GetOutputHtmlPath(linear_allocator *TempString, u8 *OldRootPath,
     return Buffer;
 }
 
-internal void GenerateBlogPages(linear_allocator *TempString, pre_processor *PreProcessor, u8 *SiteBlogDirectory)
+internal void GenerateBlogPages(arena *TempString, pre_processor *PreProcessor, u8 *SiteBlogDirectory)
 {
     u8 *BlogDirectory = (u8 *)"../blog";
     u8 *BlogPageTemplateFilePath = (u8 *)"../src/layout/blog.html";
     u8 *BlogListingFilePath = (u8 *)"../gen/blog_listing.html";
 
-    linear_allocator FileAllocator = WalkDirectory(BlogDirectory);
+    arena FileAllocator = WalkDirectory(BlogDirectory);
     file_list *SortedFileList = SortFileList((file_list *)FileAllocator.Data);
 
     buffer File;
     buffer BlogPageTemplate;
 
     BlogPageTemplate.Size = GetFileSize(BlogPageTemplateFilePath);
-    BlogPageTemplate.Data = PushLinearAllocator(TempString, BlogPageTemplate.Size + 1);
+    BlogPageTemplate.Data = PushArena(TempString, BlogPageTemplate.Size + 1);
 
     if (!BlogPageTemplate.Data)
     {
@@ -800,7 +800,7 @@ internal void GenerateBlogPages(linear_allocator *TempString, pre_processor *Pre
     for (file_list *CurrentFile = SortedFileList; CurrentFile; CurrentFile = CurrentFile->Next)
     {
         File.Size = GetFileSize(CurrentFile->Name);
-        File.Data = PushLinearAllocator(TempString, File.Size + 1);
+        File.Data = PushArena(TempString, File.Size + 1);
 
         if (File.Data)
         {
@@ -838,7 +838,7 @@ internal void GenerateBlogPages(linear_allocator *TempString, pre_processor *Pre
     }
 
     { /* write blog listing page */
-        linear_allocator *OutputAllocator = &PreProcessor->OutputAllocator;
+        arena *OutputAllocator = &PreProcessor->OutputAllocator;
         u64 OutputOffset = PreProcessor->OutputAllocator.Offset;
 
         for (file_list *CurrentFile = SortedFileList; CurrentFile; CurrentFile = CurrentFile->Next)
@@ -858,10 +858,10 @@ internal void GenerateBlogPages(linear_allocator *TempString, pre_processor *Pre
         OutputAllocator->Offset = OutputOffset;
     }
 
-    FreeLinearAllocator(FileAllocator);
+    FreeArena(FileAllocator);
 }
 
-internal buffer EscapeHtmlString(linear_allocator *TempString, u8 *HtmlString, s32 Length)
+internal buffer EscapeHtmlString(arena *TempString, u8 *HtmlString, s32 Length)
 {
     s32 HtmlStringBegin = 0;
     s32 InitialOffset = TempString->Offset;
@@ -887,7 +887,7 @@ internal buffer EscapeHtmlString(linear_allocator *TempString, u8 *HtmlString, s
         {
             u8 *BeginData = HtmlString + HtmlStringBegin;
             s32 Size = I - HtmlStringBegin;
-            u8 *Data = PushLinearAllocator(TempString, Size);
+            u8 *Data = PushArena(TempString, Size);
 
             CopyMemory(BeginData, Data, Size);
             PushString(TempString, EscapeString);
@@ -899,7 +899,7 @@ internal buffer EscapeHtmlString(linear_allocator *TempString, u8 *HtmlString, s
 
     if (RemainingLength)
     {
-        WriteLinearAllocator(TempString, HtmlString + HtmlStringBegin, RemainingLength);
+        WriteArena(TempString, HtmlString + HtmlStringBegin, RemainingLength);
     }
 
     Buffer.Size = TempString->Offset - InitialOffset;
@@ -920,7 +920,7 @@ typedef struct
     u8 *Name;
 } path_parts;
 
-internal path_parts GetPathParts(linear_allocator *TempString, u8 *Path)
+internal path_parts GetPathParts(arena *TempString, u8 *Path)
 {
     path_parts PathParts = {0};
 
@@ -933,8 +933,8 @@ internal path_parts GetPathParts(linear_allocator *TempString, u8 *Path)
         if (!Path[I])
         {
             u64 PathStringSize = I - Begin + 1; /* NOTE: Add one, and assume that Path is null-terminated. */
-            u8 *WriteLocation = GetLinearAllocatorWriteLocation(TempString);
-            s32 WriteError = WriteLinearAllocator(TempString, Path + Begin, PathStringSize);
+            u8 *WriteLocation = GetArenaWriteLocation(TempString);
+            s32 WriteError = WriteArena(TempString, Path + Begin, PathStringSize);
 
             if (WriteError)
             {
@@ -951,8 +951,8 @@ internal path_parts GetPathParts(linear_allocator *TempString, u8 *Path)
         {
             u64 Size = I - Begin + 1;
 
-            u8 *WriteLocation = GetLinearAllocatorWriteLocation(TempString);
-            s32 WriteError = WriteLinearAllocator(TempString, Path + Begin, Size);
+            u8 *WriteLocation = GetArenaWriteLocation(TempString);
+            s32 WriteError = WriteArena(TempString, Path + Begin, Size);
 
             if (WriteError)
             {
@@ -978,7 +978,7 @@ internal path_parts GetPathParts(linear_allocator *TempString, u8 *Path)
     return PathParts;
 }
 
-internal u8 *GetFileNameFromPath(linear_allocator *Allocator, u8 *Path)
+internal u8 *GetFileNameFromPath(arena *Allocator, u8 *Path)
 {
     s32 FileNameOffset = 0;
     s32 I = 0;
@@ -998,20 +998,20 @@ internal u8 *GetFileNameFromPath(linear_allocator *Allocator, u8 *Path)
 
     s32 Length = I - FileNameOffset;
     Assert(Length > 0);
-    u8 *FileName = GetLinearAllocatorWriteLocation(Allocator);
-    WriteLinearAllocator(Allocator, Path + FileNameOffset, Length);
+    u8 *FileName = GetArenaWriteLocation(Allocator);
+    WriteArena(Allocator, Path + FileNameOffset, Length);
     PushNullTerminator(Allocator);
 
     return FileName;
 }
 
-void GenerateCodePages(linear_allocator *TempString)
+void GenerateCodePages(arena *TempString)
 {
     u8 *SourceCodePath = (u8 *)"../src";
     u8 *GenCodePagesPath = (u8 *)"../gen/code_pages";
 
-    linear_allocator FileAllocator = WalkDirectory(SourceCodePath);
-    linear_allocator CodePage = CreateLinearAllocator(Gigabytes(1));
+    arena FileAllocator = WalkDirectory(SourceCodePath);
+    arena CodePage = CreateArena(Gigabytes(1));
 
     file_list *FileList = (file_list *)FileAllocator.Data;
     file_list *SortedFileList = SortFileList(FileList);
@@ -1118,7 +1118,7 @@ void GenerateCodePages(linear_allocator *TempString)
             buffer *CodePageBuffer = ReadFileIntoBuffer(CurrentFile->Name);
             buffer EscapedHtmlBuffer = EscapeHtmlString(TempString, CodePageBuffer->Data, CodePageBuffer->Size);
 
-            u8 *CodePageData = PushLinearAllocator(&CodePage, EscapedHtmlBuffer.Size);
+            u8 *CodePageData = PushArena(&CodePage, EscapedHtmlBuffer.Size);
             CopyMemory(EscapedHtmlBuffer.Data, CodePageData, EscapedHtmlBuffer.Size);
 
             PushString(&CodePage, (u8 *)"HERE" "DOC</pre></div></body></html>");
@@ -1132,10 +1132,10 @@ void GenerateCodePages(linear_allocator *TempString)
 
     }
 
-    FreeLinearAllocator(FileAllocator);
+    FreeArena(FileAllocator);
 }
 
-void GenerateSite(linear_allocator *TempString)
+void GenerateSite(arena *TempString)
 {
     u8 *GenDirectory       = (u8 *)"../gen";
     u8 *CodePagesDirectory = (u8 *)"../gen/code_pages";
@@ -1189,7 +1189,7 @@ void GenerateSite(linear_allocator *TempString)
     GenerateCodePages(TempString);
 
     {
-        linear_allocator FileAllocator = WalkDirectory(CodePagesDirectory);
+        arena FileAllocator = WalkDirectory(CodePagesDirectory);
         file_list *FileList = (file_list *)FileAllocator.Data;
         file_list *SortedFileList = SortFileList(FileList);
 
@@ -1237,7 +1237,6 @@ void GenerateSite(linear_allocator *TempString)
                     FileName[I] = Char;
                 }
                 FileName[I] = 0;
-                printf("file name %s\n", FileName);
             }
 
             SetPreprocessVariable(&PreProcessor, (u8 *)"FileName", FileName);
@@ -1245,7 +1244,7 @@ void GenerateSite(linear_allocator *TempString)
             PreprocessFile(&PreProcessor, *TempString, CurrentFile->Name, OutputHtmlPath.Data);
         }
 
-        FreeLinearAllocator(FileAllocator);
+        FreeArena(FileAllocator);
     }
 
     TempString->Offset = 0;

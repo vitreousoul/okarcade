@@ -9,13 +9,10 @@ Ok Arcade is a collection games and visual simulations. The main goal of the pro
 - Ex. `./build.sh estudioso`
 - Ex. `./build.sh scuba`
 
-
 *_Note_: The web build currently assumes that the [ecmascript library source code](https://github.com/emscripten-core/emscripten) is in a sibling folder.*
-
 
 - To initialize Emscripten for the web build, once per shell session, run `source ./init_emcc.sh`. This shell code could also just be added to your shell's startup script.
 - For the web build, use `./build_web.sh [game-name]`.
-
 
 - To build desktop and web for all apps, use `./build_all.sh`.
 
