@@ -1154,6 +1154,7 @@ internal void DisplayWinMessage(state *State, u32 LetterSpacing)
             ClearQuizInput(State);
 
             SetQuizMode(State, quiz_mode_Typing);
+            State->QuizLookupIndex = 0;
 
             InitializeQuizItems(State);
         }
