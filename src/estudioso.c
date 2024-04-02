@@ -229,8 +229,10 @@ typedef struct
     u16 MagicNumber;
     u16 Version; /* TODO: Think about how to represent version in a consise way... */
     u32 QuizItemCount;
+    u32 QuizLookupIndex;
     u32 FileSize;
     u32 OffsetToStringData;
+    u32 OffsetToQuizItemsLookupData;
 } save_file_header;
 
 #define Save_File_Magic_Number 0xe54d
@@ -370,6 +372,7 @@ internal u64 PrepareSaveFile(state *State)
     u8 *SaveFileQuizItemsLocation = SaveFileBuffer + HeaderSize;
     u32 QuizItemCount = GetQuizItemCount(State);
     u32 QuizItemSize = sizeof(quiz_item) * QuizItemCount;
+    u32 QuizLookupSize = sizeof(State->QuizItemsLookup);
 
     s32 FreeSpaceForStringData = Max_Bytes_For_Save_File - (QuizItemSize + HeaderSize);
 
@@ -383,12 +386,17 @@ internal u64 PrepareSaveFile(state *State)
     SaveHeader.MagicNumber = Save_File_Magic_Number;
     SaveHeader.Version = Save_File_Header_Version;
     SaveHeader.QuizItemCount = QuizItemCount;
-    SaveHeader.OffsetToStringData = HeaderSize + QuizItemSize;
+    SaveHeader.QuizLookupIndex = State->QuizLookupIndex;
+    SaveHeader.OffsetToQuizItemsLookupData = HeaderSize + QuizItemSize;
+    SaveHeader.OffsetToStringData = HeaderSize + QuizItemSize + QuizLookupSize;
 
     u8 *StringLocation = (u8 *)(SaveFileBuffer + SaveHeader.OffsetToStringData);
     u8 *StringStart = StringLocation;
 
     CopyMemory((u8 *)State->QuizItems, SaveFileQuizItemsLocation, QuizItemSize);
+
+    u8 *QuizLookupData = SaveFileBuffer + SaveHeader.OffsetToQuizItemsLookupData;
+    CopyMemory((u8 *)State->QuizItemsLookup, QuizLookupData, QuizLookupSize);
 
     for (u32 I = 0; I < Quiz_Item_Max; ++I)
     {
@@ -445,7 +453,6 @@ internal u64 PrepareSaveFile(state *State)
 
     FileSize = StringLocation - SaveFileBuffer;
     SaveHeader.FileSize = FileSize;
-    printf("FileSize %d\n", FileSize);
 
     CopyMemory((u8 *)&SaveHeader, SaveFileBuffer, HeaderSize);
 
@@ -1019,9 +1026,10 @@ internal b32 TryToLoadSaveFile(state *State)
             save_file_header *Header = (save_file_header *)Buffer->Data;
             u32 QuizItemSize = Header->QuizItemCount * sizeof(quiz_item);
             u32 StringDataSize = Buffer->Size - (HeaderSize + QuizItemSize);
+
+            Assert(Header->Version == Save_File_Header_Version);
             Assert(Buffer->Size == (s32)(HeaderSize + QuizItemSize + StringDataSize));
             Assert((u32)Buffer->Size == Header->FileSize);
-            printf("StringDataSize %d\n", StringDataSize);
 
             for (u32 I = 0; I < Header->QuizItemCount; ++I)
             {
@@ -1047,9 +1055,17 @@ internal b32 TryToLoadSaveFile(state *State)
             {
                 u64 Size = Header->QuizItemCount * sizeof(quiz_item);
                 CopyMemory(Buffer->Data + HeaderSize, (u8 *)State->QuizItems, Size);
-
-                SaveFileHasLoaded = 1;
+                State->QuizItemCount = Header->QuizItemCount;
             }
+
+            {
+                u8 *QuizItemsLookupData = Buffer->Data + Header->OffsetToQuizItemsLookupData;
+                CopyMemory(QuizItemsLookupData, (u8 *)State->QuizItemsLookup, sizeof(State->QuizItemsLookup));
+            }
+
+            State->QuizLookupIndex = Header->QuizLookupIndex;
+
+            SaveFileHasLoaded = 1;
         }
     }
 
@@ -1062,10 +1078,10 @@ internal void InitializeDefaultQuizItems(state *State);
 internal void InitializeQuizItems(state *State)
 {
     b32 SaveFileHasLoaded = TryToLoadSaveFile(State);
-    State->QuizLookupIndex = 0;
 
     if (!SaveFileHasLoaded)
     {
+        State->QuizLookupIndex = 0;
         InitializeDefaultQuizItems(State);
     }
     else
@@ -1076,7 +1092,6 @@ internal void InitializeQuizItems(state *State)
             State->QuizItems[I].Complete = 0;
         }
     }
-    printf("quiz item count %d\n", State->QuizItemCount);
 
     { /* NOTE: Permute the lookup table */
         s32 PermutationCount = State->QuizItemCount; /* TODO: What value should permutation-count be? */
@@ -1098,10 +1113,12 @@ internal void InitializeQuizItems(state *State)
 
 #if 1
         { /* DEBUG: Test that the list does not contain duplicates */
+            /*
             for (u32 I = 0; I < State->QuizItemCount; ++I)
             {
                 printf("%d %d\n", I, State->QuizItemsLookup[I]);
             }
+            */
 
             for (s32 I = 0; I < PermutationCount; ++I)
             {
@@ -1362,7 +1379,6 @@ internal void AddQuizConjugation_(state *State, conjugation Conjugation, char *P
 
     AddQuizItem(State, QuizItem);
 }
-
 
 internal void InitializeDefaultQuizItems(state *State)
 {
