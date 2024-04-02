@@ -1083,6 +1083,25 @@ internal void InitializeQuizItems(state *State)
     {
         State->QuizLookupIndex = 0;
         InitializeDefaultQuizItems(State);
+
+        { /* NOTE: Permute the lookup table */
+            s32 PermutationCount = State->QuizItemCount; /* TODO: What value should permutation-count be? */
+
+            for (u32 I = 0; I < State->QuizItemCount; ++I)
+            {
+                State->QuizItemsLookup[I] = I;
+            }
+
+            for (s32 I = 0; I < PermutationCount; ++I)
+            {
+                s32 RandomIndex = rand() % State->QuizItemCount;
+
+                /* NOTE: Swap the quiz item indices */
+                s32 Temp = State->QuizItemsLookup[I];
+                State->QuizItemsLookup[I] = State->QuizItemsLookup[RandomIndex];
+                State->QuizItemsLookup[RandomIndex] = Temp;
+            }
+        }
     }
     else
     {
@@ -1093,47 +1112,27 @@ internal void InitializeQuizItems(state *State)
         }
     }
 
-    { /* NOTE: Permute the lookup table */
-        s32 PermutationCount = State->QuizItemCount; /* TODO: What value should permutation-count be? */
+#if 1
+    { /* DEBUG: Test that the list does not contain duplicates */
+        /*
+          for (u32 I = 0; I < State->QuizItemCount; ++I)
+          {
+          printf("%d %d\n", I, State->QuizItemsLookup[I]);
+          }
+        */
 
         for (u32 I = 0; I < State->QuizItemCount; ++I)
         {
-            State->QuizItemsLookup[I] = I;
-        }
-
-        for (s32 I = 0; I < PermutationCount; ++I)
-        {
-            s32 RandomIndex = rand() % State->QuizItemCount;
-
-            /* NOTE: Swap the quiz item indices */
-            s32 Temp = State->QuizItemsLookup[I];
-            State->QuizItemsLookup[I] = State->QuizItemsLookup[RandomIndex];
-            State->QuizItemsLookup[RandomIndex] = Temp;
-        }
-
-#if 1
-        { /* DEBUG: Test that the list does not contain duplicates */
-            /*
-            for (u32 I = 0; I < State->QuizItemCount; ++I)
+            for (u32 J = 0; J < State->QuizItemCount; ++J)
             {
-                printf("%d %d\n", I, State->QuizItemsLookup[I]);
-            }
-            */
-
-            for (s32 I = 0; I < PermutationCount; ++I)
-            {
-                for (s32 J = 0; J < PermutationCount; ++J)
+                if (I != J)
                 {
-                    if (I != J)
-                    {
-                        Assert(State->QuizItemsLookup[I] != State->QuizItemsLookup[J]);
-                    }
+                    Assert(State->QuizItemsLookup[I] != State->QuizItemsLookup[J]);
                 }
             }
         }
-#endif
     }
-
+#endif
 }
 
 internal void DisplayWinMessage(state *State, u32 LetterSpacing)
