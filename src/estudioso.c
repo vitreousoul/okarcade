@@ -5,6 +5,7 @@
 
     A flash-card typing game for learning Spanish.
 
+    TODO: Fix bug where after winning and starting a new game, duplicate quiz-items are added to the existing quiz items. (It always adds as many quiz-items as the original quiz-item count)
     TODO: Create some UI to toggle different modes, or at least filter-out/select quiz-items.
     TODO: Prevent getting multiple failure counts by repeatidly pressing the Enter key with an incorrect answer.
     TODO: Allow a history of quiz items, so you can scroll back and view previous answers.
@@ -33,6 +34,7 @@
 #endif
 
 #include "../gen/roboto_regular.h"
+#include "../gen/sfx_correct.h"
 
 #ifdef TARGET_SCREEN_WIDTH
 global_variable int SCREEN_WIDTH = TARGET_SCREEN_WIDTH;
@@ -49,6 +51,7 @@ global_variable int SCREEN_HEIGHT = 800;
 #include "math.c"
 #include "raylib_helpers.h"
 #include "ui.c"
+#include "sound.c"
 
 
 #define TEST 0
@@ -212,6 +215,10 @@ typedef struct
     quiz_mode QuizMode;
 
     ui UI;
+
+    Sound Correct;
+    Sound Wrong;
+    Sound Win;
 } state;
 
 
@@ -872,6 +879,7 @@ internal void GetNextRandomQuizItem(state *State)
     if (State->QuizLookupIndex >= (s32)State->QuizItemCount)
     {
         SetQuizMode(State, quiz_mode_Win);
+        OkPlaySound(State->Win);
         DEBUGCanHandleEnterKeyInWinMode = 0;
         State->QuizLookupIndex = 0;
     }
@@ -1176,11 +1184,13 @@ internal void HandleQuizItem(state *State, quiz_item *QuizItem, u8 *Answer)
             if (StringsMatch((char *)Answer, State->QuizInput))
             {
                 SetQuizMode(State, quiz_mode_Correct);
+                OkPlaySound(State->Correct);
                 QuizItem->Complete = 1;
                 QuizItem->PassCount += 1;
             }
             else
             {
+                OkPlaySound(State->Wrong);
                 QuizItem->FailCount += 1;
             }
         }
@@ -1268,6 +1278,34 @@ int main(void)
     Assert((1 << Key_State_Chunk_Count_Log2) == Key_State_Chunk_Count);
 
     state State = {0};
+
+#if !PLATFORM_WEB
+    /* TODO: Update raylib binary to see if we can init audio device on web!
+       Currently, we get an error that leads to the following issue:
+           https://github.com/raysan5/raylib/issues/3441
+    */
+    {
+        InitAudioDevice();
+
+        Wave Correct = LoadWaveFromMemory(".wav", SfxCorrectData, sizeof(SfxCorrectData));
+        /* TODO: Generate data for wrong and win, then use LoadWaveFromMemory */
+        Wave Wrong = LoadWave("../assets/sfx_wrong.wav");
+        Wave Win = LoadWave("../assets/sfx_win.wav");
+
+        if (IsWaveReady(Correct) && IsWaveReady(Wrong) && IsWaveReady(Win))
+        {
+            State.Correct = LoadSoundFromWave(Correct);
+            SetSoundVolume(State.Correct, 0.55f);
+            State.Wrong = LoadSoundFromWave(Wrong);
+            State.Win = LoadSoundFromWave(Win);
+            SetSoundVolume(State.Win, 0.55f);
+        }
+        else
+        {
+            printf("Error: Wave not ready!\n");
+        }
+    }
+#endif
 
 #if defined(PLATFORM_WEB)
     InitRaylibCanvas();
@@ -1395,6 +1433,7 @@ internal void InitializeDefaultQuizItems(state *State)
         "En la mañana (hacer) buen tiempo en abril.",
         "hace"
     );
+#if 1
     AddQuizText(
         "Él (hacer) mucho frio.",
         "hace"
@@ -1501,7 +1540,6 @@ internal void InitializeDefaultQuizItems(state *State)
         "tiene"
     );
 
-#if 1
     AddQuizText(
         "_ tarea",
         "la"
@@ -1749,7 +1787,6 @@ internal void InitializeDefaultQuizItems(state *State)
         "Yo (compartir) mi casa con mi hermano.",
         "comparto"
     );
-#endif
     AddQuizText(
         "Él (insistir) en viajar a Guatemala.",
         "insiste"
@@ -1989,4 +2026,5 @@ internal void InitializeDefaultQuizItems(state *State)
         "En invierno (llover) mucho.",
         "llueve"
     );
+#endif
 }

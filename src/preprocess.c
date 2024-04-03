@@ -486,7 +486,7 @@ internal b32 PreprocessBuffer(pre_processor *PreProcessor, arena *TempString, bu
     }
 
     printf("Writing pre-processed file %s\n", OutputFilePath);
-    WriteFile(OutputFilePath, OutputAllocator->Data, OutputAllocator->Offset);
+    WriteFileWithPath(OutputFilePath, OutputAllocator->Data, OutputAllocator->Offset);
     OutputAllocator->Offset = 0;
 
     return Error;
@@ -854,7 +854,7 @@ internal void GenerateBlogPages(arena *TempString, pre_processor *PreProcessor, 
 
         u8 *BlogListingData = OutputAllocator->Data + OutputOffset;
         u64 Size = OutputAllocator->Offset - BlogListingOffset;
-        WriteFile(BlogListingFilePath, BlogListingData, Size);
+        WriteFileWithPath(BlogListingFilePath, BlogListingData, Size);
         OutputAllocator->Offset = OutputOffset;
     }
 
@@ -1082,7 +1082,7 @@ void GenerateCodePages(arena *TempString)
             PushString(&CodePage, (u8 *)"</div>");
         }
 
-        WriteFile(CodePageListingPath, CodePage.Data, CodePage.Offset);
+        WriteFileWithPath(CodePageListingPath, CodePage.Data, CodePage.Offset);
         CodePage.Offset = 0;
     }
 
@@ -1123,7 +1123,7 @@ void GenerateCodePages(arena *TempString)
 
             PushString(&CodePage, (u8 *)"HERE" "DOC</pre></div></body></html>");
 
-            WriteFile(Buffer.Data, CodePage.Data, CodePage.Offset);
+            WriteFileWithPath(Buffer.Data, CodePage.Data, CodePage.Offset);
             FreeBuffer(CodePageBuffer);
 
             CodePage.Offset = 0;
@@ -1178,7 +1178,7 @@ void GenerateSite(arena *TempString)
         /* TODO: Put asset mappings into some kind of data structure and loop thoough it? */
         u64 OldAllocatorOffset = TempString->Offset;
         u64 FileSize = ReadFileIntoAllocator(TempString, (u8 *)"../assets/scuba.png");
-        WriteFile((u8 *)"../site/assets/scuba.png", TempString->Data + OldAllocatorOffset, FileSize);
+        WriteFileWithPath((u8 *)"../site/assets/scuba.png", TempString->Data + OldAllocatorOffset, FileSize);
         TempString->Offset = OldAllocatorOffset;
     }
 

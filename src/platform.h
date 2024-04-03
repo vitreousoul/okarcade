@@ -29,6 +29,7 @@ typedef struct
     u64 Offset;
     u64 Capacity;
     u8 *Data;
+    u64 ParentOffset;
 } arena;
 
 typedef struct
@@ -38,6 +39,11 @@ typedef struct
     s32 Day;
 } date;
 
+typedef struct
+{
+    FILE *File;
+} file;
+
 void *AllocateMemory(u64 Size);
 void FreeMemory(void *Ref);
 void *AllocateVirtualMemory(size Size);
@@ -45,6 +51,7 @@ void *AllocateVirtualMemory(size Size);
 void GetResourceUsage(void);
 
 arena CreateArena(u64 Size);
+b32 IsArenaUsable(arena Arena);
 void *PushArena(arena *Arena, u64 Size);
 s32 WriteArena(arena *Arena, u8 *Data, u64 Size);
 u8 *GetArenaWriteLocation(arena *Arena);
@@ -60,7 +67,12 @@ u64 GetFileSize(u8 *FilePath);
 u64 ReadFileIntoData(u8 *FilePath, u8 *Bytes, u64 MaxBytes);
 u64 ReadFileIntoAllocator(arena *Arena, u8 *FilePath);
 void FreeBuffer(buffer *Buffer);
-void WriteFile(u8 *FilePath, u8 *Data, size Size);
+
+file OpenFile(u8 *FilePath);
+void CloseFile(file File);
+void WriteFile(file File, u8 *Data, u64 Size);
+
+void WriteFileWithPath(u8 *FilePath, u8 *Data, size Size);
 void WriteFileFromBuffer(u8 *FilePath, buffer *Buffer);
 void EnsureDirectoryExists(u8 *DirectoryPath);
 void EnsurePathDirectoriesExist(u8 *Path);
@@ -140,6 +152,7 @@ arena CreateArena(u64 Size)
     Arena.Offset = 0;
     Arena.Capacity = Size;
     Arena.Data = AllocateVirtualMemory(Size);
+    Arena.ParentOffset = 0;
 
     return Arena;
 }
@@ -161,6 +174,32 @@ void *PushArena(arena *Arena, u64 Size)
     return Result;
 }
 
+u64 GetArenaFreeSpace(arena *Arena)
+{
+    Assert(Arena->Capacity >= Arena->Offset);
+    u64 FreeSpace = Arena->Capacity - Arena->Offset;
+    return FreeSpace;
+}
+
+arena CreateSubArena(arena *Arena, u64 Size)
+{
+    arena SubArena = {0};
+
+    if (Size <= GetArenaFreeSpace(Arena))
+    {
+        SubArena.Capacity = Size;
+        SubArena.Data = GetArenaWriteLocation(Arena);
+        PushArena(Arena, Size);
+    }
+
+    return SubArena;
+}
+
+inline b32 IsArenaUsable(arena Arena)
+{
+    b32 IsUsable = Arena.Capacity && Arena.Data;
+    return IsUsable;
+}
 
 s32 WriteArena(arena *Arena, u8 *Data, u64 Size)
 {
@@ -186,16 +225,23 @@ u8 *GetArenaWriteLocation(arena *Arena)
     return WriteLocation;
 }
 
-u64 GetArenaFreeSpace(arena *Arena)
-{
-    Assert(Arena->Capacity > Arena->Offset);
-    u64 FreeSpace = Arena->Capacity - Arena->Offset;
-    return FreeSpace;
-}
-
 void FreeArena(arena Arena)
 {
     munmap(Arena.Data, Arena.Capacity);
+}
+
+void ArenaStackPush(arena *Arena)
+{
+    u64 NewParentOffset = Arena->Offset;
+    WriteArena(Arena, (u8 *)&Arena->ParentOffset, sizeof(Arena->ParentOffset));
+    Arena->ParentOffset = NewParentOffset;
+}
+
+void ArenaStackPop(arena *Arena)
+{
+    Arena->Offset = Arena->ParentOffset;
+    u64 *WriteLocation = (u64 *)GetArenaWriteLocation(Arena);
+    Arena->ParentOffset = *WriteLocation;
 }
 /*| ^ Arena Allocator ^ |*/
 
@@ -341,7 +387,7 @@ void FreeBuffer(buffer *Buffer)
     FreeMemory(Buffer);
 }
 
-void WriteFile(u8 *FilePath, u8 *Data, size Size)
+void WriteFileWithPath(u8 *FilePath, u8 *Data, size Size)
 {
     FILE *File = fopen((char *)FilePath, "wb");
 
@@ -352,13 +398,36 @@ void WriteFile(u8 *FilePath, u8 *Data, size Size)
     }
     else
     {
+        printf("Error in WriteFileWithPath: trying to open file \"%s\"\n", FilePath);
+    }
+}
+
+file OpenFile(u8 *FilePath)
+{
+    file File;
+    File.File = fopen((char *)FilePath, "wb");
+
+    if (!File.File)
+    {
         printf("Error in WriteFile: trying to open file \"%s\"\n", FilePath);
     }
+
+    return File;
+}
+
+void CloseFile(file File)
+{
+    fclose(File.File);
+}
+
+void WriteFile(file File, u8 *Data, u64 Size)
+{
+    fwrite(Data, 1, Size, File.File);
 }
 
 void WriteFileFromBuffer(u8 *FilePath, buffer *Buffer)
 {
-    WriteFile(FilePath, Buffer->Data, Buffer->Size);
+    WriteFileWithPath(FilePath, Buffer->Data, Buffer->Size);
 }
 
 void EnsureDirectoryExists(u8 *DirectoryPath)

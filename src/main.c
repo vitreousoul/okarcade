@@ -83,9 +83,87 @@ internal command_line_arg_type ParseCommandLineArgs(s32 ArgCount, char **Args)
     return CommandLineArgs;
 }
 
+internal void GenerateByteArray(arena *TempArena, u8 *DestinationPath, u8 *ByteArrayName, u8 *ByteArray, size Size)
+{
+    /* TODO: Compress the data. */
+    u8 HexData[16];
+
+    file File = OpenFile(DestinationPath);
+
+    if (!File.File)
+    {
+        printf("Error in GenerateByteArray: Destination file not found '%s'\n", DestinationPath);
+        return;
+    }
+
+    ArenaStackPush(TempArena);
+    arena ChunkArena = CreateSubArena(TempArena, 1024);
+    PushString(&ChunkArena, (u8 *)"u8 ");
+    PushString(&ChunkArena, ByteArrayName);
+    PushString(&ChunkArena, (u8 *)"[] = {");
+
+    for (u64 I = 0; I < Size; ++I)
+    {
+        b32 IsLastByte = I == Size - 1;
+
+        char *FormatString = IsLastByte ? "0x%02x" : "0x%02x,";
+
+        b32 IsEndOfLine = I != 0 && I % 15 == 0;
+
+        sprintf((char *)HexData, FormatString, ByteArray[I]);
+
+        u64 StringLength = GetStringLength(HexData);
+        if (IsEndOfLine)
+        {
+            StringLength += 1;
+        }
+
+        if (StringLength > GetArenaFreeSpace(&ChunkArena))
+        {
+            WriteFile(File, ChunkArena.Data, ChunkArena.Offset);
+            ChunkArena.Offset = 0;
+        }
+
+        PushString(&ChunkArena, HexData);
+
+        if (IsEndOfLine)
+        {
+            PushString(&ChunkArena, (u8 *)"\n");
+        }
+    }
+
+    if (ChunkArena.Offset > 0)
+    {
+        WriteFile(File, ChunkArena.Data, ChunkArena.Offset);
+    }
+
+    u8 *FileEndString = (u8 *)"};\0";
+    WriteFile(File, FileEndString, GetStringLength(FileEndString));
+    ArenaStackPop(TempArena);
+}
+
+internal void GenerateSoundData(arena *TempArena)
+{
+    u8 *SfxCorrectSourcePath = (u8 *)"../assets/sfx_correct.wav";
+    u8 *SfxCorrectDestinationPath = (u8 *)"../gen/sfx_correct.h";
+    u64 BeginningOffset = TempArena->Offset;
+
+    buffer *Buffer = ReadFileIntoBuffer(SfxCorrectSourcePath);
+
+    if (Buffer && Buffer->Data)
+    {
+        u8 *ArrayName = (u8 *)"SfxCorrectData";
+        GenerateByteArray(TempArena, SfxCorrectDestinationPath, ArrayName, Buffer->Data, Buffer->Size);
+    }
+    else
+    {
+        printf("Error in GenerateSoundData: File not found '%s'\n", SfxCorrectSourcePath);
+    }
+}
+
 internal void GenerateFontData(arena TempString)
 {
-    /* TODO: compress the font data!!!!! */
+    /* TODO: Use GenerateByteArray */
     u8 HexData[16] = {};
     u64 BeginningOffset = TempString.Offset;
 
@@ -114,7 +192,7 @@ internal void GenerateFontData(arena TempString)
     PushString(&TempString, (u8 *)"};\0");
 
     u64 FileSize = TempString.Offset - BeginningOffset;
-    WriteFile(FontDataPath, DataOutput, FileSize);
+    WriteFileWithPath(FontDataPath, DataOutput, FileSize);
 
     TempString.Offset = BeginningOffset;
 }
@@ -175,10 +253,11 @@ internal void GenerateGameAssets(arena TempString)
         PushString(&TempString, (u8 *)"\n};\0");
 
         u64 FileSize = TempString.Offset - BeginningOffset;
-        WriteFile(ScubaDataPath, ScubaOutput, FileSize);
+        WriteFileWithPath(ScubaDataPath, ScubaOutput, FileSize);
     }
 
     GenerateFontData(TempString);
+    GenerateSoundData(&TempString);
 }
 
 int main(s32 ArgCount, char **Args)
