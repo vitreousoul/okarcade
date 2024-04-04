@@ -409,7 +409,7 @@ internal b32 PreprocessBuffer(pre_processor *PreProcessor, arena *TempString, bu
                         LogError("failed to write heredoc pre-data to output");
                     }
 
-                    s32 HereDocDataBegin = Begin + HereDocLabelSize - 1;
+                    s32 HereDocDataBegin = Begin + HereDocLabelSize;
                     s32 HereDocDataSize = J - HereDocDataBegin;
                     u8 *DataBegin = Buffer->Data + HereDocDataBegin;
 
@@ -1112,7 +1112,7 @@ void GenerateCodePages(arena *TempString)
             PushString(&CodePage, (u8 *)(
                                 "</h2>"                                                    \
                                 "<pre>"                                                    \
-                                    "{" "|" "#HERE" "DOC \n"));
+                                    "{" "|" "#HERE" "DOC "));
 
 
             buffer *CodePageBuffer = ReadFileIntoBuffer(CurrentFile->Name);
