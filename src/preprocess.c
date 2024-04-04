@@ -205,13 +205,7 @@ internal pre_processor CreatePreProcessor(u8 *Bra, u8 *Ket)
         u64 TotalVirtualSize = StringAllocatorVirtualSize + OutputBufferVirtualSize;
 
         PreProcessor.StringAllocator = CreateArena(TotalVirtualSize);
-        PreProcessor.StringAllocator.Capacity = StringAllocatorVirtualSize;
-
-        /* TODO Do _not_ call CreateArena twice here, just set one of the
-           allocator's data to the first allocator's data plus an offset.
-        */
-        PreProcessor.OutputAllocator = CreateArena(Gigabytes(1));
-        PreProcessor.OutputAllocator.Capacity = OutputBufferVirtualSize;
+        PreProcessor.OutputAllocator = CreateSubArena(&PreProcessor.StringAllocator, OutputBufferVirtualSize);
     }
 
     return PreProcessor;
