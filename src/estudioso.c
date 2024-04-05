@@ -956,7 +956,8 @@ internal void DrawQuizPrompt(state *State, u32 LetterSpacing)
     if (State->QuizMode == quiz_mode_Correct)
     {
         char *CorrectString = "Correct";
-        f32 CorrectFontSize = 1.6f * State->UI.FontSize;
+        /* TODO: Scale up the Correct font size... but that requires increasing the font size that is loaded on web, to reduce blurry text... */
+        f32 CorrectFontSize = State->UI.FontSize;
         f32 CorrectLineHeight = TextPadding + CorrectFontSize;
         Vector2 CorrectSize = MeasureTextEx(State->UI.Font, CorrectString, CorrectFontSize, 1);
         Vector2 CorrectPosition = V2((SCREEN_WIDTH - CorrectSize.x) / 2.0f,
@@ -1093,7 +1094,7 @@ internal void InitializeQuizItems(state *State)
         InitializeDefaultQuizItems(State);
 
         { /* NOTE: Permute the lookup table */
-            s32 PermutationCount = State->QuizItemCount; /* TODO: What value should permutation-count be? */
+            s32 PermutationCount = 0;//State->QuizItemCount; /* TODO: What value should permutation-count be? */
 
             for (u32 I = 0; I < State->QuizItemCount; ++I)
             {
@@ -1309,7 +1310,7 @@ int main(void)
 
 #if defined(PLATFORM_WEB)
     InitRaylibCanvas();
-    State.UI.FontSize = 36;
+    State.UI.FontSize = 28;
 #else
     State.UI.FontSize = 28;
 #endif
@@ -1342,8 +1343,18 @@ int main(void)
 
         Codepoints = LoadCodepoints(TextWithAllCodepoints, &CodepointCount);
 
+#if PLATFORM_WEB
+        /* TODO: It initially seemed that scaling fonts at all on the web produced blurry text.
+           Investigate whether that is _really_ true, and if so, set up web fonts so that they
+           are loaded and displayed as 1:1 fonts. This means loading fonts per font sizes in the
+           game? Not sure about this one at the moment...
+        */
+        u32 FontScale = 1;
+#else
         u32 FontScale = 4;
+#endif
         State.UI.Font = LoadFontFromMemory(".ttf", FontData, ArrayCount(FontData), State.UI.FontSize*FontScale, Codepoints, CodepointCount);
+
         UnloadCodepoints(Codepoints);
     }
 
