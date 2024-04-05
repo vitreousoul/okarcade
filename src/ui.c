@@ -52,7 +52,7 @@ typedef struct
     Vector2 Size;
     Vector2 Offset;
 
-    b32 UpdateTurtlePosition; /* TODO: Replace UpdateTurtlePosition with a more generic name for "mouse realeased" */
+    b32 MouseReleased;
 } tablet;
 
 typedef struct
@@ -357,7 +357,7 @@ b32 DoTablet(ui *UI, tablet *Tablet)
     b32 NoActive = !UI->Active;
     b32 IsActive = UI->Active == Tablet->Id;
 
-    Tablet->UpdateTurtlePosition = 0;
+    Tablet->MouseReleased = 0;
 
     if (IsHot)
     {
@@ -384,7 +384,7 @@ b32 DoTablet(ui *UI, tablet *Tablet)
             UI->Active = 0;
             Changed = 1;
 
-            Tablet->UpdateTurtlePosition = 1;
+            Tablet->MouseReleased = 1;
             /* Tablet->Offset.x = UI->ActivationPosition.x + Tablet->Offset.x; */
             /* Tablet->Offset.y = UI->ActivationPosition.y + Tablet->Offset.y; */
         }

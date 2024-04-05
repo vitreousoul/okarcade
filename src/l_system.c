@@ -375,7 +375,7 @@ internal void UpdateAndRender(void *VoidAppState)
             {
                 ImageClearBackground(&State->Canvas, BackgroundColor);
 
-                if (Tablet->UpdateTurtlePosition)
+                if (Tablet->MouseReleased)
                 {
                     State->Turtle.Position.x += Tablet->Offset.x;
                     State->Turtle.Position.y += Tablet->Offset.y;
