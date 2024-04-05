@@ -1,5 +1,11 @@
 /*
+    L-Systems
+
+    Just trying to find beautiful patterns using l-systems.
+
     TODO: Detect if mouse position is unchanged during drag, if so, keep drawing so the tree fills out more as you drag.
+    TODO: Display rules being displayed.
+    TODO: Copy-paste the text-input code from Estudioso, and use to edit rules.
 */
 
 #include <stdlib.h>
@@ -14,8 +20,8 @@
 
 #include "types.h"
 
-int SCREEN_WIDTH = 1200;
-int SCREEN_HEIGHT = 700;
+int SCREEN_WIDTH = 1024;
+int SCREEN_HEIGHT = 600;
 #define TARGET_FPS 30
 
 #include "core.c"
@@ -92,8 +98,7 @@ typedef struct
     expansion Expansion;
     turtle TurtleStack[TURTLE_STACK_MAX];
     s32 TurtleStackIndex;
-
-} app_state;
+} state;
 
 
 internal expansion_item CreateExpansionItem(symbol Symbol, s32 Index)
@@ -186,7 +191,7 @@ internal void CopyTurtle(turtle *SourceTurtle, turtle *DestinationTurtle)
     DestinationTurtle->Heading.y = SourceTurtle->Heading.y;
 }
 
-internal void DrawLSystem(app_state *AppState, s32 Depth)
+internal void DrawLSystem(state *State, s32 Depth)
 {
     if (Depth >= EXPANSION_MAX_DEPTH)
     {
@@ -196,14 +201,14 @@ internal void DrawLSystem(app_state *AppState, s32 Depth)
         return;
     }
 
-    expansion *Expansion = &AppState->Expansion;
-    turtle *TurtleStack = AppState->TurtleStack;
-    s32 *TurtleStackIndex = &AppState->TurtleStackIndex;
+    expansion *Expansion = &State->Expansion;
+    turtle *TurtleStack = State->TurtleStack;
+    s32 *TurtleStackIndex = &State->TurtleStackIndex;
     f32 TurtleSpeed = 1.0f;
 
     s32 LineDrawCount = 0;
 
-    while (Expansion->Index > 0 && LineDrawCount < AppState->LineDrawsPerFrame)
+    while (Expansion->Index > 0 && LineDrawCount < State->LineDrawsPerFrame)
     {
         expansion_item CurrentItem = PeekExpansionItem(Expansion);
         b32 RuleIndexInBounds = CurrentItem.Index >= 0 && CurrentItem.Index < RULE_SIZE_MAX;
@@ -214,7 +219,7 @@ internal void DrawLSystem(app_state *AppState, s32 Depth)
             break;
         }
 
-        symbol ChildSymbol = AppState->Rules[CurrentItem.Symbol][CurrentItem.Index];
+        symbol ChildSymbol = State->Rules[CurrentItem.Symbol][CurrentItem.Index];
 
         if (ChildSymbol == symbol_Undefined)
         {
@@ -228,7 +233,7 @@ internal void DrawLSystem(app_state *AppState, s32 Depth)
         else
         {
             /* output symbols */
-            symbol OutputSymbol = GetSymbolFromRules(AppState->Rules, CurrentItem);
+            symbol OutputSymbol = GetSymbolFromRules(State->Rules, CurrentItem);
 
             while (OutputSymbol != symbol_Undefined)
             {
@@ -249,7 +254,7 @@ internal void DrawLSystem(app_state *AppState, s32 Depth)
                 {
                     if (*TurtleStackIndex < TURTLE_STACK_MAX - 1)
                     {
-                        f32 RotationAmount = AppState->RotationAmount;
+                        f32 RotationAmount = State->RotationAmount;
                         Vector2 NewHeading = RotateV2(Turtle->Heading, RotationAmount);
                         *TurtleStackIndex += 1;
                         CopyTurtle(Turtle, &TurtleStack[*TurtleStackIndex]);
@@ -260,7 +265,7 @@ internal void DrawLSystem(app_state *AppState, s32 Depth)
                 {
                     if (*TurtleStackIndex > 0)
                     {
-                        f32 RotationAmount = -AppState->RotationAmount;
+                        f32 RotationAmount = -State->RotationAmount;
                         *TurtleStackIndex -= 1;
                         Vector2 NewHeading = RotateV2(TurtleStack[*TurtleStackIndex].Heading, RotationAmount);
                         TurtleStack[*TurtleStackIndex].Heading = NewHeading;
@@ -276,7 +281,7 @@ internal void DrawLSystem(app_state *AppState, s32 Depth)
                     f32 NewY = Turtle->Position.y + (TurtleSpeed * Turtle->Heading.y);
                     Color LineColor = (Color){0,0,0,255};
 
-                    ImageDrawLine(&AppState->Canvas, Turtle->Position.x, Turtle->Position.y, NewX, NewY, LineColor);
+                    ImageDrawLine(&State->Canvas, Turtle->Position.x, Turtle->Position.y, NewX, NewY, LineColor);
                     LineDrawCount += 1;
 
                     Turtle->Position.x = NewX;
@@ -284,7 +289,7 @@ internal void DrawLSystem(app_state *AppState, s32 Depth)
                 }
 
                 CurrentItem.Index += 1;
-                OutputSymbol = GetSymbolFromRules(AppState->Rules, CurrentItem);
+                OutputSymbol = GetSymbolFromRules(State->Rules, CurrentItem);
             }
 
             PopAndIncrementParent(Expansion);
@@ -292,28 +297,28 @@ internal void DrawLSystem(app_state *AppState, s32 Depth)
     }
 }
 
-internal void UpdateUI(app_state *AppState)
+internal void UpdateUI(state *State)
 {
-    AppState->UI.Hot = -1;
-    AppState->UI.MouseButtonPressed = IsMouseButtonPressed(0);
-    AppState->UI.MouseButtonReleased = IsMouseButtonReleased(0);
-    AppState->UI.MousePosition = GetMousePosition();
+    State->UI.Hot = -1;
+    State->UI.MouseButtonPressed = IsMouseButtonPressed(0);
+    State->UI.MouseButtonReleased = IsMouseButtonReleased(0);
+    State->UI.MousePosition = GetMousePosition();
 }
 
-internal void InitTurtleState(app_state *AppState, f32 OffsetX, f32 OffsetY)
+internal void InitTurtleState(state *State, f32 OffsetX, f32 OffsetY)
 {
-    SetMemory((u8 *)&AppState->Expansion, 0, sizeof(expansion));
-    SetMemory((u8 *)&AppState->TurtleStack, 0, sizeof(turtle) * TURTLE_STACK_MAX);
+    SetMemory((u8 *)&State->Expansion, 0, sizeof(expansion));
+    SetMemory((u8 *)&State->TurtleStack, 0, sizeof(turtle) * TURTLE_STACK_MAX);
 
-    AppState->TurtleStackIndex = 0;
+    State->TurtleStackIndex = 0;
 
-    CopyTurtle(&AppState->Turtle, &AppState->TurtleStack[AppState->TurtleStackIndex]);
+    CopyTurtle(&State->Turtle, &State->TurtleStack[State->TurtleStackIndex]);
 
-    AppState->TurtleStack[AppState->TurtleStackIndex].Position.x += OffsetX;
-    AppState->TurtleStack[AppState->TurtleStackIndex].Position.y += OffsetY;
+    State->TurtleStack[State->TurtleStackIndex].Position.x += OffsetX;
+    State->TurtleStack[State->TurtleStackIndex].Position.y += OffsetY;
 
     expansion_item RootItem = CreateExpansionItem(symbol_Root, 0);
-    PushExpansionItem(&AppState->Expansion, RootItem);
+    PushExpansionItem(&State->Expansion, RootItem);
 }
 
 internal void UpdateAndRender(void *VoidAppState)
@@ -321,71 +326,71 @@ internal void UpdateAndRender(void *VoidAppState)
     /* We have to pass our data in as a void-star because of emscripten:
        https://github.com/raysan5/raylib/blob/master/examples/core/core_basic_window_web.c
     */
-    app_state *AppState = (app_state *)VoidAppState;
-    UpdateUI(AppState);
+    state *State = (state *)VoidAppState;
+    UpdateUI(State);
     b32 UiInteractionOccured = 0;
 
     BeginDrawing();
     ClearBackground(BackgroundColor);
 
     { /* draw simulation image */
-        Color *Pixels = LoadImageColors(AppState->Canvas);
-        UpdateTexture(AppState->FrameBuffer, Pixels);
+        Color *Pixels = LoadImageColors(State->Canvas);
+        UpdateTexture(State->FrameBuffer, Pixels);
         UnloadImageColors(Pixels);
-        DrawTexture(AppState->FrameBuffer, 0, 0, (Color){255,255,255,255});
+        DrawTexture(State->FrameBuffer, 0, 0, (Color){255,255,255,255});
     }
 
     { /* draw ui */
-        ui *UI = &AppState->UI;
+        ui *UI = &State->UI;
 
 #if 0
         for (s32 I = 1; I < button_kind_Count; I++)
         {
-            button Button = AppState->Buttons[I];
+            button Button = State->Buttons[I];
 
             if (DoButton(UI, &Button))
             {
                 UiInteractionOccured = 1;
-                ImageClearBackground(&AppState->Canvas, BackgroundColor);
+                ImageClearBackground(&State->Canvas, BackgroundColor);
             }
         }
 #endif
 
-        b32 SliderUpdated = DoSlider(UI, &AppState->Slider);
+        b32 SliderUpdated = DoSlider(UI, &State->Slider);
 
         if (SliderUpdated)
         {
             UiInteractionOccured = 1;
-            AppState->RotationAmount = AppState->Slider.Value * 8.0f;
-            ImageClearBackground(&AppState->Canvas, BackgroundColor);
-            InitTurtleState(AppState, 0.0f, 0.0f);
+            State->RotationAmount = State->Slider.Value * 8.0f;
+            ImageClearBackground(&State->Canvas, BackgroundColor);
+            InitTurtleState(State, 0.0f, 0.0f);
         }
 
         if (!UiInteractionOccured)
         {
-            b32 TabletChanged = DoUiElement(UI, &AppState->Tablet);
-            tablet *Tablet = &AppState->Tablet.Tablet;
+            b32 TabletChanged = DoUiElement(UI, &State->Tablet);
+            tablet *Tablet = &State->Tablet.Tablet;
 
             if (TabletChanged)
             {
-                ImageClearBackground(&AppState->Canvas, BackgroundColor);
+                ImageClearBackground(&State->Canvas, BackgroundColor);
 
                 if (Tablet->UpdateTurtlePosition)
                 {
-                    AppState->Turtle.Position.x += Tablet->Offset.x;
-                    AppState->Turtle.Position.y += Tablet->Offset.y;
-                    InitTurtleState(AppState, 0.0f, 0.0f);
+                    State->Turtle.Position.x += Tablet->Offset.x;
+                    State->Turtle.Position.y += Tablet->Offset.y;
+                    InitTurtleState(State, 0.0f, 0.0f);
                 }
                 else
                 {
                     Vector2 Offset = Tablet->Offset;
-                    InitTurtleState(AppState, Offset.x, Offset.y);
+                    InitTurtleState(State, Offset.x, Offset.y);
                 }
             }
         }
     }
 
-    DrawLSystem(AppState, 8);
+    DrawLSystem(State, 8);
 
     EndDrawing();
 }
@@ -420,80 +425,80 @@ internal void InitRules(symbol Rules[symbol_Count][RULE_SIZE_MAX])
     }
 }
 
-internal void InitUi(app_state *AppState)
+internal void InitUi(state *State)
 {
     s32 Y = 10.0f;
     s32 I = 1;
     s32 TwicePadding = 2 * BUTTON_PADDING;
 
-    AppState->UI.Active = 0;
+    State->UI.Active = 0;
 
     for (; I < button_kind_Count; I++)
     {
         u8 *Text = ButtonText[I];
 
-        AppState->Buttons[I].Id = I;
+        State->Buttons[I].Id = I;
 
-        AppState->Buttons[I].Text = Text;
-        AppState->Buttons[I].Position = (Vector2){10.0f, Y};
+        State->Buttons[I].Text = Text;
+        State->Buttons[I].Position = (Vector2){10.0f, Y};
 
-        Y += TwicePadding + AppState->UI.FontSize + 10;
+        Y += TwicePadding + State->UI.FontSize + 10;
     }
 
     { /* init slider */
-        AppState->Slider.Id = I;
+        State->Slider.Id = I;
 
-        AppState->Slider.Position.x = 10.0f;
-        AppState->Slider.Position.y = Y;
+        State->Slider.Position.x = 10.0f;
+        State->Slider.Position.y = Y;
 
-        AppState->Slider.Size.x = 240.0f;
-        AppState->Slider.Size.y = 40.0f;
+        State->Slider.Size.x = 240.0f;
+        State->Slider.Size.y = 40.0f;
 
-        AppState->Slider.Value = 0.3f;
+        State->Slider.Value = 0.3f;
 
         I += 1;
     }
 
     { /* init tablet */
-        AppState->Tablet.Tablet.Id = I;
-        AppState->Tablet.Type = ui_element_type_Tablet;
+        State->Tablet.Tablet.Id = I;
+        State->Tablet.Type = ui_element_type_Tablet;
 
-        AppState->Tablet.Tablet.Position.x = 0.0f;
-        AppState->Tablet.Tablet.Position.y = 0.0f;
+        State->Tablet.Tablet.Position.x = 0.0f;
+        State->Tablet.Tablet.Position.y = 0.0f;
 
-        AppState->Tablet.Tablet.Size.x = SCREEN_WIDTH;
-        AppState->Tablet.Tablet.Size.y = SCREEN_HEIGHT;
+        State->Tablet.Tablet.Size.x = SCREEN_WIDTH;
+        State->Tablet.Tablet.Size.y = SCREEN_HEIGHT;
 
-        AppState->Tablet.Tablet.Offset.x = 0.0f;
-        AppState->Tablet.Tablet.Offset.y = 0.0f;
+        State->Tablet.Tablet.Offset.x = 0.0f;
+        State->Tablet.Tablet.Offset.y = 0.0f;
 
         I += 1;
     }
 }
 
-internal app_state InitAppState(void)
+internal state InitAppState(void)
 {
-    app_state AppState;
+    state State;
 
     Vector2 TurtlePosition = V2(120.0f, SCREEN_HEIGHT / 2.0f);
     Vector2 TurtleHeading = V2(1.0f, 0.0f);
 
-    AppState.Turtle = (turtle){TurtlePosition, TurtleHeading};
+    State.Turtle = (turtle){TurtlePosition, TurtleHeading};
 
-    AppState.RotationAmount = 0.25f;
-    AppState.LineDrawsPerFrame = 20000;
+    State.RotationAmount = 0.25f;
+    State.LineDrawsPerFrame = 20000;
 
-    AppState.Canvas = GenImageColor(SCREEN_WIDTH, SCREEN_HEIGHT, BackgroundColor);
-    AppState.FrameBuffer = LoadTextureFromImage(AppState.Canvas);
-    AppState.UI.FontSize = 18;
+    State.Canvas = GenImageColor(SCREEN_WIDTH, SCREEN_HEIGHT, BackgroundColor);
+    State.FrameBuffer = LoadTextureFromImage(State.Canvas);
+    State.UI.FontSize = 18;
 
-    InitTurtleState(&AppState, 0.0f, 0.0f);
+    InitTurtleState(&State, 0.0f, 0.0f);
 
-    InitUi(&AppState);
+    InitUi(&State);
 
-    InitRules(AppState.Rules);
+    InitRules(State.Rules);
 
-    return AppState;
+    return State;
 }
 
 int main(void)
@@ -505,15 +510,15 @@ int main(void)
     printf("InitWindow %d %d\n", SCREEN_WIDTH, SCREEN_HEIGHT);
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Look at the l-systems");
 
-    app_state AppState = InitAppState();
+    state State = InitAppState();
 
 #if defined(PLATFORM_WEB)
-    emscripten_set_main_loop_arg(UpdateAndRender, &AppState, 0, 1);
+    emscripten_set_main_loop_arg(UpdateAndRender, &State, 0, 1);
 #else
     SetTargetFPS(60);
     while (!WindowShouldClose())
     {
-        UpdateAndRender(&AppState);
+        UpdateAndRender(&State);
     }
 #endif
 

@@ -81,6 +81,9 @@ typedef struct
     b32 EnterPressed;
 
     Vector2 ActivationPosition;
+
+    f32 CursorBlinkRate;
+    f32 CursorBlinkTime;
 } ui;
 
 ui_id GetElementId(ui_element Element);

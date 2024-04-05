@@ -5,6 +5,7 @@
 
     A flash-card typing game for learning Spanish.
 
+    TODO: Don't blink cursor while the user is submitting input actions, just always show the cursor then.
     TODO: Fix bug where after winning and starting a new game, duplicate quiz-items are added to the existing quiz items. (It always adds as many quiz-items as the original quiz-item count)
     TODO: Create some UI to toggle different modes, or at least filter-out/select quiz-items.
     TODO: Prevent getting multiple failure counts by repeatidly pressing the Enter key with an incorrect answer.
@@ -15,7 +16,7 @@
     TODO: Should we ignore whitespace in the user input (like trailing space after an answer)
     TODO: How do we merge an existing save with a version of the app with new quiz-items? Should save file versions line up with versions of the app, so to upgrade a version of the save file is to upgrade save file itself? (For this to work, we would need an update function that can take any version of a save-file and convert it to the newest version)
     TODO: Implement line break for long lines, especially now that our quiz sentences are getting longer.
-    TODO: Improve the quality of fonts on web? They look pixellated but I'm not sure why :(
+    TODO: Fonts for web and desktop need to be handled differently (at least it seems that way). Make better architecture for defining fonts that let web/desktop do whatever needs to be done to look best on its platform.
 */
 #include <stdlib.h>
 #include <stdio.h>
@@ -999,9 +1000,25 @@ internal void DrawQuizPrompt(state *State, u32 LetterSpacing)
     DrawTextEx(State->UI.Font, State->QuizInput, V2(InputX, InputY), State->UI.FontSize, LetterSpacing, FONT_COLOR);
 
     { /* Draw cursor */
-        Color CursorColor = (Color){130,100,250,255};
-        f32 Spacing = 3.0f;
-        DrawRectangle(CursorX + Spacing, CursorY, 3, State->UI.FontSize, CursorColor);
+        f32 BlinkTime = State->UI.CursorBlinkTime;
+        f32 BlinkRate = State->UI.CursorBlinkRate;
+        f32 TimeWithCursorInvisible = 0.4f * BlinkRate;
+
+        BlinkTime = BlinkTime + State->DeltaTime;
+        while (BlinkTime > BlinkRate)
+        {
+            BlinkTime -= BlinkRate;
+        }
+        State->UI.CursorBlinkTime = BlinkTime;
+
+        b32 ShowCursor = BlinkTime > TimeWithCursorInvisible;
+
+        if (ShowCursor)
+        {
+            Color CursorColor = (Color){130,100,250,255};
+            f32 Spacing = 3.0f;
+            DrawRectangle(CursorX + Spacing, CursorY, 3, State->UI.FontSize, CursorColor);
+        }
     }
 
     Vector2 NextButtonPosition = V2(SCREEN_WIDTH - BorderPadding, SCREEN_HEIGHT - BorderPadding);
@@ -1279,6 +1296,7 @@ int main(void)
     Assert((1 << Key_State_Chunk_Count_Log2) == Key_State_Chunk_Count);
 
     state State = {0};
+    State.UI.CursorBlinkRate = 1.0f;
 
 #if !PLATFORM_WEB
     /* TODO: Update raylib binary to see if we can init audio device on web!
