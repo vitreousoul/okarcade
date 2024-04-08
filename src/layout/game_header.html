@@ -2,6 +2,8 @@
   body {
       display: flex;
       flex-direction: column;
+      background-color: rgb(20, 20, 20);
+      color: #fff9f3;
   }
 
   header {
@@ -11,13 +13,15 @@
   .canvas-wrapper {
       flex: 0 1 100%;
       overflow: hidden;
+      text-align: center;
   }
 
   .canvas-wrapper canvas {
       width: 100%;
       height: 100%;
+      max-width: 1024px;
+      max-height: 1024px;
   }
-
 </style>
 <header>
   <a href="/">&lt; Back</a>

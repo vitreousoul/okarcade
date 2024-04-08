@@ -54,6 +54,7 @@ EM_JS(void, UpdateCanvasDimensions, (f32 TargetWidth, f32 TargetHeight), {
 
     if (Canvas) {
         var CanvasRect = Canvas.getBoundingClientRect();
+#if 0
         var CanvasRatio = CanvasRect.width / CanvasRect.height;
 
         var PixelCount = TargetWidth * TargetHeight;
@@ -61,6 +62,10 @@ EM_JS(void, UpdateCanvasDimensions, (f32 TargetWidth, f32 TargetHeight), {
 
         Canvas.width = Math.sqrt((PixelScale * CanvasRect.width * CanvasRect.height) * CanvasRatio);
         Canvas.height = Math.sqrt((PixelScale * CanvasRect.width * CanvasRect.height) / CanvasRatio);
+#else
+        Canvas.width = CanvasRect.width;
+        Canvas.height = CanvasRect.height;
+#endif
     }
 });
 

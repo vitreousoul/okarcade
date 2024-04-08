@@ -1111,7 +1111,7 @@ internal void InitializeQuizItems(state *State)
         InitializeDefaultQuizItems(State);
 
         { /* NOTE: Permute the lookup table */
-            s32 PermutationCount = 0;//State->QuizItemCount; /* TODO: What value should permutation-count be? */
+            s32 PermutationCount = State->QuizItemCount; /* TODO: What value should permutation-count be? */
 
             for (u32 I = 0; I < State->QuizItemCount; ++I)
             {
