@@ -12,10 +12,9 @@
     TODO: Allow a history of quiz items, so you can scroll back and view previous answers.
     TODO: Allow marking a quiz-item as inaccurate or in need of a review. This would be helpful when using the app and noticing typos or other errors in the item content.
     TODO: Allow moving cursor between characters and splice editing. Currently cursor is always at the end of the input.
-    TODO: Display a message showing that save-file has been written. Also, maybe disable the save button for a bit...
+    TODO: Draw a message showing that save-file has been written. Also, maybe disable the save button for a bit...
     TODO: Should we ignore whitespace in the user input (like trailing space after an answer)
     TODO: How do we merge an existing save with a version of the app with new quiz-items? Should save file versions line up with versions of the app, so to upgrade a version of the save file is to upgrade save file itself? (For this to work, we would need an update function that can take any version of a save-file and convert it to the newest version)
-    TODO: Implement line break for long lines, especially now that our quiz sentences are getting longer.
     TODO: Fonts for web and desktop need to be handled differently (at least it seems that way). Make better architecture for defining fonts that let web/desktop do whatever needs to be done to look best on its platform.
 */
 #include <stdlib.h>
@@ -37,23 +36,18 @@
 #include "../gen/roboto_regular.h"
 #include "../gen/sfx_correct.h"
 
-#ifdef TARGET_SCREEN_WIDTH
-global_variable int SCREEN_WIDTH = TARGET_SCREEN_WIDTH;
-#else
-global_variable int SCREEN_WIDTH = 1280;
-#endif
-
-#ifdef TARGET_SCREEN_HEIGHT
-global_variable int SCREEN_HEIGHT = TARGET_SCREEN_HEIGHT;
-#else
-global_variable int SCREEN_HEIGHT = 800;
-#endif
-
 #include "math.c"
 #include "raylib_helpers.h"
 #include "ui.c"
 #include "sound.c"
 
+#if 0
+global_variable int SCREEN_WIDTH = TARGET_SCREEN_WIDTH;
+global_variable int SCREEN_HEIGHT = TARGET_SCREEN_HEIGHT;
+#else
+global_variable int SCREEN_WIDTH = 400;
+global_variable int SCREEN_HEIGHT = 700;
+#endif
 
 #define TEST 0
 #define SAVE_FILE_PATH ((u8 *)"../save/save_file_0.estudioso")
@@ -61,6 +55,7 @@ global_variable int SCREEN_HEIGHT = 800;
 
 #define ArrayCount(a) (sizeof(a)/sizeof((a)[0]))
 
+#define IS_SPACE(c) ((c) == ' ' || (c) == '\t' || (c) == '\n' || (c) == '\r')
 #define IS_UPPER_CASE(c) ((c) >= 65 && (c) <= 90)
 
 #define SCREEN_HALF_WIDTH (SCREEN_WIDTH / 2)
@@ -216,6 +211,11 @@ typedef struct
     quiz_mode QuizMode;
 
     ui UI;
+
+#define Max_Line_Count 6
+#define Max_Line_Buffer_Size 256
+    u8 LineBuffer[Max_Line_Count][Max_Line_Buffer_Size];
+    s32 LineBufferIndex;
 
     Sound Correct;
     Sound Wrong;
@@ -732,6 +732,7 @@ internal void HandleUserInput(state *State)
     {
         State->UI.MouseButtonPressed = IsMouseButtonPressed(MOUSE_LEFT_BUTTON);
         State->UI.MouseButtonReleased = IsMouseButtonDown(MOUSE_LEFT_BUTTON);
+
         State->UI.MousePosition = GetMousePosition();
     }
 
@@ -899,6 +900,110 @@ internal quiz_item *GetActiveQuizItem(state *State)
     return Item;
 }
 
+internal f32 GetCenteredTextX(state *State, u8 *Text, s32 LetterSpacing)
+{
+    Vector2 TextSize = MeasureTextEx(State->UI.Font, (char *)Text, State->UI.FontSize, LetterSpacing);
+    f32 X = (SCREEN_WIDTH - TextSize.x) / 2.0f;
+
+    return X;
+}
+
+internal void DrawWrappedText(state *State, u8 *Text, f32 MaxWidth, f32 Y, f32 LineHeight, f32 LetterSpacing)
+{
+    /* NOTE: Assumes that Y passed in is the Y position for the _last_ line.
+       We probably want to allow the caller to specify which direction the lines grow.
+    */
+    Vector2 TextSize = MeasureTextEx(State->UI.Font, (char *)Text, State->UI.FontSize, 1);
+    State->LineBufferIndex = 0;
+
+    if (TextSize.x < MaxWidth)
+    {
+        f32 X = GetCenteredTextX(State, Text, LetterSpacing);
+        DrawTextEx(State->UI.Font, (char *)Text, V2(X, Y), State->UI.FontSize, LetterSpacing, FONT_COLOR);
+    }
+    else
+    {
+        s32 I = 0;
+        s32 J = 0;
+        s32 Offset = 0;
+
+        /* TODO: @Speed We should be able to better than a linear search */
+        while (Text[I] && State->LineBufferIndex < Max_Line_Count)
+        {
+            J = I - Offset;
+            Assert(J >= 0 && J < Max_Line_Buffer_Size);
+
+            u8 *Line = State->LineBuffer[State->LineBufferIndex];
+
+            Line[J] = Text[I];
+            Line[J + 1] = 0;
+            Assert(J > 0 || !IS_SPACE(Line[J]));
+            Vector2 LineSize = MeasureTextEx(State->UI.Font, (char *)Line, State->UI.FontSize, LetterSpacing);
+
+            if (LineSize.x > MaxWidth)
+            {
+                b32 SpaceFound = 0;
+
+                /* NOTE: Seek back to the last space, and break the line there */
+                while (J >= 0)
+                {
+                    if (IS_SPACE(Line[J]))
+                    {
+                        SpaceFound = 1;
+                        Line[J] = 0;
+                        Offset += J + 1;
+                        I = Offset;
+
+                        ++State->LineBufferIndex;
+
+                        break;
+                    }
+                    else
+                    {
+                        while (Is_Utf8_Tail_Byte(Line[J--]));
+                    }
+                }
+
+                /* NOTE: No space was found, which means we have a word that is longer than
+                   the maximum line width. Break the word and put a dash at the end of the line.
+                */
+                if (!SpaceFound)
+                {
+                    s32 LastCharIndex = I - Offset;
+                    Line[LastCharIndex] = '-';
+
+                    Offset = I;
+                }
+
+                Assert(Offset == I);
+            }
+            else
+            {
+                ++I;
+            }
+        }
+
+        f32 OffsetY = Y - (LineHeight * State->LineBufferIndex);
+
+        /* NOTE: Draw the accumulated lines */
+        for (s32 LineIndex = 0; LineIndex < State->LineBufferIndex; ++LineIndex)
+        {
+            u8 *Line = State->LineBuffer[LineIndex];
+            f32 X = GetCenteredTextX(State, Line, LetterSpacing);
+            DrawTextEx(State->UI.Font, (char *)Line, V2(X, OffsetY), State->UI.FontSize, LetterSpacing, FONT_COLOR);
+            OffsetY += LineHeight;
+        }
+
+        /* NOTE: Draw any text remaining after the last line. */
+        if (I > Offset)
+        {
+            u8 *RemainingText = Text + Offset;
+            f32 X = GetCenteredTextX(State, RemainingText, LetterSpacing);
+            DrawTextEx(State->UI.Font, (char *)RemainingText, V2(X, OffsetY), State->UI.FontSize, LetterSpacing, FONT_COLOR);
+        }
+    }
+}
+
 internal void DrawQuizPrompt(state *State, u32 LetterSpacing)
 {
     quiz_item *QuizItem = GetActiveQuizItem(State);
@@ -935,14 +1040,10 @@ internal void DrawQuizPrompt(state *State, u32 LetterSpacing)
         DrawTextEx(State->UI.Font, Buff, V2(BorderPadding, BorderPadding), State->UI.FontSize, LetterSpacing, FONT_COLOR);
     }
 
-    Vector2 PromptSize = MeasureTextEx(State->UI.Font, (char *)Prompt, State->UI.FontSize, 1);
+    f32 MaxPromptWidth = MinF32(500.0f, SCREEN_WIDTH - 2.0f * BorderPadding);
+
     Vector2 AnswerSize = MeasureTextEx(State->UI.Font, (char *)Answer, State->UI.FontSize, 1);
     Vector2 InputSize = MeasureTextEx(State->UI.Font, State->QuizInput, State->UI.FontSize, 1);
-
-    /* TODO: Scale the text y positions based off of font-size!!! */
-    f32 PromptOffsetX = PromptSize.x / 2.0f;
-    f32 PromptX = SCREEN_HALF_WIDTH - PromptOffsetX;
-    f32 PromptY = SCREEN_HALF_HEIGHT - (2 * LineHeight);
 
     f32 AnswerOffsetX = AnswerSize.x / 2.0f;
     f32 AnswerX = SCREEN_HALF_WIDTH - AnswerOffsetX;
@@ -954,15 +1055,28 @@ internal void DrawQuizPrompt(state *State, u32 LetterSpacing)
     f32 CursorX = SCREEN_HALF_WIDTH + (InputSize.x / 2.0f);
     f32 CursorY = InputY;
 
+    if (State->ShowAnswer)
+    {
+        DrawTextEx(State->UI.Font, (char *)Answer, V2(AnswerX, AnswerY), State->UI.FontSize, LetterSpacing, ANSWER_COLOR);
+    }
+
+    { /* Draw the index of the quiz item. */
+        char Buff[64];
+        sprintf(Buff, "%d/%d  index=%d", State->QuizLookupIndex, State->QuizItemCount, State->QuizItemsLookup[State->QuizLookupIndex]);
+        DrawTextEx(State->UI.Font, Buff, V2(BorderPadding, BorderPadding + LineHeight), State->UI.FontSize, LetterSpacing, FONT_COLOR);
+    }
+
+    f32 WrappedTextY = SCREEN_HALF_HEIGHT - (2.0f * LineHeight);
+    DrawWrappedText(State, Prompt, MaxPromptWidth, WrappedTextY, LineHeight, LetterSpacing);
+
     if (State->QuizMode == quiz_mode_Correct)
     {
         char *CorrectString = "Correct";
         /* TODO: Scale up the Correct font size... but that requires increasing the font size that is loaded on web, to reduce blurry text... */
         f32 CorrectFontSize = State->UI.FontSize;
-        f32 CorrectLineHeight = TextPadding + CorrectFontSize;
-        Vector2 CorrectSize = MeasureTextEx(State->UI.Font, CorrectString, CorrectFontSize, 1);
-        Vector2 CorrectPosition = V2((SCREEN_WIDTH - CorrectSize.x) / 2.0f,
-                                     SCREEN_HALF_HEIGHT - (3 * LineHeight + CorrectLineHeight));
+        f32 X = GetCenteredTextX(State, (u8 *)CorrectString, LetterSpacing);
+        f32 OffsetY = (State->LineBufferIndex + 4) * LineHeight;
+        Vector2 CorrectPosition = V2(X, SCREEN_HALF_HEIGHT - OffsetY);
 
         DrawTextEx(State->UI.Font, CorrectString, CorrectPosition, CorrectFontSize, LetterSpacing, (Color){20, 200, 40, 255});
     }
@@ -985,18 +1099,6 @@ internal void DrawQuizPrompt(state *State, u32 LetterSpacing)
         DrawTextEx(State->UI.Font, ConjugationText, TextPosition, State->UI.FontSize, LetterSpacing, CONJUGATION_TYPE_COLOR);
     }
 
-    if (State->ShowAnswer)
-    {
-        DrawTextEx(State->UI.Font, (char *)Answer, V2(AnswerX, AnswerY), State->UI.FontSize, LetterSpacing, ANSWER_COLOR);
-    }
-
-    { /* Draw the index of the quiz item. */
-        char Buff[64];
-        sprintf(Buff, "%d/%d  index=%d", State->QuizLookupIndex, State->QuizItemCount, State->QuizItemsLookup[State->QuizLookupIndex]);
-        DrawTextEx(State->UI.Font, Buff, V2(BorderPadding, BorderPadding + LineHeight), State->UI.FontSize, LetterSpacing, FONT_COLOR);
-    }
-
-    DrawTextEx(State->UI.Font, (char *)Prompt, V2(PromptX, PromptY), State->UI.FontSize, LetterSpacing, FONT_COLOR);
     DrawTextEx(State->UI.Font, State->QuizInput, V2(InputX, InputY), State->UI.FontSize, LetterSpacing, FONT_COLOR);
 
     { /* Draw cursor */
@@ -1161,7 +1263,7 @@ internal void InitializeQuizItems(state *State)
 #endif
 }
 
-internal void DisplayWinMessage(state *State, u32 LetterSpacing)
+internal void DrawWinMessage(state *State, u32 LetterSpacing)
 {
     if (DEBUGCanHandleEnterKeyInWinMode)
     {
@@ -1224,7 +1326,7 @@ internal void HandleQuizItem(state *State, quiz_item *QuizItem, u8 *Answer)
     }
     else if (State->QuizMode == quiz_mode_Win)
     {
-        DisplayWinMessage(State, LetterSpacing);
+        DrawWinMessage(State, LetterSpacing);
     }
 }
 
@@ -1364,7 +1466,7 @@ int main(void)
 #if PLATFORM_WEB
         /* TODO: It initially seemed that scaling fonts at all on the web produced blurry text.
            Investigate whether that is _really_ true, and if so, set up web fonts so that they
-           are loaded and displayed as 1:1 fonts. This means loading fonts per font sizes in the
+           are loaded and drawn as 1:1 fonts. This means loading fonts per font sizes in the
            game? Not sure about this one at the moment...
         */
         u32 FontScale = 1;
@@ -1449,6 +1551,7 @@ internal void AddQuizConjugation_(state *State, conjugation Conjugation, char *P
 
 internal void InitializeDefaultQuizItems(state *State)
 {
+#if 1
     /* 003_hacer_y_tener */
     AddQuizText(
         "Qué tiempo (hacer)?",
@@ -1462,7 +1565,6 @@ internal void InitializeDefaultQuizItems(state *State)
         "En la mañana (hacer) buen tiempo en abril.",
         "hace"
     );
-#if 1
     AddQuizText(
         "Él (hacer) mucho frio.",
         "hace"
