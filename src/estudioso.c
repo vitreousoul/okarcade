@@ -6,9 +6,7 @@
     A flash-card typing game for learning Spanish.
 
     TODO: Don't blink cursor while the user is submitting input actions, just always show the cursor then.
-    TODO: Fix bug where after winning and starting a new game, duplicate quiz-items are added to the existing quiz items. (It always adds as many quiz-items as the original quiz-item count)
     TODO: Create some UI to toggle different modes, or at least filter-out/select quiz-items.
-    TODO: Prevent getting multiple failure counts by repeatidly pressing the Enter key with an incorrect answer.
     TODO: Allow a history of quiz items, so you can scroll back and view previous answers.
     TODO: Allow marking a quiz-item as inaccurate or in need of a review. This would be helpful when using the app and noticing typos or other errors in the item content.
     TODO: Allow moving cursor between characters and splice editing. Currently cursor is always at the end of the input.
@@ -195,6 +193,7 @@ typedef struct
     accent CurrentAccent;
     b32 AccentMode;
     b32 ShowAnswer;
+    b32 CurrentQuizItemFailed;
 
     b32 InputOccured;
     key_code LastKeyPressed;
@@ -933,8 +932,8 @@ internal void GetNextRandomQuizItem(state *State)
     State->ShowAnswer = 0;
 
     ClearQuizInput(State);
-
     State->QuizInputIndex = 0;
+    State->CurrentQuizItemFailed = 0;
 
     if (State->QuizLookupIndex >= (s32)State->QuizItemCount)
     {
@@ -1261,6 +1260,15 @@ internal b32 TryToLoadSaveFile(state *State)
 
 internal void InitializeDefaultQuizItems(state *State);
 
+internal void ResetQuizItems(state *State)
+{
+    /* NOTE: Set all complete fields to 0, just in case they were saved as Complete=1 */
+    for (u32 I = 0; I < State->QuizItemCount; ++I)
+    {
+        State->QuizItems[I].Complete = 0;
+    }
+}
+
 internal void InitializeQuizItems(state *State)
 {
     b32 SaveFileHasLoaded = TryToLoadSaveFile(State);
@@ -1268,6 +1276,7 @@ internal void InitializeQuizItems(state *State)
     if (!SaveFileHasLoaded)
     {
         State->QuizLookupIndex = 0;
+        State->QuizItemCount = 0;
         InitializeDefaultQuizItems(State);
 
         { /* NOTE: Permute the lookup table */
@@ -1291,11 +1300,7 @@ internal void InitializeQuizItems(state *State)
     }
     else
     {
-        /* NOTE: Set all complete fields to 0, just in case they were saved as Complete=1 */
-        for (u32 I = 0; I < State->QuizItemCount; ++I)
-        {
-            State->QuizItems[I].Complete = 0;
-        }
+        ResetQuizItems(State);
     }
 
 #if 1
@@ -1332,11 +1337,7 @@ internal void DrawWinMessage(state *State, u32 LetterSpacing)
 
         if (IsKeyPressed(KEY_ENTER))
         {
-            /* NOTE: reset quiz completion */
-            for (s32 I = 0; I < Quiz_Item_Max; ++I)
-            {
-                State->QuizItems[I].Complete = 0;
-            }
+            ResetQuizItems(State);
             ClearQuizInput(State);
 
             SetQuizMode(State, quiz_mode_Typing);
@@ -1369,7 +1370,12 @@ internal void HandleQuizItem(state *State, quiz_item *QuizItem, u8 *Answer)
             else
             {
                 OkPlaySound(State->Wrong);
-                QuizItem->FailCount += 1;
+
+                if (!State->CurrentQuizItemFailed)
+                {
+                    QuizItem->FailCount += 1;
+                    State->CurrentQuizItemFailed = 1;
+                }
             }
         }
         else if (State->QuizMode == quiz_mode_Correct)

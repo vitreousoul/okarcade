@@ -12,7 +12,7 @@
 #if PLATFORM_WEB
 #define ryn_PROFILER 0
 #endif
-#include "ryn_prof.h"
+#include "../lib/ryn_prof.h"
 
 #include "types.h"
 

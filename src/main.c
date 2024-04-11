@@ -13,7 +13,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "../lib/stb_image.h"
 
-#include "ryn_prof.h"
+#include "../lib/ryn_prof.h"
 
 #include "platform.h"
 #include "preprocess.c"
