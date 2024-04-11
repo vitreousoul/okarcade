@@ -5,6 +5,7 @@
 
     A flash-card typing game for learning Spanish.
 
+    TODO: Create a new/load game screen, to choose between default quiz items and an existing save.
     TODO: Don't blink cursor while the user is submitting input actions, just always show the cursor then.
     TODO: Create some UI to toggle different modes, or at least filter-out/select quiz-items.
     TODO: Allow a history of quiz items, so you can scroll back and view previous answers.
@@ -230,7 +231,7 @@ typedef enum
     ui_Previous,
     ui_ShowAnswer,
     ui_Save,
-} estudioso_ui_ids;
+} estudioso_ui_id;
 
 typedef struct
 {
@@ -1200,7 +1201,6 @@ internal b32 TryToLoadSaveFile(state *State)
     b32 SaveFileHasLoaded = 0;
 #ifndef PLATFORM_WEB
 
-    /* quiz_item *QuizItemsFromFile = ReadQuizItemsFromFile(SAVE_FILE_PATH); */
     buffer *Buffer = ReadFileIntoBuffer(SAVE_FILE_PATH);
     s32 HeaderSize = sizeof(save_file_header);
 
@@ -1262,7 +1262,6 @@ internal void InitializeDefaultQuizItems(state *State);
 
 internal void ResetQuizItems(state *State)
 {
-    /* NOTE: Set all complete fields to 0, just in case they were saved as Complete=1 */
     for (u32 I = 0; I < State->QuizItemCount; ++I)
     {
         State->QuizItems[I].Complete = 0;
@@ -1305,13 +1304,6 @@ internal void InitializeQuizItems(state *State)
 
 #if 1
     { /* DEBUG: Test that the list does not contain duplicates */
-        /*
-          for (u32 I = 0; I < State->QuizItemCount; ++I)
-          {
-          printf("%d %d\n", I, State->QuizItemsLookup[I]);
-          }
-        */
-
         for (u32 I = 0; I < State->QuizItemCount; ++I)
         {
             for (u32 J = 0; J < State->QuizItemCount; ++J)
