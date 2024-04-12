@@ -18,6 +18,7 @@
     TODO: Allow moving cursor between characters and splice editing. Currently cursor is always at the end of the input.
 
     Quiz Features
+    TODO: Add a "Show Answer" button, instead of relying on undocumented hotkeys.
     TODO: Allow a history of quiz items, so you can scroll back and view previous answers.
     TODO: Add automated number quizes, where random numbers are picked and the user enters the spelled out name for the number.
 
