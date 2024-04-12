@@ -5,17 +5,24 @@
 
     A flash-card typing game for learning Spanish.
 
+    Save File
     TODO: Create a new/load game screen, to choose between default quiz items and an existing save.
-    TODO: Don't blink cursor while the user is submitting input actions, just always show the cursor then.
-    TODO: Create some UI to toggle different modes, or at least filter-out/select quiz-items.
-    TODO: Allow a history of quiz items, so you can scroll back and view previous answers.
-    TODO: Allow marking a quiz-item as inaccurate or in need of a review. This would be helpful when using the app and noticing typos or other errors in the item content.
-    TODO: Allow moving cursor between characters and splice editing. Currently cursor is always at the end of the input.
-    TODO: Draw a message showing that save-file has been written. Also, maybe disable the save button for a bit...
-    TODO: Should we ignore whitespace in the user input (like trailing space after an answer)
     TODO: How do we merge an existing save with a version of the app with new quiz-items? Should save file versions line up with versions of the app, so to upgrade a version of the save file is to upgrade save file itself? (For this to work, we would need an update function that can take any version of a save-file and convert it to the newest version)
-    TODO: Fonts for web and desktop need to be handled differently (at least it seems that way). Make better architecture for defining fonts that let web/desktop do whatever needs to be done to look best on its platform.
+    TODO: Draw a message showing that save-file has been written. Also, maybe disable the save button for a bit...
+
+    Meta Game
+    TODO: Create some UI to toggle different modes, or at least filter-out/select quiz-items.
+
+    Text Input
+    TODO: Should we ignore whitespace in the user input (like trailing space after an answer)
+    TODO: Allow moving cursor between characters and splice editing. Currently cursor is always at the end of the input.
+
+    Quiz Features
+    TODO: Allow a history of quiz items, so you can scroll back and view previous answers.
     TODO: Add automated number quizes, where random numbers are picked and the user enters the spelled out name for the number.
+
+    Debugging
+    TODO: Allow marking a quiz-item as inaccurate or in need of a review. This would be helpful when using the app and noticing typos or other errors in the item content.
 */
 #include <stdlib.h>
 #include <stdio.h>
@@ -45,8 +52,8 @@
 global_variable int SCREEN_WIDTH = TARGET_SCREEN_WIDTH;
 global_variable int SCREEN_HEIGHT = TARGET_SCREEN_HEIGHT;
 #else
-global_variable int SCREEN_WIDTH = 400;
-global_variable int SCREEN_HEIGHT = 700;
+global_variable int SCREEN_WIDTH = 800;
+global_variable int SCREEN_HEIGHT = 600;
 #endif
 
 #define TEST 0
@@ -1171,7 +1178,12 @@ internal void DrawQuizPrompt(state *State, u32 LetterSpacing)
         }
         State->UI.CursorBlinkTime = BlinkTime;
 
-        b32 ShowCursor = BlinkTime > TimeWithCursorInvisible;
+        if (State->InputOccured)
+        {
+            State->UI.CursorBlinkTime = TimeWithCursorInvisible;
+        }
+
+        b32 ShowCursor = BlinkTime >= TimeWithCursorInvisible;
 
         if (ShowCursor)
         {
