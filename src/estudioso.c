@@ -191,8 +191,9 @@ typedef struct
 
 typedef enum
 {
-    frequency_Medium,
     frequency_High,
+    frequency_Medium,
+    frequency_Low,
     frequency_Count
 } frequency;
 
@@ -229,7 +230,10 @@ typedef struct
     u32 QuizItemCount;
 
     s32 FrequencyThreshold[frequency_Count];
-    s32 CurrentLookup[frequency_Count];
+    s32 Bucket[frequency_Count];
+    s32 BucketCount[frequency_Count];
+    s32 BucketSize[frequency_Count];
+    s32 BucketIndex;
 
     quiz_mode QuizMode;
 
@@ -260,7 +264,7 @@ typedef struct
     u16 Version; /* TODO: Think about how to represent version in a consise way... */
     u32 QuizItemCount;
     s32 FrequencyThreshold[frequency_Count];
-    s32 CurrentLookup[frequency_Count];
+    s32 Bucket[frequency_Count];
     u32 FileSize;
     u32 OffsetToStringData;
     u32 OffsetToQuizItemsLookupData;
@@ -481,7 +485,7 @@ internal u64 PrepareSaveFile(state *State)
         for (s32 I = 0; I < frequency_Count; ++I)
         {
             SaveHeader.FrequencyThreshold[I] = State->FrequencyThreshold[I];
-            SaveHeader.CurrentLookup[I] = State->CurrentLookup[I];
+            SaveHeader.Bucket[I] = State->Bucket[I];
         }
     }
 
@@ -956,21 +960,88 @@ internal inline void SetQuizMode(state *State, quiz_mode Mode)
 
 debug_variable b32 DEBUGCanHandleEnterKeyInWinMode = 0; /* TODO: Just fix the Enter key-press bug, where the user hits the enter key, gets the last quiz item correct, so the win screen only appears for a single frame. */
 
+internal s32 GetBucketSize(state *State, s32 BucketIndex)
+{
+    Assert(BucketIndex >= 0 && BucketIndex < frequency_Count);
+
+    s32 Size = 0;
+    /* @CopyPasta */
+    s32 HighFrequencyThreshold = State->FrequencyThreshold[frequency_High];
+    s32 MediumFrequencyThreshold = State->FrequencyThreshold[frequency_Medium];
+    s32 LowFrequencyThreshold = State->QuizItemCount;
+
+    switch(BucketIndex)
+    {
+    case frequency_High:
+        Size = HighFrequencyThreshold;
+        break;
+    case frequency_Medium:
+        Size = MediumFrequencyThreshold - HighFrequencyThreshold;
+        break;
+    case frequency_Low:
+        Size = LowFrequencyThreshold - MediumFrequencyThreshold;
+        break;
+    }
+
+    return Size;
+}
+
 internal void GetNextRandomQuizItem(state *State)
 {
-    State->CurrentLookup[0] += 1;
+    Assert(State->BucketIndex >= 0 && State->BucketIndex < frequency_Count);
+
+    s32 MaxCount;
+    s32 FrequencySize = GetBucketSize(State, State->BucketIndex);
+
+    switch(State->BucketIndex)
+    {
+    case frequency_High:    MaxCount = 8; break;
+    case frequency_Medium:  MaxCount = 2; break;
+    /* NOTE: Low frequency. */
+    default:                MaxCount = 1; break;
+    }
+
+    s32 FrequencyModulo = FrequencySize;
+
+    if (!FrequencySize)
+    {
+        State->BucketIndex = 0;
+        FrequencyModulo = 1;
+    }
+
+    State->Bucket[State->BucketIndex] += 1;
+    State->Bucket[State->BucketIndex] = State->Bucket[State->BucketIndex] % FrequencyModulo;
+    State->BucketCount[State->BucketIndex] += 1;
+
+    if (State->BucketCount[State->BucketIndex] >= MaxCount)
+    {
+        /* TODO: Permute the frequency bucket, but not the other buckets. */
+        /* State->Bucket[State->BucketIndex] = 0; */
+        State->BucketCount[State->BucketIndex] = 0;
+
+        for (s32 Tries = 0; Tries < frequency_Count; ++Tries)
+        {
+            State->BucketIndex = (State->BucketIndex + 1) % frequency_Count;
+
+            if (GetBucketSize(State, State->BucketIndex) > 0)
+            {
+                break;
+            }
+        }
+
+    }
+
     State->ShowAnswer = 0;
 
     ClearQuizInput(State);
     State->QuizInputIndex = 0;
     State->CurrentQuizItemFailed = 0;
 
-    if (State->CurrentLookup[0] >= (s32)State->QuizItemCount)
+    if (State->Bucket[State->BucketIndex] >= (s32)State->QuizItemCount)
     {
         SetQuizMode(State, quiz_mode_Win);
         OkPlaySound(State->Win);
         DEBUGCanHandleEnterKeyInWinMode = 0;
-        State->CurrentLookup[0] = 0;
     }
     else
     {
@@ -979,9 +1050,38 @@ internal void GetNextRandomQuizItem(state *State)
     }
 }
 
+internal s32 GetActiveQuizItemIndex(state *State)
+{
+    s32 LookupIndex = State->Bucket[State->BucketIndex];
+
+    s32 Offset;
+
+    s32 HighFrequencyThreshold = State->FrequencyThreshold[frequency_High];
+    s32 MediumFrequencyThreshold = State->FrequencyThreshold[frequency_Medium];
+
+    switch(State->BucketIndex)
+    {
+    case frequency_Medium:
+        Offset = HighFrequencyThreshold;
+        break;
+    case frequency_Low:
+        Offset = MediumFrequencyThreshold;
+        break;
+    default:
+        Offset = 0;
+    }
+
+    s32 OffsetLookupIndex = LookupIndex + Offset;
+    s32 Index = State->QuizItemsLookup[OffsetLookupIndex];
+    Assert(Index >= 0 && Index < Quiz_Item_Max);
+
+    return Index;
+}
+
 internal quiz_item *GetActiveQuizItem(state *State)
 {
-    u32 Index = State->QuizItemsLookup[State->CurrentLookup[0]];
+    s32 Index = GetActiveQuizItemIndex(State);
+    Assert(Index >= 0 && Index < Quiz_Item_Max);
     quiz_item *Item = State->QuizItems + Index;
 
     return Item;
@@ -1149,9 +1249,17 @@ internal void DrawQuizPrompt(state *State, u32 LetterSpacing)
 
     { /* Draw the index of the quiz item. */
         char Buff[64];
-        sprintf(Buff, "%d/%d  index=%d", State->CurrentLookup[0], State->QuizItemCount, State->QuizItemsLookup[State->CurrentLookup[0]]);
+        s32 Index = GetActiveQuizItemIndex(State);
+        sprintf(Buff, "quiz_item_count=%d  index=%d", State->QuizItemCount, Index);
         DrawTextEx(State->UI.Font, Buff, V2(BorderPadding, BorderPadding + LineHeight), State->UI.FontSize, LetterSpacing, FONT_COLOR);
     }
+
+    { /* Draw the bucket index. */
+        char Buff[64];
+        sprintf(Buff, "bucket_index=%d", State->BucketIndex);
+        DrawTextEx(State->UI.Font, Buff, V2(BorderPadding, BorderPadding + 2 * LineHeight), State->UI.FontSize, LetterSpacing, FONT_COLOR);
+    }
+
 
     f32 WrappedTextY = SCREEN_HALF_HEIGHT - (2.0f * LineHeight);
     DrawWrappedText(State, Prompt, MaxPromptWidth, WrappedTextY, LineHeight, LetterSpacing);
@@ -1282,7 +1390,7 @@ internal b32 TryToLoadSaveFile(state *State)
                 CopyMemory(QuizItemsLookupData, (u8 *)State->QuizItemsLookup, sizeof(State->QuizItemsLookup));
             }
 
-            State->CurrentLookup[0] = Header->CurrentLookup[0];
+            State->Bucket[State->BucketIndex] = Header->Bucket[0];
 
             SaveFileHasLoaded = 1;
         }
@@ -1361,6 +1469,11 @@ void MergeSortQuizItems(state *State)
 
 internal void ResetQuizItems(state *State)
 {
+    for (s32 I = 0; I < frequency_Count; ++I)
+    {
+        State->BucketCount[I] = 0;
+    }
+
     for (u32 I = 0; I < State->QuizItemCount; ++I)
     {
         State->QuizItems[I].Complete = 0;
@@ -1368,41 +1481,57 @@ internal void ResetQuizItems(state *State)
 
     MergeSortQuizItems(State);
 
+    s32 MaxHighFrequencyScore = 0;
+    s32 MaxMediumFrequencyScore = 2;
+
+    for (u32 I = 0; I < State->QuizItemCount; ++I)
     {
-        s32 MaxHighFrequencyScore = 0;
-        s32 MaxMediumFrequencyScore = 2;
+        s32 Index = State->QuizItemsLookupWorkingSet[I];
+        quiz_item Item = State->QuizItems[Index];
+        s32 Score = Item.PassCount - Item.FailCount;
 
-        for (u32 I = 0; I < State->QuizItemCount; ++I)
+        State->QuizItemsLookup[I] = Index; /* NOTE: Copy sorted array back into the lookup array. */
+
+        if (Score < MaxHighFrequencyScore)
         {
-            s32 Index = State->QuizItemsLookupWorkingSet[I];
-            quiz_item Item = State->QuizItems[Index];
-            s32 Score = Item.PassCount - Item.FailCount;
-            /* NOTE: Copy sorted array back into the lookup array. */
-            State->QuizItemsLookup[I] = Index;
-
-            if (Score < MaxHighFrequencyScore)
-            {
-                State->FrequencyThreshold[frequency_High] = I;
-            }
-            else if (Score < MaxMediumFrequencyScore)
-            {
-                State->FrequencyThreshold[frequency_Medium] = I;
-            }
-            else
-            {
-                break;
-            }
+            State->FrequencyThreshold[frequency_High] = I + 1;
         }
+        else if (Score < MaxMediumFrequencyScore)
+        {
+            State->FrequencyThreshold[frequency_Medium] = I + 1;
+        }
+        else
+        {
+            break;
+        }
+    }
+
+    if (State->FrequencyThreshold[frequency_High])
+    {
+        State->BucketIndex = frequency_High;
+    }
+    else if (State->FrequencyThreshold[frequency_Medium])
+    {
+        State->BucketIndex = frequency_Medium;
+    }
+    else if (State->QuizItemCount)
+    {
+        State->BucketIndex = frequency_Low;
+    }
+    else
+    {
+        State->BucketIndex = frequency_High;
     }
 }
 
 internal void PermuteQuizItemRange(state *State, s32 BeginIndex, s32 EndIndex)
 {
-    if (BeginIndex < EndIndex)
-    {
-        s32 PermutationCount = EndIndex - BeginIndex;
+    s32 PermutationCount = EndIndex - BeginIndex;
 
-        for (s32 I = BeginIndex; I < EndIndex; ++I)
+    if (PermutationCount)
+    {
+        /* NOTE: Set initial lookup index */
+        for (s32 I = BeginIndex; I <= EndIndex; ++I)
         {
             State->QuizItemsLookup[I] = I;
         }
@@ -1424,10 +1553,14 @@ internal void InitializeQuizItems(state *State, b32 InitializeDefault)
 {
     b32 SaveFileHasLoaded = TryToLoadSaveFile(State);
 
+    for (s32 I = 0; I < frequency_Count; ++I)
+    {
+        State->Bucket[I] = 0;
+    }
+    State->BucketIndex = 0;
+
     if (!SaveFileHasLoaded)
     {
-        State->CurrentLookup[0] = 0;
-
         if (InitializeDefault)
         {
             State->QuizItemCount = 0;
@@ -1439,10 +1572,11 @@ internal void InitializeQuizItems(state *State, b32 InitializeDefault)
 
     s32 HighThreshold = State->FrequencyThreshold[frequency_High];
     s32 MediumThreshold = State->FrequencyThreshold[frequency_Medium];
+    s32 LowThreshold = State->QuizItemCount;
 
     PermuteQuizItemRange(State, 0, HighThreshold);
     PermuteQuizItemRange(State, HighThreshold, MediumThreshold);
-    PermuteQuizItemRange(State, MediumThreshold, State->QuizItemCount);
+    PermuteQuizItemRange(State, MediumThreshold, LowThreshold);
 
 #if 1
     { /* DEBUG: Test that the list does not contain duplicates */
@@ -1475,7 +1609,6 @@ internal void DrawWinMessage(state *State, u32 LetterSpacing)
             ClearQuizInput(State);
 
             SetQuizMode(State, quiz_mode_Typing);
-            State->CurrentLookup[0] = 0;
 
             InitializeQuizItems(State, 0);
         }
