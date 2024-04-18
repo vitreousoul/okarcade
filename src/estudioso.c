@@ -18,7 +18,6 @@
     TODO: Allow moving cursor between characters and splice editing. Currently cursor is always at the end of the input.
 
     Quiz Features
-    TODO: Create a system for short/medium/long-term quiz-items. More failure means shorter-term, more corrects means longer-term.
     TODO: Add a "Show Answer" button, instead of relying on undocumented hotkeys.
     TODO: Allow a history of quiz items, so you can scroll back and view previous answers.
     TODO: Add automated number quizes, where random numbers are picked and the user enters the spelled out name for the number.
@@ -50,6 +49,8 @@
 #include "raylib_helpers.h"
 #include "ui.c"
 #include "sound.c"
+
+#define DEBUG_GRAPHICS 0
 
 #if 0
 global_variable int SCREEN_WIDTH = TARGET_SCREEN_WIDTH;
@@ -1247,18 +1248,19 @@ internal void DrawQuizPrompt(state *State, u32 LetterSpacing)
         DrawTextEx(State->UI.Font, (char *)Answer, V2(AnswerX, AnswerY), State->UI.FontSize, LetterSpacing, ANSWER_COLOR);
     }
 
+#if DEBUG_GRAPHICS
     { /* Draw the index of the quiz item. */
         char Buff[64];
         s32 Index = GetActiveQuizItemIndex(State);
         sprintf(Buff, "quiz_item_count=%d  index=%d", State->QuizItemCount, Index);
         DrawTextEx(State->UI.Font, Buff, V2(BorderPadding, BorderPadding + LineHeight), State->UI.FontSize, LetterSpacing, FONT_COLOR);
     }
-
     { /* Draw the bucket index. */
         char Buff[64];
         sprintf(Buff, "bucket_index=%d", State->BucketIndex);
         DrawTextEx(State->UI.Font, Buff, V2(BorderPadding, BorderPadding + 2 * LineHeight), State->UI.FontSize, LetterSpacing, FONT_COLOR);
     }
+#endif
 
 
     f32 WrappedTextY = SCREEN_HALF_HEIGHT - (2.0f * LineHeight);
@@ -1530,6 +1532,7 @@ internal void PermuteQuizItemRange(state *State, s32 BeginIndex, s32 EndIndex)
 
     if (PermutationCount)
     {
+        printf("permute %d %d\n", BeginIndex, EndIndex);
         /* NOTE: Set initial lookup index */
         for (s32 I = BeginIndex; I <= EndIndex; ++I)
         {

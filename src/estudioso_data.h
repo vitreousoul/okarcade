@@ -1,6 +1,6 @@
 internal void InitializeDefaultQuizItems(state *State)
 {
-#if 0
+#if 1
     /* 003_hacer_y_tener */
     AddQuizText(
         "Qué tiempo (hacer)?",
@@ -615,7 +615,7 @@ internal void InitializeDefaultQuizItems(state *State)
     AddQuizText("marzo", "March");
     AddQuizText("abril", "April");
     AddQuizText("mayo", "May");
-#if 0
+#if 1
     AddQuizText("junio", "June");
     AddQuizText("julio", "July");
     AddQuizText("agosto", "August");
@@ -632,7 +632,7 @@ internal void InitializeDefaultQuizItems(state *State)
     /* AddQuizText("", ""); */
 #endif
 
-#if 0
+#if 1
     AddQuizText("la actividad", "activity");
     AddQuizText("las actividades", "activities");
     AddQuizText("actualmente", "nowadays");
