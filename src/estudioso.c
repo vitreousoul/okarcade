@@ -50,7 +50,7 @@
 #include "ui.c"
 #include "sound.c"
 
-#define DEBUG_GRAPHICS 0
+#define DEBUG_GRAPHICS 1
 
 #if 0
 global_variable int SCREEN_WIDTH = TARGET_SCREEN_WIDTH;
@@ -1014,7 +1014,8 @@ internal void GetNextRandomQuizItem(state *State)
     State->Bucket[State->BucketIndex] = State->Bucket[State->BucketIndex] % FrequencyModulo;
     State->BucketCount[State->BucketIndex] += 1;
 
-    if (State->BucketCount[State->BucketIndex] >= MaxCount)
+    if (State->BucketCount[State->BucketIndex] >= MaxCount ||
+        FrequencySize == 1)
     {
         /* TODO: Permute the frequency bucket, but not the other buckets. */
         /* State->Bucket[State->BucketIndex] = 0; */
@@ -1641,7 +1642,7 @@ internal void HandleQuizItem(state *State, quiz_item *QuizItem, u8 *Answer)
             {
                 OkPlaySound(State->Wrong);
 
-                if (1 || !State->CurrentQuizItemFailed)
+                if (!State->CurrentQuizItemFailed)
                 {
                     QuizItem->FailCount += 1;
                     State->CurrentQuizItemFailed = 1;
