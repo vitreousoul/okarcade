@@ -1018,7 +1018,6 @@ internal void GetNextRandomQuizItem(state *State)
         FrequencySize == 1)
     {
         /* TODO: Permute the frequency bucket, but not the other buckets. */
-        /* State->Bucket[State->BucketIndex] = 0; */
         State->BucketCount[State->BucketIndex] = 0;
 
         for (s32 Tries = 0; Tries < frequency_Count; ++Tries)
@@ -1116,7 +1115,7 @@ internal void DrawWrappedText(state *State, u8 *Text, f32 MaxWidth, f32 Y, f32 L
         s32 J = 0;
         s32 Offset = 0;
 
-        /* TODO: @Speed We should be able to better than a linear search */
+        /* TODO: @Speed We should be able do better than a linear search */
         while (Text[I] && State->LineBufferIndex < Max_Line_Count)
         {
             J = I - Offset;

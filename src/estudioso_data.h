@@ -2,610 +2,218 @@ internal void InitializeDefaultQuizItems(state *State)
 {
 #if 1
     /* 003_hacer_y_tener */
-    AddQuizText(
-        "Qué tiempo (hacer)?",
-        "hace"
-    );
-    AddQuizText(
-        "Él (hacer) un poco de frío.",
-        "hace"
-    );
-    AddQuizText(
-        "En la mañana (hacer) buen tiempo en abril.",
-        "hace"
-    );
-    AddQuizText(
-        "Él (hacer) mucho frio.",
-        "hace"
-    );
-    AddQuizText(
-        "Ella (hacer) mucho calor.",
-        "hace"
-    );
-    AddQuizText(
-        "En el verano (hacer) sol.",
-        "hace"
-    );
-    AddQuizText(
-        "Tú estudias español (hacer) una semana.",
-        "hace"
-    );
-    AddQuizText(
-        "Ella (hacer) una pregunta a su amigo.",
-        "hace"
-    );
-    AddQuizText(
-        "Él (hacer) una visita a su amigo.",
-        "hace"
-    );
-    AddQuizText(
-        "Él (hacer) una visita a Guatemala.",
-        "hace"
-    );
-    AddQuizText(
-        "Yo (hacer) un viaje a la playa.",
-        "hago"
-    );
-    AddQuizText(
-        "Nosotros (hacer) un viaje a las montañas.",
-        "hacemos"
-    );
+    AddQuizText("Qué tiempo (hacer)?", "hace");
+    AddQuizText("Él (hacer) un poco de frío.", "hace");
+    AddQuizText("En la mañana (hacer) buen tiempo en abril.", "hace");
+    AddQuizText("Él (hacer) mucho frio.", "hace");
+    AddQuizText("Ella (hacer) mucho calor.", "hace");
+    AddQuizText("En el verano (hacer) sol.", "hace");
+    AddQuizText("Tú estudias español (hacer) una semana.", "hace");
+    AddQuizText("Ella (hacer) una pregunta a su amigo.", "hace");
+    AddQuizText("Él (hacer) una visita a su amigo.", "hace");
+    AddQuizText("Él (hacer) una visita a Guatemala.", "hace");
+    AddQuizText("Yo (hacer) un viaje a la playa.", "hago");
+    AddQuizText("Nosotros (hacer) un viaje a las montañas.", "hacemos");
 
-    AddQuizText(
-        "Yo (tener) 28 veintiocho años.",
-        "tengo"
-    );
-    AddQuizText(
-        "Yo (tener) poca sed.",
-        "tengo"
-    );
-    AddQuizText(
-        "Ella (tener) sed después de jugar.",
-        "tiene"
-    );
-    AddQuizText(
-        "Ella (tener) mucho frio.",
-        "tiene"
-    );
-    AddQuizText(
-        "El niño (tener) cuidado cuando él juega soccer.",
-        "tiene"
-    );
-    AddQuizText(
-        "Ellos (tener) prisa todos los días.",
-        "tienen"
-    );
-    AddQuizText(
-        "Yo no quiero (tener) prisa hoy.",
-        "tener"
-    );
-    AddQuizText(
-        "Después del trabajo yo (tener) mucho sueño.",
-        "tengo"
-    );
-    AddQuizText(
-        "La niña (tener) miedo de la oscuridad.",
-        "tiene"
-    );
-    AddQuizText(
-        "El niño no (tener) razón en la respuesta.",
-        "tiene"
-    );
-    AddQuizText(
-        "Yo (tener) razón en el argumento.",
-        "tengo"
-    );
-    AddQuizText(
-        "Ella (tener) suerte en el juego.",
-        "tiene"
-    );
-    AddQuizText(
-        "Él (tener) éxito en la vida.",
-        "tiene"
-    );
-    AddQuizText(
-        "Ellos (tener) ganas de comer una pizza.",
-        "tienen"
-    );
-    AddQuizText(
-        "Ella (tener) dolor de cabeza.",
-        "tiene"
-    );
-    AddQuizText(
-        "Ellos (tener) dolor de espalda.",
-        "tienen"
-    );
-    AddQuizText(
-        "Él (tener) que preparar la cena hoy",
-        "tiene"
-    );
+    AddQuizText("Yo (tener) 28 veintiocho años.", "tengo");
+    AddQuizText("Yo (tener) poca sed.", "tengo");
+    AddQuizText("Ella (tener) sed después de jugar.", "tiene");
+    AddQuizText("Ella (tener) mucho frio.", "tiene");
+    AddQuizText("El niño (tener) cuidado cuando él juega soccer.", "tiene");
+    AddQuizText("Ellos (tener) prisa todos los días.", "tienen");
+    AddQuizText("Yo no quiero (tener) prisa hoy.", "tener");
+    AddQuizText("Después del trabajo yo (tener) mucho sueño.", "tengo");
+    AddQuizText("La niña (tener) miedo de la oscuridad.", "tiene");
+    AddQuizText("El niño no (tener) razón en la respuesta.", "tiene");
+    AddQuizText("Yo (tener) razón en el argumento.", "tengo");
+    AddQuizText("Ella (tener) suerte en el juego.", "tiene");
+    AddQuizText("Él (tener) éxito en la vida.", "tiene");
+    AddQuizText("Ellos (tener) ganas de comer una pizza.", "tienen");
+    AddQuizText("Ella (tener) dolor de cabeza.", "tiene");
+    AddQuizText("Ellos (tener) dolor de espalda.", "tienen");
+    AddQuizText("Él (tener) que preparar la cena hoy", "tiene");
 
-    AddQuizText(
-        "_ tarea",
-        "la"
-    );
-    AddQuizText(
-        "_ restaurante",
-        "el"
-    );
-    AddQuizText(
-        "_ café",
-        "el"
-    );
-    AddQuizText(
-        "_ coche",
-        "el"
-    );
-    AddQuizText(
-        "_ viaje",
-        "el"
-    );
-    AddQuizText(
-        "_ parque",
-        "el"
-    );
-    AddQuizText(
-        "_ paquete",
-        "el"
-    );
-    AddQuizText(
-        "_ menú",
-        "el"
-    );
-    AddQuizText(
-        "_ colibrí",
-        "el"
-    );
-    AddQuizText(
-        "_ reloj",
-        "el"
-    );
-    AddQuizText(
-        "_ chocolate",
-        "el"
-    );
-    AddQuizText(
-        "_ pie",
-        "el"
-    );
-    AddQuizText(
-        "_ diente",
-        "el"
-    );
-    AddQuizText(
-        "_ noche",
-        "la"
-    );
-    AddQuizText(
-        "_ sangre",
-        "la"
-    );
-    AddQuizText(
-        "_ nube",
-        "la"
-    );
-    AddQuizText(
-        "_ llave",
-        "la"
-    );
-    AddQuizText(
-        "_ calle",
-        "la"
-    );
-    AddQuizText(
-        "_ gente",
-        "la"
-    );
-    AddQuizText(
-        "_ nieve",
-        "la"
-    );
-    AddQuizText(
-        "_ leche",
-        "la"
-    );
-    AddQuizText(
-        "_ carne",
-        "la"
-    );
-    AddQuizText(
-        "_ ley",
-        "la"
-    );
-    AddQuizText(
-        "_ imagen",
-        "la"
-    );
+    { /* 002_estar_y_ser.txt */
+        /* Ser */
+        AddQuizText("Félix y Raúl (ser/estar) altos.", "son");
+        AddQuizText("Antón (ser/estar) muy simpático.", "es");
+        AddQuizText("Yo (ser/estar) Santiago.", "soy");
+        AddQuizText("Este (ser/estar) el Teatro Real.", "es");
+        AddQuizText("La familia de Carlos (ser/estar) católica.", "es");
+        AddQuizText("Marta (ser/estar) de México DF.", "es");
+        AddQuizText("Esa lámina (ser/estar) de Japón.", "es");
+        AddQuizText("Tatiana y Sarai (ser/estar) mis hermanas.", "son");
+        AddQuizText("Estos (ser/estar) mis amigos.", "son");
+        AddQuizText("Elisa (ser/estar) mi exnovia.", "es");
+        AddQuizText("Ese paraguas (ser/estar) mío.", "es");
+        AddQuizText("El partido de fútbol (ser/estar) en Valencia.", "es");
+        AddQuizText("El partido (ser/estar) el miércoles.", "es");
+        AddQuizText("Hoy (ser/estar) domingo.", "es");
+        AddQuizText("Hoy (ser/estar) 1 de abril.", "es");
+        AddQuizText("En México ahora (ser/estar) por la mañana.", "es");
+        AddQuizText("En el norte ya (ser/estar) de noche.", "es");
+        AddQuizText("Las camas (ser/estar) hechas por Claudia.", "son");
+        AddQuizText("Esa máquina (ser/estar) para Gabriel.", "es");
+        AddQuizText("¿Cuánto es? (Ser/Estar) 120 euros.", "Son");
+        AddQuizText("Ese anillo (ser/estar) de plata.", "es");
+        AddQuizText("Ese anillo (ser/estar) de Perú.", "es");
+        AddQuizText("Juana (ser/estar) ingeniera.", "es");
+        AddQuizText("Ramón (ser/estar) periodista.", "es");
+        /* Estar */
+        AddQuizText("Yo (ser/estar) en paro.", "estoy");
+        AddQuizText("(Ser/Estar) triste por el examen.", "Está");
+        AddQuizText("(Ser/Estar) enfermo desde ayer.", "Estoy");
+        AddQuizText("Mi abuela (ser/estar) muy joven para su edad.", "está");
+        AddQuizText("Alfredo (ser/estar) muy moreno.", "está");
+        AddQuizText("Yo (ser/estar) soltero.", "estoy");
+        AddQuizText("Yo (ser/estar) prometido.", "estoy");
+        AddQuizText("Yo (ser/estar) casado.", "estoy");
+        AddQuizText("Yo (ser/estar) divorciado.", "estoy");
+        AddQuizText("Yo (ser/estar) viudo.", "soy");
+        AddQuizText("El estadio (ser/estar) en Valencia.", "está");
+        AddQuizText("Los jugadores (ser/estar) en el hotel.", "están");
+        AddQuizText("(Ser/Estar) a domingo.", "Estamos");
+        AddQuizText("(Ser/Estar) a 1 de abril.", "Estamos");
+        AddQuizText("(Ser/Estar) en primavera.", "Estamos");
+        AddQuizText("¿A qué día (ser/estar) hoy?", "estamos");
+        AddQuizText("(Ser/Estar) bien irse de vacaciones una vez al año.", "Está");
+        AddQuizText("Marco siempre (ser/estar) de buen humor.", "está");
+        AddQuizText("Marisa (ser/estar) ahora de camarera en Ibiza.", "está");
+        AddQuizText("Mi hermana (ser/estar) de parto.", "está");
+        AddQuizText("Carla y Marina (ser/estar) de guardia este fin de semana.", "están");
+        AddQuizText("¿A cuánto (ser/estar) las manzanas?", "están");
+        AddQuizText("(Ser/Estar) a 2€ el kilo.", "Están");
+        AddQuizText("Todo el reloj (ser/estar) fabricado en oro.", "está");
+        AddQuizText("El collar (ser/estar) hecho de papel.", "está");
+        AddQuizText("El anillo (ser/estar) bañado en plata.", "está");
+        AddQuizText("Nosotros (ser/estar) cenando en el jardín.", "estamos");
+    }
+
+    AddQuizText("_ tarea", "la");
+    AddQuizText("_ restaurante", "el");
+    AddQuizText("_ café", "el");
+    AddQuizText("_ coche", "el");
+    AddQuizText("_ viaje", "el");
+    AddQuizText("_ parque", "el");
+    AddQuizText("_ paquete", "el");
+    AddQuizText("_ menú", "el");
+    AddQuizText("_ colibrí", "el");
+    AddQuizText("_ reloj", "el");
+    AddQuizText("_ chocolate", "el");
+    AddQuizText("_ pie", "el");
+    AddQuizText("_ diente", "el");
+    AddQuizText("_ noche", "la");
+    AddQuizText("_ sangre", "la");
+    AddQuizText("_ nube", "la");
+    AddQuizText("_ llave", "la");
+    AddQuizText("_ calle", "la");
+    AddQuizText("_ gente", "la");
+    AddQuizText("_ nieve", "la");
+    AddQuizText("_ leche", "la");
+    AddQuizText("_ carne", "la");
+    AddQuizText("_ ley", "la");
+    AddQuizText("_ imagen", "la");
     /* 006_gustar_homework */
-    AddQuizText(
-        "A María no (me/te/le/nos/les gustar) este libro.",
-        "le gusta"
-    );
-    AddQuizText(
-        "A mí (me/te/le/nos/les gustar) mucho escribir composiciones.",
-        "me gusta"
-    );
-    AddQuizText(
-        "A ellos no (me/te/le/nos/les gustar) el clima de Alaska.",
-        "les gusta"
-    );
-    AddQuizText(
-        "A este joven (me/te/le/nos/les gustar) todas las muchachas del club.",
-        "le gustan"
-    );
-    AddQuizText(
-        "A los animales (me/te/le/nos/les gustar) la carne cruda.",
-        "les gusta"
-    );
-    AddQuizText(
-        "A Eneida no (me/te/le/nos/les gustar) los perros.",
-        "le gustan"
-    );
-    AddQuizText(
-        "A nosotros no (me/te/le/nos/les gustar) las ciudades que visitamos ayer.",
-        "nos gustan"
-    );
-    AddQuizText(
-        "A mis primas (me/te/le/nos/les gustar) mucho ir a los bailes.",
-        "les gusta"
-    );
-    AddQuizText(
-        "¿(me/te/le/nos/les gustar) a ti las clases de español?",
-        "Te gustan"
-    );
-    AddQuizText(
-        "A nosotros no (me/te/le/nos/les gustar) los exámenes.",
-        "nos gustan"
-    );
-    AddQuizText(
-        "A mí no (me/te/le/nos/les gustar) estudiar los sábados.",
-        "me gusta"
-    );
-    AddQuizText(
-        "A mis vecinos (me/te/le/nos/les gustar) mucho viajar.",
-        "les gusta"
-    );
-    AddQuizText(
-        "A nosotros no (me/te/le/nos/les gustar) los viajes muy largos.",
-        "nos gustan"
-    );
-    AddQuizText(
-        "Al maestro (me/te/le/nos/les gustar) escribir los ejercicios en la pizarra.",
-        "le gusta"
-    );
-    AddQuizText(
-        "¿(me/te/le/nos/les gustar) a Enrique trabajar en esa tienda?",
-        "Le gusta"
-    );
-    AddQuizText(
-        "A mi médico (me/te/le/nos/les gustar) escribir los ejercicios en la pizarra.",
-        "le gusta"
-    );
-    AddQuizText(
-        "A mí (me/te/le/nos/les gustar) mucho la película de anoche.",
-        "me gusta"
-    );
-    AddQuizText(
-        "A mi madre (me/te/le/nos/les gustar) sembrar flores.",
-        "le gusta"
-    );
-    AddQuizText(
-        "A mi no (me/te/le/nos/les gustar) el discurso del señor Gómez en la reunión de ayer.",
-        "me gusta"
-    );
-    AddQuizText(
-        "A ellos no (me/te/le/nos/les gustar) el paseo de la semana pasada.",
-        "les gusta"
-    );
+    AddQuizText("A María no (me/te/le/nos/les gustar) este libro.", "le gusta");
+    AddQuizText("A mí (me/te/le/nos/les gustar) mucho escribir composiciones.", "me gusta");
+    AddQuizText("A ellos no (me/te/le/nos/les gustar) el clima de Alaska.", "les gusta");
+    AddQuizText("A este joven (me/te/le/nos/les gustar) todas las muchachas del club.", "le gustan");
+    AddQuizText("A los animales (me/te/le/nos/les gustar) la carne cruda.", "les gusta");
+    AddQuizText("A Eneida no (me/te/le/nos/les gustar) los perros.", "le gustan");
+    AddQuizText("A nosotros no (me/te/le/nos/les gustar) las ciudades que visitamos ayer.", "nos gustan");
+    AddQuizText("A mis primas (me/te/le/nos/les gustar) mucho ir a los bailes.", "les gusta");
+    AddQuizText("¿(me/te/le/nos/les gustar) a ti las clases de español?", "Te gustan");
+    AddQuizText("A nosotros no (me/te/le/nos/les gustar) los exámenes.", "nos gustan");
+    AddQuizText("A mí no (me/te/le/nos/les gustar) estudiar los sábados.", "me gusta");
+    AddQuizText("A mis vecinos (me/te/le/nos/les gustar) mucho viajar.", "les gusta");
+    AddQuizText("A nosotros no (me/te/le/nos/les gustar) los viajes muy largos.", "nos gustan");
+    AddQuizText("Al maestro (me/te/le/nos/les gustar) escribir los ejercicios en la pizarra.", "le gusta");
+    AddQuizText("¿(me/te/le/nos/les gustar) a Enrique trabajar en esa tienda?", "Le gusta");
+    AddQuizText("A mi médico (me/te/le/nos/les gustar) escribir los ejercicios en la pizarra.", "le gusta");
+    AddQuizText("A mí (me/te/le/nos/les gustar) mucho la película de anoche.", "me gusta");
+    AddQuizText("A mi madre (me/te/le/nos/les gustar) sembrar flores.", "le gusta");
+    AddQuizText("A mi no (me/te/le/nos/les gustar) el discurso del señor Gómez en la reunión de ayer.", "me gusta");
+    AddQuizText("A ellos no (me/te/le/nos/les gustar) el paseo de la semana pasada.", "les gusta");
     /* 008_mas_verbos_homework EJERCICIO A (1 Singular) */
-    AddQuizText(
-        "En la mañana yo (beber) café con leche.",
-        "bebo"
-    );
-    AddQuizText(
-        "Tú no (comer) carne.",
-        "comes"
-    );
-    AddQuizText(
-        "Nosotros (comprender) español.",
-        "comprendemos"
-    );
-    AddQuizText(
-        "Ellos (correr) en el parque.",
-        "corren"
-    );
-    AddQuizText(
-        "Ella (aprender) español en la Cooperativa.",
-        "aprende"
-    );
-    AddQuizText(
-        "Él (vender) limonada.",
-        "vende"
-    );
-    AddQuizText(
-        "Usted (leer) un nuevo libro.",
-        "lee"
-    );
-    AddQuizText(
-        "María no (beber) café.",
-        "bebe"
-    );
-    AddQuizText(
-        "Carlos y Anita (comer) una hamburguesa.",
-        "comen"
-    );
-    AddQuizText(
-        "Mi hermana (deber) estudiar más.",
-        "debe"
-    );
+    AddQuizText("En la mañana yo (beber) café con leche.", "bebo");
+    AddQuizText("Tú no (comer) carne.", "comes");
+    AddQuizText("Nosotros (comprender) español.", "comprendemos");
+    AddQuizText("Ellos (correr) en el parque.", "corren");
+    AddQuizText("Ella (aprender) español en la Cooperativa.", "aprende");
+    AddQuizText("Él (vender) limonada.", "vende");
+    AddQuizText("Usted (leer) un nuevo libro.", "lee");
+    AddQuizText("María no (beber) café.", "bebe");
+    AddQuizText("Carlos y Anita (comer) una hamburguesa.", "comen");
+    AddQuizText("Mi hermana (deber) estudiar más.", "debe");
     /* 008_mas_verbos_homework EJERCICIO A (2 Plurares) */
-    AddQuizText(
-        "Yo (asistir) a la escuela todos los días.",
-        "asisto"
-    );
-    AddQuizText(
-        "Mis padres (vivir) en un pueblo pequeño.",
-        "viven"
-    );
-    AddQuizText(
-        "Yo (recibir) muchas cartas de los amigos.",
-        "recibo"
-    );
-    AddQuizText(
-        "Yo (escribir) a mis amigos.",
-        "escribo"
-    );
-    AddQuizText(
-        "Tú (abrir) las ventanas.",
-        "abres"
-    );
-    AddQuizText(
-        "El fin de semana nosotros (subir) las montañas.",
-        "subimos"
-    );
-    AddQuizText(
-        "Yo (compartir) mi casa con mi hermano.",
-        "comparto"
-    );
-    AddQuizText(
-        "Él (insistir) en viajar a Guatemala.",
-        "insiste"
-    );
-    AddQuizText(
-        "Yo (partir) la próxima semana.",
-        "parto"
-    );
-    AddQuizText(
-        "En Guatemala (existir) muchos lugares bonitos.",
-        "existen"
-    );
+    AddQuizText("Yo (asistir) a la escuela todos los días.", "asisto");
+    AddQuizText("Mis padres (vivir) en un pueblo pequeño.", "viven");
+    AddQuizText("Yo (recibir) muchas cartas de los amigos.", "recibo");
+    AddQuizText("Yo (escribir) a mis amigos.", "escribo");
+    AddQuizText("Tú (abrir) las ventanas.", "abres");
+    AddQuizText("El fin de semana nosotros (subir) las montañas.", "subimos");
+    AddQuizText("Yo (compartir) mi casa con mi hermano.", "comparto");
+    AddQuizText("Él (insistir) en viajar a Guatemala.", "insiste");
+    AddQuizText("Yo (partir) la próxima semana.", "parto");
+    AddQuizText("En Guatemala (existir) muchos lugares bonitos.", "existen");
     /* 007_verbos_homework EJERCICIO A */
-    AddQuizText(
-        "Yo (hablar) español en la escuela.",
-        "hablo"
-    );
-    AddQuizText(
-        "En San Pedro yo no (necesitar) mucho dinero.",
-        "necesito"
-    );
-    AddQuizText(
-        "Yo (viajar) solo.",
-        "viajo"
-    );
-    AddQuizText(
-        "Tú (ayudar) a tu hermano.",
-        "ayudas"
-    );
-    AddQuizText(
-        "Tú (cocinar) mucha comida.",
-        "cocinas"
-    );
-    AddQuizText(
-        "Nosotros (visitar) muchas partes de Guatemala.",
-        "visitamos"
-    );
-    AddQuizText(
-        "En la tarde ellos (descansar) por una hora.",
-        "descansan"
-    );
-    AddQuizText(
-        "Cuando yo (tomar) cerveza, yo (fumar) mucho.",
-        "tomo fumo"
-    );
-    AddQuizText(
-        "Él (regresar) a su país la próxima semana.",
-        "regresa"
-    );
-    AddQuizText(
-        "Ella (lavar) su ropa cada semana.",
-        "lava"
-    );
-    AddQuizText(
-        "Yo (pagar) veinticinco quetzales por una comida.",
-        "pago"
-    );
-    AddQuizText(
-        "Ellos (desear) estudiar español.",
-        "desean"
-    );
-    AddQuizText(
-        "Yo (estudiar) español en la Cooperativa.",
-        "estudio"
-    );
-    AddQuizText(
-        "Mi padre (trabajar) ocho horas cada día.",
-        "trabaja"
-    );
-    AddQuizText(
-        "Yo (mirar) una película cada semana en la escuela.",
-        "miro"
-    );
-
-
-
-
+    AddQuizText("Yo (hablar) español en la escuela.", "hablo");
+    AddQuizText("En San Pedro yo no (necesitar) mucho dinero.", "necesito");
+    AddQuizText("Yo (viajar) solo.", "viajo");
+    AddQuizText("Tú (ayudar) a tu hermano.", "ayudas");
+    AddQuizText("Tú (cocinar) mucha comida.", "cocinas");
+    AddQuizText("Nosotros (visitar) muchas partes de Guatemala.", "visitamos");
+    AddQuizText("En la tarde ellos (descansar) por una hora.", "descansan");
+    AddQuizText("Cuando yo (tomar) cerveza, yo (fumar) mucho.", "tomo fumo");
+    AddQuizText("Él (regresar) a su país la próxima semana.", "regresa");
+    AddQuizText("Ella (lavar) su ropa cada semana.", "lava");
+    AddQuizText("Yo (pagar) veinticinco quetzales por una comida.", "pago");
+    AddQuizText("Ellos (desear) estudiar español.", "desean");
+    AddQuizText("Yo (estudiar) español en la Cooperativa.", "estudio");
+    AddQuizText("Mi padre (trabajar) ocho horas cada día.", "trabaja");
+    AddQuizText("Yo (mirar) una película cada semana en la escuela.", "miro");
 
     /* 009_y_mas_verbos_homework */
-    AddQuizText(
-        "Yo (salir) a las doce de la escuela.",
-        "salgo"
-    );
-    AddQuizText(
-        "Yo (hacer) la tarea todas las tardes.",
-        "hago"
-    );
-    AddQuizText(
-        "Yo (traer) libros a la escuela.",
-        "traigo"
-    );
-    AddQuizText(
-        "Yo (poner) mis libros en la mesa.",
-        "pongo"
-    );
-    AddQuizText(
-        "Yo (saber) hablar poco español.",
-        "sé"
-    );
-    AddQuizText(
-        "Yo (dar) la tarea al profesor.",
-        "doy"
-    );
-    AddQuizText(
-        "Yo (hacer) ejercicios físicos.",
-        "hago"
-    );
-    AddQuizText(
-        "Yo (ver) un programa interesante.",
-        "veo"
-    );
-    AddQuizText(
-        "Yo no (salir) en este espacio.",
-        "salgo"
-    );
-    AddQuizText(
-        "Yo (salir) la próxima semana.",
-        "salgo"
-    );
-    AddQuizText(
-        "¿Qué tipo de música (oír) tú?",
-        "oyes"
-    );
-    AddQuizText(
-        "Yo (venir) a la escuela.",
-        "vengo"
-    );
-    AddQuizText(
-        "Cuando yo salgo de la casa (decir) adiós.",
-        "digo"
-    );
-    AddQuizText(
-        "Yo (oír) las noticias en la radio.",
-        "oigo"
-    );
-    AddQuizText(
-        "Mis amigos no (venir) a la escuela hoy.",
-        "vienen"
-    );
-    AddQuizText(
-        "¿Qué (decir) tú cuando recibes un regalo?",
-        "dices"
-    );
-    AddQuizText(
-        "Yo (decir) gracias.",
-        "digo"
-    );
-    AddQuizText(
-        "Nosotros (venir) temprano a la escuela.",
-        "venimos"
-    );
-    AddQuizText(
-        "Cuando él (venir) a la escuela, siempre (oír) música.",
-        "viene oye"
-    );
-    AddQuizText(
-        "Ellos (oír) el pronóstico del tiempo.",
-        "oyen"
-    );
-    AddQuizText(
-        "Cerca de mi casa yo (oír) mucho ruido.",
-        "oigo"
-    );
-    AddQuizText(
-        "¿A qué hora (venir) tú a la casa?",
-        "vienes"
-    );
-    AddQuizText(
-        "Mis amigos y yo siempre (decir) la verdad.",
-        "decimos"
-    );
-    AddQuizText(
-        "Cuando yo estoy en el centro del pueblo (oír) mucho ruido.",
-        "oigo"
-    );
-    AddQuizText(
-        "El maestro (oír) mis respuestas con atención.",
-        "oye"
-    );
-    AddQuizText(
-        "Yo (poder) hablar alemán.",
-        "puedo"
-    );
-    AddQuizText(
-        "Nosotros no (recordar) mucho.",
-        "recordamos"
-    );
-    AddQuizText(
-        "Mi hermano (dormir) ocho horas cada día.",
-        "duerme"
-    );
-    AddQuizText(
-        "¿Dónde (almorzar) tú normalmente?",
-        "almuerzas"
-    );
-    AddQuizText(
-        "Yo (volver) a las cuatro del trabajo.",
-        "vuelvo"
-    );
-    AddQuizText(
-        "Mi mejor amigo (jugar) fútbol.",
-        "juega"
-    );
-    AddQuizText(
-        "¿Te (acordar) tú de la fecha de la fiesta?",
-        "acuerdas"
-    );
-    AddQuizText(
-        "¿Cuántas horas (volar) tú desde Europa hasta América?",
-        "vuelas"
-    );
-    AddQuizText(
-        "¿A qué hora (almorzar) tu familia normalmente?",
-        "almuerza"
-    );
-    AddQuizText(
-        "Los estudiantes (devolver) los libros a la escuela.",
-        "devuelven"
-    );
-    AddQuizText(
-        "¿Cuánto (costar) una cámara digital?",
-        "cuesta"
-    );
-    AddQuizText(
-        "Mi abuelo (contar) sus experiencias.",
-        "cuenta"
-    );
-    AddQuizText(
-        "Muchas plantas (morir) en verano.",
-        "mueren"
-    );
-    AddQuizText(
-        "Nosotros (mostrar) las fotos a nuestros amigos.",
-        "mostramos"
-    );
-    AddQuizText(
-        "En invierno (llover) mucho.",
-        "llueve"
-    );
+    AddQuizText("Yo (salir) a las doce de la escuela.", "salgo");
+    AddQuizText("Yo (hacer) la tarea todas las tardes.", "hago");
+    AddQuizText("Yo (traer) libros a la escuela.", "traigo");
+    AddQuizText("Yo (poner) mis libros en la mesa.", "pongo");
+    AddQuizText("Yo (saber) hablar poco español.", "sé");
+    AddQuizText("Yo (dar) la tarea al profesor.", "doy");
+    AddQuizText("Yo (hacer) ejercicios físicos.", "hago");
+    AddQuizText("Yo (ver) un programa interesante.", "veo");
+    AddQuizText("Yo no (salir) en este espacio.", "salgo");
+    AddQuizText("Yo (salir) la próxima semana.", "salgo");
+    AddQuizText("¿Qué tipo de música (oír) tú?", "oyes");
+    AddQuizText("Yo (venir) a la escuela.", "vengo");
+    AddQuizText("Cuando yo salgo de la casa (decir) adiós.", "digo");
+    AddQuizText("Yo (oír) las noticias en la radio.", "oigo");
+    AddQuizText("Mis amigos no (venir) a la escuela hoy.", "vienen");
+    AddQuizText("¿Qué (decir) tú cuando recibes un regalo?", "dices");
+    AddQuizText("Yo (decir) gracias.", "digo");
+    AddQuizText("Nosotros (venir) temprano a la escuela.", "venimos");
+    AddQuizText("Cuando él (venir) a la escuela, siempre (oír) música.", "viene oye");
+    AddQuizText("Ellos (oír) el pronóstico del tiempo.", "oyen");
+    AddQuizText("Cerca de mi casa yo (oír) mucho ruido.", "oigo");
+    AddQuizText("¿A qué hora (venir) tú a la casa?", "vienes");
+    AddQuizText("Mis amigos y yo siempre (decir) la verdad.", "decimos");
+    AddQuizText("Cuando yo estoy en el centro del pueblo (oír) mucho ruido.", "oigo");
+    AddQuizText("El maestro (oír) mis respuestas con atención.", "oye");
+    AddQuizText("Yo (poder) hablar alemán.", "puedo");
+    AddQuizText("Nosotros no (recordar) mucho.", "recordamos");
+    AddQuizText("Mi hermano (dormir) ocho horas cada día.", "duerme");
+    AddQuizText("¿Dónde (almorzar) tú normalmente?", "almuerzas");
+    AddQuizText("Yo (volver) a las cuatro del trabajo.", "vuelvo");
+    AddQuizText("Mi mejor amigo (jugar) fútbol.", "juega");
+    AddQuizText("¿Te (acordar) tú de la fecha de la fiesta?", "acuerdas");
+    AddQuizText("¿Cuántas horas (volar) tú desde Europa hasta América?", "vuelas");
+    AddQuizText("¿A qué hora (almorzar) tu familia normalmente?", "almuerza");
+    AddQuizText("Los estudiantes (devolver) los libros a la escuela.", "devuelven");
+    AddQuizText("¿Cuánto (costar) una cámara digital?", "cuesta");
+    AddQuizText("Mi abuelo (contar) sus experiencias.", "cuenta");
+    AddQuizText("Muchas plantas (morir) en verano.", "mueren");
+    AddQuizText("Nosotros (mostrar) las fotos a nuestros amigos.", "mostramos");
+    AddQuizText("En invierno (llover) mucho.", "llueve");
 #endif
 
 
@@ -635,7 +243,7 @@ internal void InitializeDefaultQuizItems(state *State)
 #if 1
     AddQuizText("la actividad", "activity");
     AddQuizText("las actividades", "activities");
-    AddQuizText("actualmente", "nowadays");
+    AddQuizText("actualmente", "currently"); /* nowadays */
     AddQuizText("adjetivo", "adjective");
     AddQuizText("adjetivos", "adjectives");
     AddQuizText("adverbio", "adverb");
