@@ -225,7 +225,7 @@ typedef struct
     char QuizInput[Test_Buffer_Count + 1];
     s32 QuizInputIndex;
 
-#define Quiz_Item_Max 256
+#define Quiz_Item_Max 512
     quiz_item QuizItems[Quiz_Item_Max];
     s32 QuizItemsLookup[Quiz_Item_Max];
     s32 QuizItemsLookupWorkingSet[Quiz_Item_Max];

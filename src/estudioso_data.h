@@ -82,7 +82,6 @@ internal void InitializeDefaultQuizItems(state *State)
         AddQuizText("Mi hermana (ser/estar) de parto.", "está");
         AddQuizText("Carla y Marina (ser/estar) de guardia este fin de semana.", "están");
         AddQuizText("¿A cuánto (ser/estar) las manzanas?", "están");
-        AddQuizText("(Ser/Estar) a 2€ el kilo.", "Están");
         AddQuizText("Todo el reloj (ser/estar) fabricado en oro.", "está");
         AddQuizText("El collar (ser/estar) hecho de papel.", "está");
         AddQuizText("El anillo (ser/estar) bañado en plata.", "está");
@@ -113,6 +112,7 @@ internal void InitializeDefaultQuizItems(state *State)
     AddQuizText("_ carne", "la");
     AddQuizText("_ ley", "la");
     AddQuizText("_ imagen", "la");
+
     /* 006_gustar_homework */
     AddQuizText("A María no (me/te/le/nos/les gustar) este libro.", "le gusta");
     AddQuizText("A mí (me/te/le/nos/les gustar) mucho escribir composiciones.", "me gusta");
@@ -134,6 +134,7 @@ internal void InitializeDefaultQuizItems(state *State)
     AddQuizText("A mi madre (me/te/le/nos/les gustar) sembrar flores.", "le gusta");
     AddQuizText("A mi no (me/te/le/nos/les gustar) el discurso del señor Gómez en la reunión de ayer.", "me gusta");
     AddQuizText("A ellos no (me/te/le/nos/les gustar) el paseo de la semana pasada.", "les gusta");
+
     /* 008_mas_verbos_homework EJERCICIO A (1 Singular) */
     AddQuizText("En la mañana yo (beber) café con leche.", "bebo");
     AddQuizText("Tú no (comer) carne.", "comes");
@@ -145,6 +146,7 @@ internal void InitializeDefaultQuizItems(state *State)
     AddQuizText("María no (beber) café.", "bebe");
     AddQuizText("Carlos y Anita (comer) una hamburguesa.", "comen");
     AddQuizText("Mi hermana (deber) estudiar más.", "debe");
+
     /* 008_mas_verbos_homework EJERCICIO A (2 Plurares) */
     AddQuizText("Yo (asistir) a la escuela todos los días.", "asisto");
     AddQuizText("Mis padres (vivir) en un pueblo pequeño.", "viven");
@@ -156,6 +158,7 @@ internal void InitializeDefaultQuizItems(state *State)
     AddQuizText("Él (insistir) en viajar a Guatemala.", "insiste");
     AddQuizText("Yo (partir) la próxima semana.", "parto");
     AddQuizText("En Guatemala (existir) muchos lugares bonitos.", "existen");
+
     /* 007_verbos_homework EJERCICIO A */
     AddQuizText("Yo (hablar) español en la escuela.", "hablo");
     AddQuizText("En San Pedro yo no (necesitar) mucho dinero.", "necesito");
@@ -214,6 +217,107 @@ internal void InitializeDefaultQuizItems(state *State)
     AddQuizText("Muchas plantas (morir) en verano.", "mueren");
     AddQuizText("Nosotros (mostrar) las fotos a nuestros amigos.", "mostramos");
     AddQuizText("En invierno (llover) mucho.", "llueve");
+#endif
+
+#if 1
+    /* 010_mas_mas_verbos_homework.txt */
+    AddQuizText("Yo (querer) visitar tu país.", "quiero");
+    AddQuizText("Nosotros (empezar) las clases a las ocho de la mañana.", "empezamos");
+    AddQuizText("Ella (perder) sus llaves frecuentemente.", "pierde");
+    AddQuizText("Ellas (entender) el español muy bien.", "entienden");
+    AddQuizText("Mi hermano se (despertar) muy tarde.", "despierta");
+    AddQuizText("Mi padre (cerrar) la puerta.", "cierra");
+    AddQuizText("En el cine yo me (sentar) en la tercera fila.", "siento");
+    AddQuizText("¿Cuándo (empezar) el invierno en tu país?", "empieza");
+    AddQuizText("Mi padre (defender) a su familia.", "defiende");
+    AddQuizText("Nosotros (confesar) la verdad a mi madre.", "confesamos");
+    AddQuizText("En Europa (nevar) mucho.", "nieva");
+    AddQuizText("En Guatemala los ricos (gobernar) siempre.", "gobiernan");
+    AddQuizText("Ellos (querer) aprender español.", "quieren");
+    AddQuizText("Yo (entender) tu problema.", "entiendo");
+    AddQuizText("¿Quién (calentar) el agua para el té en tu casa?", "calienta");
+#endif
+
+#if 1
+    /* 011_VERBOS_homework.txt */
+    AddQuizText("Los ladrones (huir) de la policía.", "huyen");
+    AddQuizText("La próxima semana (concluir) las clases.", "concluyen");
+    AddQuizText("Nosotros (incluir) a Juan en nuestro equipo.", "incluimos");
+    AddQuizText("Mi padre (construir) una casa muy bonita.", "construye");
+    AddQuizText("Yo (contribuir) con los jóvenes.", "contribuyo");
+    AddQuizText("Mario (distribuir) dulces a los niños.", "distribuye");
+    AddQuizText("Mis hermanos (distinguir) las cosas buenas y malas.", "distinguen");
+    AddQuizText("Mi hijo (destruir) sus juguetes.", "destruye");
+    AddQuizText("Los bomberos (extinguir) el fuego.", "extinguen");
+    AddQuizText("Los productos de Estados Unidos (influir) en muchos países.", "influyen");
+    AddQuizText("Ella nunca me (incluir) entre sus invitados.", "incluye");
+    AddQuizText("Ese gato siempre (destruir) las flores de nuestro jardín.", "destruye");
+    AddQuizText("Ese gato siempre (huir) cuando mi perro está en el jardín.", "huye");
+    AddQuizText("Nosotros (contribuir) con el desarrollo de nuestro pueblo.", "contribuimos");
+    AddQuizText("Yo no (distinguir) nada de lejos.", "distingo");
+    AddQuizText("Para ir a la escuela Cooperativa los estudiantes siempre (seguir) este camino.", "siguen");
+    AddQuizText("Yo siempre (conseguir) lo que quiero.", "consigo");
+    AddQuizText("La policía (perseguir) a los criminales.", "persigue");
+    AddQuizText("El profesor (concluir) sus clases con una broma.", "concluye");
+    AddQuizText("Cuando la gente (construir) una casa, necesita mucho dinero.", "construye");
+#endif
+
+#if 1
+    /* 014_preterito_tarea.txt */
+    AddQuizText("La semana pasada yo (estudiar) cuatro horas cada día.", "estudié");
+    AddQuizText("Yo (llegar) a San Pedro la semana pasada.", "llegué");
+    AddQuizText("Mis amigos (visitar) San Pedro el año pasado.", "visitaron");
+    AddQuizText("Yo (colocar) mi ropa en el armario.", "colozcé");
+    AddQuizText("Anoche mis amigos y yo (mirar) la película.", "miramos");
+    AddQuizText("Ella (visitar) Honduras el año pasado.", "visitó");
+    AddQuizText("Ustedes (tomar) muchas cervezas anoche.", "tomaron");
+    AddQuizText("Yo (buscar) a mis amigos en el bar anoche.", "buscé");
+    AddQuizText("El fin de semana nosotros (nadar) en el lago.", "nadamos");
+    AddQuizText("El domingo ella (comprar) muchos regalos en Chichicastenango.", "compró");
+    AddQuizText("Yo (empezar) a estudiar en la Cooperativa hace dos semanas.", "empezé");
+    AddQuizText("La semana pasada yo (jugar) con los niños.", "jugué");
+    AddQuizText("Anoche durante la cena yo (hablar) mucho con mi familia.", "hablé");
+    AddQuizText("El jueves pasado los estudiantes de la Cooperativa (bailar) salsa.", "bailaron");
+    AddQuizText("El fin de semana pasado yo no (practicar) mucho mi español.", "practicé");
+#endif
+
+#if 1
+    /* 015_irregular_preterito_tarea.txt */
+    AddQuizText("Mi amigo (oír) música clásica toda la noche.", "oyó");
+    AddQuizText("Ella (leer) una novela el fin de semana.", "leió");
+    AddQuizText("Mi gato (huir) de los perros anoche.", "huió");
+    AddQuizText("Los niños no (creer) la historia.", "creyeron");
+    AddQuizText("La semana pasada un avión (caer) en el lago.", "cayó");
+    AddQuizText("Mis padres (construir) esta casa hace diez años.", "construyeron");
+    AddQuizText("En el año 1976 un terremoto (destruir) muchas casas en Guatemala.", "destruyó");
+    AddQuizText("Después del huracán Stan mucha gente (contribuir) con los damnificados.", "contribuyeron");
+    AddQuizText("Los estudiantes (leer) su tarea en la escuela.", "leyeron");
+    AddQuizText("El año pasado una bomba (caer) en el centro del pueblo.", "cayó");
+    AddQuizText("La explosión se (oír) hasta Panajachel.", "oyó");
+    AddQuizText("Esa bomba (destruir) el mercado.", "destruyó");
+    AddQuizText("El fin de semana mis amigos (oír) música latina.", "oyeron");
+    AddQuizText("Los bandidos (huir) de la policía.", "huyeron");
+    AddQuizText("Mis hermanos (construir) una nueva casa.", "construyeron");
+    AddQuizText("Mi hermana (ir) a Europa el año pasado.", "fue");
+    AddQuizText("Yo le (dar) un regalo a mi padre el día de su cumpleaños.", "di");
+    AddQuizText("Yo no (ver) a otros estudiantes en la fiesta.", "vi");
+    AddQuizText("Mi hermano (ser) un buen estudiante de español.", "fue");
+    AddQuizText("Ellos (ir) a la playa el fin de semana.", "fueron");
+    AddQuizText("Después de comer en el restaurante ellos (dar) una propina al mesero.", "dieron");
+#endif
+
+#if 1
+    /* 018_homework.txt */
+    AddQuizText("Él (hablar) con su madre ayer.", "habló");
+    AddQuizText("Yo (comer) mucho la semana pasada.", "comí");
+    AddQuizText("Mis padres (vivir) en florida hace cuarenta años.", "vivieron");
+    AddQuizText("Nosotros (nadar) en el lago ayer.", "nadamos");
+    AddQuizText("Yo (tener) mucho frio.", "tuve");
+    AddQuizText("Tú (leer) muchos libros el año pasado.", "leíste");
+    AddQuizText("Ellos (construir) esta casa hace 80 años.", "construyeron");
+    AddQuizText("Ella (conducir) al trabajo ayer.", "condujo");
+    AddQuizText("Él (hacer) muchas cosas esta semana.", "hizo");
+    AddQuizText("Yo no (poder) trabajar hace algunos años.", "pude");
 #endif
 
     /* Some word translations */
