@@ -216,14 +216,12 @@ internal void InitializeDefaultQuizItems(state *State)
     AddQuizText("En invierno (llover) mucho.", "llueve");
 #endif
 
-
     /* Some word translations */
     AddQuizText("enero", "January");
     AddQuizText("febrero", "February");
     AddQuizText("marzo", "March");
     AddQuizText("abril", "April");
     AddQuizText("mayo", "May");
-#if 1
     AddQuizText("junio", "June");
     AddQuizText("julio", "July");
     AddQuizText("agosto", "August");
@@ -237,8 +235,6 @@ internal void InitializeDefaultQuizItems(state *State)
     AddQuizText("acento", "accent");
     AddQuizText("acordar", "to agree");
     AddQuizText("acordeón", "accordion");
-    /* AddQuizText("", ""); */
-#endif
 
 #if 1
     AddQuizText("la actividad", "activity");

@@ -22,6 +22,7 @@
     TODO: Allow a history of quiz items, so you can scroll back and view previous answers.
     TODO: Add automated number quizes, where random numbers are picked and the user enters the spelled out name for the number.
     TODO: Allow multiple potential answers, for things that may have multiple translations.
+    TODO: Create grammar structures in order to randomize sentences with similar structure.
 
     Debugging
     TODO: Allow marking a quiz-item as inaccurate or in need of a review. This would be helpful when using the app and noticing typos or other errors in the item content.
@@ -201,7 +202,7 @@ typedef enum
 typedef struct
 {
     f32 DeltaTime;
-    f32 LastTime;
+    f32 Time;
 
     u32 KeyStateIndex;
     key_state_chunk KeyStates[2][Key_State_Chunk_Count];
@@ -338,6 +339,10 @@ internal void AddQuizItem(state *State, quiz_item QuizItem)
     {
         State->QuizItems[State->QuizItemCount] = QuizItem;
         State->QuizItemCount += 1;
+    }
+    else
+    {
+        Assert(0);
     }
 }
 
@@ -776,21 +781,18 @@ internal void HandleKey(state *State, key_code Key)
                     }
                     else if (TailBytesSkipped == 1 && Is_Utf8_Header_Byte2(Char))
                     {
-                        Assert(TailBytesSkipped == 1);
                         if (State->QuizInputIndex < 0) break;
                         State->QuizInput[State->QuizInputIndex] = 0;
                         break;
                     }
                     else if (TailBytesSkipped == 2 && Is_Utf8_Header_Byte3(Char))
                     {
-                        Assert(!"Three-byte characters have not been tested. Delete this assertion to begin testing three-byte characters.");
                         if (State->QuizInputIndex < 0) break;
                         State->QuizInput[State->QuizInputIndex] = 0;
                         break;
                     }
                     else if (TailBytesSkipped == 3 && Is_Utf8_Header_Byte4(Char))
                     {
-                        Assert(!"Four-byte characters have not been tested. Delete this assertion to begin testing four-byte characters.");
                         if (State->QuizInputIndex < 0) break;
                         State->QuizInput[State->QuizInputIndex] = 0;
                         break;
@@ -822,9 +824,6 @@ internal void HandleUserInput(state *State)
     }
 
     {
-        State->UI.MouseButtonPressed = IsMouseButtonPressed(MOUSE_LEFT_BUTTON);
-        State->UI.MouseButtonReleased = IsMouseButtonDown(MOUSE_LEFT_BUTTON);
-
         State->UI.MousePosition = GetMousePosition();
     }
 
@@ -844,12 +843,18 @@ internal void HandleUserInput(state *State)
 
         if (!(IsTyping && Key && QueueNotEmpty))
         {
+            /* TODO: Do we need to still consume all key-presses with GetKeyPressed?
+                     Right now we break if the queue is full, but maybe we really
+                     should not do the code below, but still loop through calling
+                     GetKeyPressed in order to flush all the key events?
+            */
             break;
         }
 
         if (State->ModifierKeys.Control && Key == KEY_H)
         {
             State->ShowAnswer = 1;
+            KeysWerePressed = 1;
             State->InputOccured = 1;
         }
         else
@@ -894,7 +899,7 @@ internal void HandleUserInput(state *State)
         if (KeyLocationIsValid(Location))
         {
             u32 KeyStateChunk = State->KeyStates[State->KeyStateIndex][Location.Index];
-            key_state NextState = KeyStateMap[CurrentState][IsDown];
+            key_state NextState = KeyStateMap[CurrentState][IsDown]; /* TODO: What is NextState used for? */
             CurrentState = (KeyStateChunk >> Location.Shift) & Bits_Per_Key_State_Mask;
 
             Assert(NextState < key_state_Count);
@@ -1727,7 +1732,7 @@ internal void UpdateAndRender(state *State, b32 ForceDraw)
 
 int main(void)
 {
-    Assert(key_state_Count >= (1 << Bits_Per_Key_State) - 1);
+    Assert(key_state_Count >= (1 << Bits_Per_Key_State) - 1); /* NOTE: What is this assertion about? */
     Assert((1 << Key_State_Chunk_Size_Log2) == 8 * sizeof(key_state_chunk));
     Assert((1 << Key_State_Chunk_Count_Log2) == Key_State_Chunk_Count);
 
@@ -1820,6 +1825,8 @@ int main(void)
         return 1;
     }
 
+
+
     for (;;)
     {
         if (WindowShouldClose())
@@ -1830,8 +1837,8 @@ int main(void)
 
         { /* time calculation */
             f32 CurrentTime = GetTime();
-            State.DeltaTime = CurrentTime - State.LastTime;
-            State.LastTime = CurrentTime;
+            State.DeltaTime = CurrentTime - State.Time;
+            State.Time = CurrentTime;
         }
 
         b32 ForceDraw = FrameIndex == 0;
