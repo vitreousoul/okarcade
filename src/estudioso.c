@@ -46,13 +46,6 @@
 #include "../gen/roboto_regular.h"
 #include "../gen/sfx_correct.h"
 
-#include "math.c"
-#include "raylib_helpers.h"
-#include "ui.c"
-#include "sound.c"
-
-#define DEBUG_GRAPHICS 1
-
 #if 0
 global_variable int SCREEN_WIDTH = TARGET_SCREEN_WIDTH;
 global_variable int SCREEN_HEIGHT = TARGET_SCREEN_HEIGHT;
@@ -60,6 +53,13 @@ global_variable int SCREEN_HEIGHT = TARGET_SCREEN_HEIGHT;
 global_variable int SCREEN_WIDTH = 800;
 global_variable int SCREEN_HEIGHT = 600;
 #endif
+
+#include "math.c"
+#include "raylib_helpers.h"
+#include "ui.c"
+#include "sound.c"
+
+#define DEBUG_GRAPHICS 1
 
 #define TEST 0
 #define SAVE_FILE_PATH ((u8 *)"../save/save_file_0.estudioso")

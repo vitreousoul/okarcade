@@ -3,10 +3,7 @@ internal void InitializeDefaultQuizItems(state *State)
 #if 1
     /* 003_hacer_y_tener */
     AddQuizText("Qué tiempo (hacer)?", "hace");
-    AddQuizText("Él (hacer) un poco de frío.", "hace");
     AddQuizText("En la mañana (hacer) buen tiempo en abril.", "hace");
-    AddQuizText("Él (hacer) mucho frio.", "hace");
-    AddQuizText("Ella (hacer) mucho calor.", "hace");
     AddQuizText("En el verano (hacer) sol.", "hace");
     AddQuizText("Tú estudias español (hacer) una semana.", "hace");
     AddQuizText("Ella (hacer) una pregunta a su amigo.", "hace");
