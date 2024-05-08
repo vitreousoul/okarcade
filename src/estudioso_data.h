@@ -59,7 +59,6 @@ internal void InitializeDefaultQuizItems(state *State)
         /* Estar */
         AddQuizText("Yo (ser/estar) en paro.", "estoy");
         AddQuizText("(Ser/Estar) triste por el examen.", "Está");
-        AddQuizText("(Ser/Estar) enfermo desde ayer.", "Estoy");
         AddQuizText("Mi abuela (ser/estar) muy joven para su edad.", "está");
         AddQuizText("Alfredo (ser/estar) muy moreno.", "está");
         AddQuizText("Yo (ser/estar) soltero.", "estoy");
@@ -69,9 +68,10 @@ internal void InitializeDefaultQuizItems(state *State)
         AddQuizText("Yo (ser/estar) viudo.", "soy");
         AddQuizText("El estadio (ser/estar) en Valencia.", "está");
         AddQuizText("Los jugadores (ser/estar) en el hotel.", "están");
-        AddQuizText("(Ser/Estar) a domingo.", "Estamos");
-        AddQuizText("(Ser/Estar) a 1 de abril.", "Estamos");
-        AddQuizText("(Ser/Estar) en primavera.", "Estamos");
+        /* NOTE: Confused about the use of Estamos below... are these correct? */
+        /* AddQuizText("(Ser/Estar) a domingo.", "Estamos"); */
+        /* AddQuizText("(Ser/Estar) a 1 de abril.", "Estamos"); */
+        /* AddQuizText("(Ser/Estar) en primavera.", "Estamos"); */
         AddQuizText("¿A qué día (ser/estar) hoy?", "estamos");
         AddQuizText("(Ser/Estar) bien irse de vacaciones una vez al año.", "Está");
         AddQuizText("Marco siempre (ser/estar) de buen humor.", "está");

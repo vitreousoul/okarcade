@@ -98,6 +98,8 @@ typedef struct
     expansion Expansion;
     turtle TurtleStack[TURTLE_STACK_MAX];
     s32 TurtleStackIndex;
+
+    char TempTextBuffer[256];
 } state;
 
 
@@ -356,15 +358,27 @@ internal void UpdateAndRender(void *VoidAppState)
         }
 #endif
 
-        b32 SliderUpdated = DoSlider(UI, &State->Slider);
+        { /* NOTE: Angle slider */
+            b32 SliderUpdated = DoSlider(UI, &State->Slider);
+            slider Slider = State->Slider;
 
-        if (SliderUpdated)
-        {
-            UiInteractionOccured = 1;
-            State->RotationAmount = State->Slider.Value * 8.0f;
-            ImageClearBackground(&State->Canvas, BackgroundColor);
-            InitTurtleState(State, 0.0f, 0.0f);
+            if (SliderUpdated)
+            {
+                UiInteractionOccured = 1;
+                State->RotationAmount = Slider.Value * 8.0f;
+                ImageClearBackground(&State->Canvas, BackgroundColor);
+                InitTurtleState(State, 0.0f, 0.0f);
+            }
+
+            Vector2 TextPosition = (Vector2){
+                Slider.Position.x + Slider.Size.x + 8.0f,
+                Slider.Position.y + (Slider.Size.y - UI->FontSize) / 2.0f
+            };
+
+            sprintf(State->TempTextBuffer, "%.04f", Slider.Value);
+            DrawText(State->TempTextBuffer, TextPosition.x, TextPosition.y, UI->FontSize, (Color){255,255,255,255});
         }
+
 
         if (!UiInteractionOccured)
         {
