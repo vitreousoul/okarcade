@@ -416,6 +416,10 @@ internal void UpdateAndRender(void *VoidAppState)
                         char Char = SymbolToCharTable[Symbol];
                         State->TempTextBuffer[BufferIndex++] = Char;
                     }
+                    else
+                    {
+                        break;
+                    }
                 }
 
                 State->TempTextBuffer[BufferIndex] = 0;
