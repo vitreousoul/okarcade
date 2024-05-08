@@ -48,6 +48,17 @@ typedef enum
     symbol_Count,
 } symbol;
 
+global_variable char SymbolToCharTable[symbol_Count] = {
+    [symbol_Undefined] = ' ',
+    [symbol_Root] = '.',
+    [symbol_A] = 'a',
+    [symbol_B] = 'b',
+    [symbol_Push] = '[',
+    [symbol_Pop] = ']',
+};
+
+#define Is_Valid_Symbol(s) ((s) > symbol_Undefined && (s) < symbol_Count)
+
 typedef struct
 {
     symbol Symbol;
@@ -99,7 +110,8 @@ typedef struct
     turtle TurtleStack[TURTLE_STACK_MAX];
     s32 TurtleStackIndex;
 
-    char TempTextBuffer[256];
+#define Temp_Text_Buffer_Size 256
+    char TempTextBuffer[Temp_Text_Buffer_Size];
 } state;
 
 
@@ -379,6 +391,38 @@ internal void UpdateAndRender(void *VoidAppState)
             DrawText(State->TempTextBuffer, TextPosition.x, TextPosition.y, UI->FontSize, (Color){255,255,255,255});
         }
 
+        { /* NOTE: Draw rules. */
+            Assert(RULE_SIZE_MAX + 4 < Temp_Text_Buffer_Size);
+
+            symbol RuleSymbols[2] = {symbol_A, symbol_B};
+            f32 X = 8.0f;
+            f32 Y = 8.0f;
+
+            for (u32 I = 0; I < ArrayCount(RuleSymbols); ++I)
+            {
+                s32 BufferIndex = 0;
+                symbol RuleSymbol = RuleSymbols[I];
+
+                State->TempTextBuffer[BufferIndex++] = SymbolToCharTable[RuleSymbol];
+                State->TempTextBuffer[BufferIndex++] = ':';
+                State->TempTextBuffer[BufferIndex++] = ' ';
+
+                for (s32 RuleIndex = 0; RuleIndex < RULE_SIZE_MAX; ++RuleIndex)
+                {
+                    symbol Symbol = State->Rules[RuleSymbol][RuleIndex];
+
+                    if (Is_Valid_Symbol(Symbol))
+                    {
+                        char Char = SymbolToCharTable[Symbol];
+                        State->TempTextBuffer[BufferIndex++] = Char;
+                    }
+                }
+
+                State->TempTextBuffer[BufferIndex] = 0;
+                DrawText(State->TempTextBuffer, X, Y, UI->FontSize, (Color){255, 255, 255, 255});
+                Y += UI->FontSize + 4.0f;
+            }
+        }
 
         if (!UiInteractionOccured)
         {
@@ -504,7 +548,7 @@ internal state InitAppState(void)
 
     State.Canvas = GenImageColor(SCREEN_WIDTH, SCREEN_HEIGHT, BackgroundColor);
     State.FrameBuffer = LoadTextureFromImage(State.Canvas);
-    State.UI.FontSize = 18;
+    State.UI.FontSize = 22;
 
     InitTurtleState(&State, 0.0f, 0.0f);
 
