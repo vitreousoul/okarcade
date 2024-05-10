@@ -370,6 +370,9 @@ internal void UpdateAndRender(void *VoidAppState)
     BeginDrawing();
     ClearBackground(BackgroundColor);
 
+    f32 OldAngle = State->AngleSlider.Value;
+    f32 OldLength = State->LengthSlider.Value;
+
     { /* draw simulation image */
         Color *Pixels = LoadImageColors(State->Canvas);
         UpdateTexture(State->FrameBuffer, Pixels);
@@ -394,22 +397,16 @@ internal void UpdateAndRender(void *VoidAppState)
 #endif
 
         b32 AngleUpdated = UpdateSlider(State, &State->AngleSlider);
-        b32 LengthUpdated = UpdateSlider(State, &State->LengthSlider);
+        UpdateSlider(State, &State->LengthSlider);
 
         if (AngleUpdated)
         {
             State->RotationAmount = State->AngleSlider.Value * 8.0f;
-            ImageClearBackground(&State->Canvas, BackgroundColor);
-            InitTurtleState(State, 0.0f, 0.0f);
         }
 
-        if (LengthUpdated)
-        {
-            ImageClearBackground(&State->Canvas, BackgroundColor);
-            InitTurtleState(State, 0.0f, 0.0f);
-        }
-
-        UiInteractionOccured = AngleUpdated || LengthUpdated;
+        f32 AngleDelta = AbsF32(State->AngleSlider.Value - OldAngle);
+        f32 LengthDelta  = AbsF32(State->LengthSlider.Value - OldLength);
+        UiInteractionOccured = AngleDelta > 0.001f || LengthDelta > 0.001f;
 
         { /* NOTE: Draw rules. */
             Assert(RULE_SIZE_MAX + 4 < Temp_Text_Buffer_Size);
@@ -448,12 +445,19 @@ internal void UpdateAndRender(void *VoidAppState)
             }
         }
 
-        if (!UiInteractionOccured)
+        if (UiInteractionOccured)
         {
-            b32 TabletChanged = DoUiElement(UI, &State->Tablet);
+            ImageClearBackground(&State->Canvas, BackgroundColor);
+            InitTurtleState(State, 0.0f, 0.0f);
+        }
+        else
+        {
             tablet *Tablet = &State->Tablet.Tablet;
+            Vector2 OldOffset = Tablet->Offset;
+            b32 TabletChanged = DoUiElement(UI, &State->Tablet);
+            Vector2 DeltaOffset = AbsV2(SubtractV2(OldOffset, Tablet->Offset));
 
-            if (TabletChanged)
+            if (TabletChanged && (DeltaOffset.x > 0.001f || DeltaOffset.y > 0.001f))
             {
                 ImageClearBackground(&State->Canvas, BackgroundColor);
 
