@@ -30,10 +30,16 @@ int SCREEN_HEIGHT = 600;
 #include "ui.c"
 
 #define EXPANSION_BUFFER_SIZE (1 << 12)
-#define EXPANSION_MAX_DEPTH 16
 #define RULE_SIZE_MAX 16
-#define TURTLE_STACK_MAX 16
 
+/* TODO: It seems like EXPANSION_MAX_DEPTH and TURTLE_STACK_MAX
+   need to be the same value. Maybe this means that we should merge
+   the stacks that use these values: State.Expansion.Items and
+   State.TurtleStack.
+*/
+#define Max_Depth 16
+#define EXPANSION_MAX_DEPTH Max_Depth
+#define TURTLE_STACK_MAX Max_Depth
 
 global_variable Color BackgroundColor = (Color){58, 141, 230, 255};
 
@@ -85,7 +91,7 @@ typedef enum
     button_kind_Count,
 } button_kind;
 
-u8 *ButtonText[button_kind_Count] = {
+global_variable u8 *ButtonText[button_kind_Count] = {
     [button_kind_Expansion] = (u8 *)"Expansion",
     [button_kind_Movement] = (u8 *)"Movement",
 };
@@ -103,7 +109,8 @@ typedef struct
 
     ui UI;
     button Buttons[button_kind_Count];
-    slider Slider;
+    slider AngleSlider;
+    slider LengthSlider;
     ui_element Tablet;
 
     expansion Expansion;
@@ -218,7 +225,7 @@ internal void DrawLSystem(state *State, s32 Depth)
     expansion *Expansion = &State->Expansion;
     turtle *TurtleStack = State->TurtleStack;
     s32 *TurtleStackIndex = &State->TurtleStackIndex;
-    f32 TurtleSpeed = 1.0f;
+    f32 TurtleSpeed = State->LengthSlider.Value;
 
     s32 LineDrawCount = 0;
 
@@ -335,6 +342,22 @@ internal void InitTurtleState(state *State, f32 OffsetX, f32 OffsetY)
     PushExpansionItem(&State->Expansion, RootItem);
 }
 
+internal b32 UpdateSlider(state *State, slider *Slider)
+{
+    ui *UI = &State->UI;
+    b32 SliderUpdated = DoSlider(UI, Slider);
+
+    Vector2 TextPosition = (Vector2){
+        Slider->Position.x + Slider->Size.x + 8.0f,
+        Slider->Position.y + (Slider->Size.y - UI->FontSize) / 2.0f
+    };
+
+    sprintf(State->TempTextBuffer, "%.04f", Slider->Value);
+    DrawText(State->TempTextBuffer, TextPosition.x, TextPosition.y, UI->FontSize, (Color){255,255,255,255});
+
+    return SliderUpdated;
+}
+
 internal void UpdateAndRender(void *VoidAppState)
 {
     /* We have to pass our data in as a void-star because of emscripten:
@@ -370,26 +393,23 @@ internal void UpdateAndRender(void *VoidAppState)
         }
 #endif
 
-        { /* NOTE: Angle slider */
-            b32 SliderUpdated = DoSlider(UI, &State->Slider);
-            slider Slider = State->Slider;
+        b32 AngleUpdated = UpdateSlider(State, &State->AngleSlider);
+        b32 LengthUpdated = UpdateSlider(State, &State->LengthSlider);
 
-            if (SliderUpdated)
-            {
-                UiInteractionOccured = 1;
-                State->RotationAmount = Slider.Value * 8.0f;
-                ImageClearBackground(&State->Canvas, BackgroundColor);
-                InitTurtleState(State, 0.0f, 0.0f);
-            }
-
-            Vector2 TextPosition = (Vector2){
-                Slider.Position.x + Slider.Size.x + 8.0f,
-                Slider.Position.y + (Slider.Size.y - UI->FontSize) / 2.0f
-            };
-
-            sprintf(State->TempTextBuffer, "%.04f", Slider.Value);
-            DrawText(State->TempTextBuffer, TextPosition.x, TextPosition.y, UI->FontSize, (Color){255,255,255,255});
+        if (AngleUpdated)
+        {
+            State->RotationAmount = State->AngleSlider.Value * 8.0f;
+            ImageClearBackground(&State->Canvas, BackgroundColor);
+            InitTurtleState(State, 0.0f, 0.0f);
         }
+
+        if (LengthUpdated)
+        {
+            ImageClearBackground(&State->Canvas, BackgroundColor);
+            InitTurtleState(State, 0.0f, 0.0f);
+        }
+
+        UiInteractionOccured = AngleUpdated || LengthUpdated;
 
         { /* NOTE: Draw rules. */
             Assert(RULE_SIZE_MAX + 4 < Temp_Text_Buffer_Size);
@@ -507,16 +527,30 @@ internal void InitUi(state *State)
         Y += TwicePadding + State->UI.FontSize + 10;
     }
 
-    { /* init slider */
-        State->Slider.Id = I;
+    { /* init angle slider */
+        State->AngleSlider.Id = I;
 
-        State->Slider.Position.x = 10.0f;
-        State->Slider.Position.y = Y;
+        State->AngleSlider.Position.x = 10.0f;
+        State->AngleSlider.Position.y = Y;
 
-        State->Slider.Size.x = 240.0f;
-        State->Slider.Size.y = 40.0f;
+        State->AngleSlider.Size.x = 240.0f;
+        State->AngleSlider.Size.y = 40.0f;
 
-        State->Slider.Value = 0.3f;
+        State->AngleSlider.Value = 0.3f;
+
+        I += 1;
+    }
+
+    { /* init length slider */
+        State->LengthSlider.Id = I;
+
+        State->LengthSlider.Position.x = 10.0f;
+        State->LengthSlider.Position.y = Y + 50.0f;
+
+        State->LengthSlider.Size.x = 240.0f;
+        State->LengthSlider.Size.y = 40.0f;
+
+        State->LengthSlider.Value = 0.7f;
 
         I += 1;
     }
@@ -554,9 +588,9 @@ internal state InitAppState(void)
     State.FrameBuffer = LoadTextureFromImage(State.Canvas);
     State.UI.FontSize = 22;
 
-    InitTurtleState(&State, 0.0f, 0.0f);
-
     InitUi(&State);
+
+    InitTurtleState(&State, 0.0f, 0.0f);
 
     InitRules(State.Rules);
 
