@@ -65,6 +65,8 @@ global_variable int SCREEN_HEIGHT = 600;
 #define SAVE_FILE_PATH ((u8 *)"../save/save_file_0.estudioso")
 
 
+/* NOTE: The "A" macro is used to wrap array literals that are passed directly into macros. */
+#define A(...) __VA_ARGS__
 #define ArrayCount(a) (sizeof(a)/sizeof((a)[0]))
 
 #define IS_SPACE(c) ((c) == ' ' || (c) == '\t' || (c) == '\n' || (c) == '\r')
@@ -160,6 +162,7 @@ typedef enum
     quiz_item_Null,
     quiz_item_Text,
     quiz_item_Conjugation,
+    quiz_item_VariableAnswer,
     quiz_item_Translation,
     quiz_item_Count,
 } quiz_item_type;
@@ -177,6 +180,23 @@ typedef struct
     u8 *Answer;
 } quiz_conjugation;
 
+/* TODO: Don't hard-code the variable size stuff in variable_answer.
+   Instead, use a linked list or some other dynamic structure (this will be easier once
+   estudioso is using some kind of allocator like arenas.
+*/
+#define Max_Variable_Answers 4
+#define Max_Variables 4
+
+typedef struct
+{
+    char *PromptParts[Max_Variables + 1];
+    s32 PromptPartCount;
+    char *Variables[Max_Variable_Answers][Max_Variables];
+    char *Answers[Max_Variable_Answers];
+    s32 VariableAnswerCount;
+    s32 VariableAnswerIndex;
+} variable_answer;
+
 typedef struct
 {
     quiz_item_type Type;
@@ -188,6 +208,7 @@ typedef struct
     {
         quiz_text Text;
         quiz_conjugation Conjugation;
+        variable_answer VariableAnswer;
     };
 } quiz_item;
 
@@ -388,6 +409,51 @@ internal void AddQuizTranslation_(state *State, char *Prompt, char *Answer)
     QuizItem.FailCount = 0;
     QuizItem.Text.Prompt = (u8 *)Prompt;
     QuizItem.Text.Answer = (u8 *)Answer;
+
+    AddQuizItem(State, QuizItem);
+}
+
+/* TODO: Give the *VariableAnswer names better names. */
+#define AddQuizItemVariableAnswer(PP, V, A, PPC, VAC)           \
+    {                                                                   \
+        char *Answers[VAC] = A;                                         \
+        char *PromptParts[PPC] = PP;                                    \
+        AddQuizVariableAnswer_(State,                           \
+            PromptParts, PPC, (V), Answers, VAC);    \
+    }
+
+internal void AddQuizVariableAnswer_(
+    state *State, char **PromptParts, s32 PromptPartCount,
+    char *Variables[Max_Variable_Answers][Max_Variables],
+    char *Answers[Max_Variable_Answers],
+    s32 VariableAnswerCount)
+{
+    Assert(VariableAnswerCount >= 0 && VariableAnswerCount < Max_Variable_Answers);
+    Assert(PromptPartCount >= 0);
+
+    quiz_item QuizItem = {0};
+
+    QuizItem.Type = quiz_item_VariableAnswer;
+    QuizItem.Complete = 0;
+    QuizItem.PassCount = 0;
+    QuizItem.FailCount = 0;
+    QuizItem.VariableAnswer.PromptPartCount = PromptPartCount;
+    QuizItem.VariableAnswer.VariableAnswerCount = VariableAnswerCount;
+
+    for (s32 I = 0; I < PromptPartCount; ++I)
+    {
+        QuizItem.VariableAnswer.PromptParts[I] = PromptParts[I];
+    }
+
+    for (s32 I = 0; I < Max_Variable_Answers; ++I)
+    {
+        for (s32 J = 0; J < PromptPartCount - 1; ++J)
+        {
+            QuizItem.VariableAnswer.Variables[I][J] = Variables[I][J];
+        }
+
+        QuizItem.VariableAnswer.Answers[I] = Answers[I];
+    }
 
     AddQuizItem(State, QuizItem);
 }
@@ -1197,7 +1263,7 @@ internal void DrawWrappedText(state *State, u8 *Text, f32 MaxWidth, f32 Y, f32 L
     }
 }
 
-internal void DrawQuizPrompt(state *State, u32 LetterSpacing)
+internal void DrawQuizItem(state *State, u32 LetterSpacing)
 {
     quiz_item *QuizItem = GetActiveQuizItem(State);
 
@@ -1219,6 +1285,43 @@ internal void DrawQuizPrompt(state *State, u32 LetterSpacing)
     {
         Prompt = QuizItem->Conjugation.Prompt;
         Answer = QuizItem->Conjugation.Answer;
+    } break;
+    case quiz_item_VariableAnswer:
+    {
+        variable_answer VA = QuizItem->VariableAnswer;
+        s32 VariableAnswerIndex = VA.VariableAnswerIndex;
+        Assert(VariableAnswerIndex >= 0);
+        s32 PromptPartCount = VA.PromptPartCount;
+        u8 Buffer[1024]; /* TODO: We should use some type of temp memory instead of this inline buffer. */
+        s32 At = 0;
+
+        for (s32 I = 0; I < PromptPartCount; ++I)
+        {
+            if (I > 0)
+            {
+                u8 *Variable = (u8 *)VA.Variables[VariableAnswerIndex][I - 1];
+                s32 VariableSize = GetStringLength(Variable);
+                CopyString(Variable, Buffer + At, 1024 - At);
+                At += VariableSize;
+            }
+
+            u8 *PromptPart = (u8 *)VA.PromptParts[I];
+
+            if (!PromptPart)
+            {
+                break;
+            }
+
+            s32 PromptPartSize = GetStringLength(PromptPart);
+            CopyString(PromptPart, Buffer + At, 1024 - At);
+            At += PromptPartSize;
+        }
+
+        s32 NullIndex = At < 1024 ? At : 1023;
+        Buffer[NullIndex] = 0;
+
+        Prompt = Buffer;
+        Answer = (u8 *)VA.Answers[VariableAnswerIndex];
     } break;
     default:
     {
@@ -1627,9 +1730,42 @@ internal void DrawWinMessage(state *State, u32 LetterSpacing)
     }
 }
 
-internal void HandleQuizItem(state *State, quiz_item *QuizItem, u8 *Answer)
+internal void DrawUnknownQuizItem(state *State)
+{
+    DrawText("Unknown quiz type\n", 20, 20, 22, (Color){220,100,180,255});
+
+    Vector2 NextButtonPosition = V2(SCREEN_WIDTH - State->UI.FontSize, SCREEN_HEIGHT - State->UI.FontSize);
+    b32 NextPressed = DoButtonWith(&State->UI, ui_Next, (u8 *)"Next", NextButtonPosition, alignment_BottomRight);
+
+    if (NextPressed)
+    {
+        GetNextRandomQuizItem(State);
+    }
+}
+
+internal void HandleQuizItem(state *State, quiz_item *QuizItem)
 {
     int LetterSpacing = 1;
+    u8 *Answer;
+
+    switch(QuizItem->Type)
+    {
+    case quiz_item_Conjugation: Answer = QuizItem->Conjugation.Answer; break;
+    case quiz_item_Text: Answer = QuizItem->Text.Answer; break;
+    case quiz_item_VariableAnswer:
+    {
+        /* TODO: Set this random index on the first time we start the current quiz-item,
+           doing it here resets the index on each frame!
+        */
+        s32 RandomIndex = rand() % QuizItem->VariableAnswer.VariableAnswerCount;
+        QuizItem->VariableAnswer.VariableAnswerIndex = RandomIndex;
+        Answer = (u8 *)QuizItem->VariableAnswer.Answers[RandomIndex];
+    } break;
+    default:
+    {
+        Answer = (u8 *)"";
+    }
+    }
 
     if (IsKeyPressed(KEY_ENTER))
     {
@@ -1661,7 +1797,7 @@ internal void HandleQuizItem(state *State, quiz_item *QuizItem, u8 *Answer)
 
     if (State->QuizMode == quiz_mode_Typing || State->QuizMode == quiz_mode_Correct)
     {
-        DrawQuizPrompt(State, LetterSpacing);
+        DrawQuizItem(State, LetterSpacing);
     }
     else if (State->QuizMode == quiz_mode_Win)
     {
@@ -1693,23 +1829,14 @@ internal void UpdateAndRender(state *State, b32 ForceDraw)
         switch(QuizItem->Type)
         {
         case quiz_item_Conjugation:
-        {
-            HandleQuizItem(State, QuizItem, QuizItem->Conjugation.Answer);
-        } break;
         case quiz_item_Text:
+        case quiz_item_VariableAnswer:
         {
-            HandleQuizItem(State, QuizItem, QuizItem->Text.Answer);
+            HandleQuizItem(State, QuizItem);
         } break;
         default:
         {
-            DrawText("Unknown quiz type\n", 20, 20, 22, (Color){220,100,180,255});
-
-            Vector2 NextButtonPosition = V2(SCREEN_WIDTH - State->UI.FontSize, SCREEN_HEIGHT - State->UI.FontSize);
-            b32 NextPressed = DoButtonWith(&State->UI, ui_Next, (u8 *)"Next", NextButtonPosition, alignment_BottomRight);
-            if (NextPressed)
-            {
-                GetNextRandomQuizItem(State);
-            }
+            DrawUnknownQuizItem(State);
         }
         }
 

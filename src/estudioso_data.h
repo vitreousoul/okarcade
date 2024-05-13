@@ -1,6 +1,6 @@
 internal void InitializeDefaultQuizItems(state *State)
 {
-#if 1
+#if 0
     /* 003_hacer_y_tener */
     AddQuizText("Qué tiempo (hacer)?", "hace");
     AddQuizText("En la mañana (hacer) buen tiempo en abril.", "hace");
@@ -216,7 +216,7 @@ internal void InitializeDefaultQuizItems(state *State)
     AddQuizText("En invierno (llover) mucho.", "llueve");
 #endif
 
-#if 1
+#if 0
     /* 010_mas_mas_verbos_homework.txt */
     AddQuizText("Yo (querer) visitar tu país.", "quiero");
     AddQuizText("Nosotros (empezar) las clases a las ocho de la mañana.", "empezamos");
@@ -235,7 +235,7 @@ internal void InitializeDefaultQuizItems(state *State)
     AddQuizText("¿Quién (calentar) el agua para el té en tu casa?", "calienta");
 #endif
 
-#if 1
+#if 0
     /* 011_VERBOS_homework.txt */
     AddQuizText("Los ladrones (huir) de la policía.", "huyen");
     AddQuizText("La próxima semana (concluir) las clases.", "concluyen");
@@ -259,12 +259,12 @@ internal void InitializeDefaultQuizItems(state *State)
     AddQuizText("Cuando la gente (construir) una casa, necesita mucho dinero.", "construye");
 #endif
 
-#if 1
+#if 0
     /* 014_preterito_tarea.txt */
     AddQuizText("La semana pasada yo (estudiar) cuatro horas cada día.", "estudié");
     AddQuizText("Yo (llegar) a San Pedro la semana pasada.", "llegué");
     AddQuizText("Mis amigos (visitar) San Pedro el año pasado.", "visitaron");
-    AddQuizText("Yo (colocar) mi ropa en el armario.", "colozcé");
+    AddQuizText("Yo (colocar) mi ropa en el armario ayer.", "colozcé");
     AddQuizText("Anoche mis amigos y yo (mirar) la película.", "miramos");
     AddQuizText("Ella (visitar) Honduras el año pasado.", "visitó");
     AddQuizText("Ustedes (tomar) muchas cervezas anoche.", "tomaron");
@@ -278,7 +278,7 @@ internal void InitializeDefaultQuizItems(state *State)
     AddQuizText("El fin de semana pasado yo no (practicar) mucho mi español.", "practicé");
 #endif
 
-#if 1
+#if 0
     /* 015_irregular_preterito_tarea.txt */
     AddQuizText("Mi amigo (oír) música clásica toda la noche.", "oyó");
     AddQuizText("Ella (leer) una novela el fin de semana.", "leió");
@@ -297,13 +297,13 @@ internal void InitializeDefaultQuizItems(state *State)
     AddQuizText("Mis hermanos (construir) una nueva casa.", "construyeron");
     AddQuizText("Mi hermana (ir) a Europa el año pasado.", "fue");
     AddQuizText("Yo le (dar) un regalo a mi padre el día de su cumpleaños.", "di");
-    AddQuizText("Yo no (ver) a otros estudiantes en la fiesta.", "vi");
-    AddQuizText("Mi hermano (ser) un buen estudiante de español.", "fue");
+    AddQuizText("Yo no (ver) a otros estudiantes en la fiesta anoche.", "vi");
+    AddQuizText("Mi hermano (ser) un buen estudiante de español en el pasado.", "fue");
     AddQuizText("Ellos (ir) a la playa el fin de semana.", "fueron");
-    AddQuizText("Después de comer en el restaurante ellos (dar) una propina al mesero.", "dieron");
+    AddQuizText("Hace un semana, después de comer en el restaurante ellos (dar) una propina al mesero.", "dieron");
 #endif
 
-#if 1
+#if 0
     /* 018_homework.txt */
     AddQuizText("Él (hablar) con su madre ayer.", "habló");
     AddQuizText("Yo (comer) mucho la semana pasada.", "comí");
@@ -317,6 +317,25 @@ internal void InitializeDefaultQuizItems(state *State)
     AddQuizText("Yo no (poder) trabajar hace algunos años.", "pude");
 #endif
 
+#if 1
+    char *Foo[Max_Variable_Answers][Max_Variables] = {{"ahí"}, {"allí"}};
+    AddQuizItemVariableAnswer(
+        A({"Llevo esta blusa porque ____ de ", " no va bien con aquella falda."}),
+        Foo,
+        A({"ésa", "aquella"}),
+        3, 2);
+#else
+No llevo ese chaleco porque (éste) de aquí es más bonito.
+Estos zapatos son más cómodos que (aquellos) de allí.
+Voy a llevar aquel traje de baño porque es más nuevo que (éste) de aquí.
+Esos pantalones cortos son más prácticos que (aquellos) de allí.
+Aquellas sandalias son más de moda que (ésas) de ahí.
+Estos suéteres son más ligeros que (aquellos) de allí.
+Esa falda negra es más útil que (esta) de aquí de flores.
+La única bolsa que voy a llevar es (esa) de ahí.
+#endif
+
+#if 0
     /* Some word translations */
     AddQuizText("enero", "January");
     AddQuizText("febrero", "February");
@@ -336,8 +355,9 @@ internal void InitializeDefaultQuizItems(state *State)
     AddQuizText("acento", "accent");
     AddQuizText("acordar", "to agree");
     AddQuizText("acordeón", "accordion");
+#endif
 
-#if 1
+#if 0
     AddQuizText("la actividad", "activity");
     AddQuizText("las actividades", "activities");
     AddQuizText("actualmente", "currently"); /* nowadays */
@@ -354,13 +374,14 @@ internal void InitializeDefaultQuizItems(state *State)
     AddQuizText("los agricultores", "farmers");
     AddQuizText("el agua", "water");
     AddQuizText("ahora", "now");
-#endif
     AddQuizText("alergia", "allergy"); /* ALSO: allergic, allergies */
     AddQuizText("algo", "something"); /* ALSO: anything */
     AddQuizText("alguno", "any"); /* ALSO: one */
     AddQuizText("algunos", "some"); /* ALSO: few */
+#endif
 }
 #if 0 /* TODO: delete these words after boiling them down to translatable words */
+LA/S mano/s
 almorzar
 alrededor
 alto

@@ -77,6 +77,6 @@ void CopyMemory(u8 *Source, u8 *Destination, u64 Size)
 s32 GetStringLength(u8 *String)
 {
     s32 StringLength = -1;
-    while (String[++StringLength]);
+    while (String && String[++StringLength]);
     return StringLength;
 }
