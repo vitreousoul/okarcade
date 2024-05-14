@@ -65,8 +65,6 @@ global_variable int SCREEN_HEIGHT = 600;
 #define SAVE_FILE_PATH ((u8 *)"../save/save_file_0.estudioso")
 
 
-/* NOTE: The "A" macro is used to wrap array literals that are passed directly into macros. */
-#define A(...) __VA_ARGS__
 #define ArrayCount(a) (sizeof(a)/sizeof((a)[0]))
 
 #define IS_SPACE(c) ((c) == ' ' || (c) == '\t' || (c) == '\n' || (c) == '\r')
@@ -413,23 +411,10 @@ internal void AddQuizTranslation_(state *State, char *Prompt, char *Answer)
     AddQuizItem(State, QuizItem);
 }
 
-/* TODO: Give the *VariableAnswer names better names. */
-#define AddQuizItemVariableAnswer(PP, V, A, PPC, VAC)           \
-    {                                                                   \
-        char *Answers[VAC] = A;                                         \
-        char *PromptParts[PPC] = PP;                                    \
-        AddQuizVariableAnswer_(State,                           \
-            PromptParts, PPC, (V), Answers, VAC);    \
-    }
-
-internal void AddQuizVariableAnswer_(
-    state *State, char **PromptParts, s32 PromptPartCount,
-    char *Variables[Max_Variable_Answers][Max_Variables],
-    char *Answers[Max_Variable_Answers],
-    s32 VariableAnswerCount)
+internal void AddQuizVariableAnswer_(state *State, variable_answer VA)
 {
-    Assert(VariableAnswerCount >= 0 && VariableAnswerCount < Max_Variable_Answers);
-    Assert(PromptPartCount >= 0);
+    Assert(VA.VariableAnswerCount >= 0 && VA.VariableAnswerCount < Max_Variable_Answers);
+    Assert(VA.PromptPartCount >= 0);
 
     quiz_item QuizItem = {0};
 
@@ -437,22 +422,22 @@ internal void AddQuizVariableAnswer_(
     QuizItem.Complete = 0;
     QuizItem.PassCount = 0;
     QuizItem.FailCount = 0;
-    QuizItem.VariableAnswer.PromptPartCount = PromptPartCount;
-    QuizItem.VariableAnswer.VariableAnswerCount = VariableAnswerCount;
+    QuizItem.VariableAnswer.PromptPartCount = VA.PromptPartCount;
+    QuizItem.VariableAnswer.VariableAnswerCount = VA.VariableAnswerCount;
 
-    for (s32 I = 0; I < PromptPartCount; ++I)
+    for (s32 I = 0; I < VA.PromptPartCount; ++I)
     {
-        QuizItem.VariableAnswer.PromptParts[I] = PromptParts[I];
+        QuizItem.VariableAnswer.PromptParts[I] = VA.PromptParts[I];
     }
 
     for (s32 I = 0; I < Max_Variable_Answers; ++I)
     {
-        for (s32 J = 0; J < PromptPartCount - 1; ++J)
+        for (s32 J = 0; J < VA.PromptPartCount - 1; ++J)
         {
-            QuizItem.VariableAnswer.Variables[I][J] = Variables[I][J];
+            QuizItem.VariableAnswer.Variables[I][J] = VA.Variables[I][J];
         }
 
-        QuizItem.VariableAnswer.Answers[I] = Answers[I];
+        QuizItem.VariableAnswer.Answers[I] = VA.Answers[I];
     }
 
     AddQuizItem(State, QuizItem);
@@ -1058,6 +1043,34 @@ internal s32 GetBucketSize(state *State, s32 BucketIndex)
     return Size;
 }
 
+internal s32 GetActiveQuizItemIndex(state *State)
+{
+    s32 LookupIndex = State->Bucket[State->BucketIndex];
+
+    s32 Offset;
+
+    s32 HighFrequencyThreshold = State->FrequencyThreshold[frequency_High];
+    s32 MediumFrequencyThreshold = State->FrequencyThreshold[frequency_Medium];
+
+    switch(State->BucketIndex)
+    {
+    case frequency_Medium:
+        Offset = HighFrequencyThreshold;
+        break;
+    case frequency_Low:
+        Offset = MediumFrequencyThreshold;
+        break;
+    default:
+        Offset = 0;
+    }
+
+    s32 OffsetLookupIndex = LookupIndex + Offset;
+    s32 Index = State->QuizItemsLookup[OffsetLookupIndex];
+    Assert(Index >= 0 && Index < Quiz_Item_Max);
+
+    return Index;
+}
+
 internal void GetNextRandomQuizItem(state *State)
 {
     Assert(State->BucketIndex >= 0 && State->BucketIndex < frequency_Count);
@@ -1109,6 +1122,22 @@ internal void GetNextRandomQuizItem(state *State)
     State->QuizInputIndex = 0;
     State->CurrentQuizItemFailed = 0;
 
+    { /* NOTE: Randomly pick index for variable-answer quiz-items. */
+        s32 Index = GetActiveQuizItemIndex(State);
+        Assert(Index >= 0 && Index < Quiz_Item_Max);
+        quiz_item *QuizItem = State->QuizItems + Index;
+
+        switch(QuizItem->Type)
+        {
+        case quiz_item_VariableAnswer:
+        {
+            s32 RandomIndex = rand() % QuizItem->VariableAnswer.VariableAnswerCount;
+            QuizItem->VariableAnswer.VariableAnswerIndex = RandomIndex;
+        } break;
+        default: break;
+        }
+    }
+
     if (State->Bucket[State->BucketIndex] >= (s32)State->QuizItemCount)
     {
         SetQuizMode(State, quiz_mode_Win);
@@ -1120,34 +1149,6 @@ internal void GetNextRandomQuizItem(state *State)
         SetQuizMode(State, quiz_mode_Typing);
         FrameIndex = 0;
     }
-}
-
-internal s32 GetActiveQuizItemIndex(state *State)
-{
-    s32 LookupIndex = State->Bucket[State->BucketIndex];
-
-    s32 Offset;
-
-    s32 HighFrequencyThreshold = State->FrequencyThreshold[frequency_High];
-    s32 MediumFrequencyThreshold = State->FrequencyThreshold[frequency_Medium];
-
-    switch(State->BucketIndex)
-    {
-    case frequency_Medium:
-        Offset = HighFrequencyThreshold;
-        break;
-    case frequency_Low:
-        Offset = MediumFrequencyThreshold;
-        break;
-    default:
-        Offset = 0;
-    }
-
-    s32 OffsetLookupIndex = LookupIndex + Offset;
-    s32 Index = State->QuizItemsLookup[OffsetLookupIndex];
-    Assert(Index >= 0 && Index < Quiz_Item_Max);
-
-    return Index;
 }
 
 internal quiz_item *GetActiveQuizItem(state *State)
@@ -1754,11 +1755,7 @@ internal void HandleQuizItem(state *State, quiz_item *QuizItem)
     case quiz_item_Text: Answer = QuizItem->Text.Answer; break;
     case quiz_item_VariableAnswer:
     {
-        /* TODO: Set this random index on the first time we start the current quiz-item,
-           doing it here resets the index on each frame!
-        */
-        s32 RandomIndex = rand() % QuizItem->VariableAnswer.VariableAnswerCount;
-        QuizItem->VariableAnswer.VariableAnswerIndex = RandomIndex;
+        s32 RandomIndex = QuizItem->VariableAnswer.VariableAnswerIndex;
         Answer = (u8 *)QuizItem->VariableAnswer.Answers[RandomIndex];
     } break;
     default:

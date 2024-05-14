@@ -1,3 +1,24 @@
+/* NOTE: Used to pass array literals into macros. */
+#define A(...) {__VA_ARGS__}
+
+/* TODO: Figure out a way to use ArrayCount instead of passing
+   PromptPartCount and VariableAnswerCount.
+*/
+#define VarAns(PromptPartCount, VariableAnswerCount,    \
+               PromptParts, Variables, Answers)         \
+    {                                                   \
+        variable_answer VariableAnswer = {              \
+            PromptParts,                                \
+            PromptPartCount,                            \
+            Variables,                                  \
+            Answers,                                    \
+            VariableAnswerCount,                        \
+            0                                           \
+        };                                              \
+        AddQuizVariableAnswer_(State, VariableAnswer);  \
+    }
+
+
 internal void InitializeDefaultQuizItems(state *State)
 {
 #if 0
@@ -318,12 +339,10 @@ internal void InitializeDefaultQuizItems(state *State)
 #endif
 
 #if 1
-    char *Foo[Max_Variable_Answers][Max_Variables] = {{"ahí"}, {"allí"}};
-    AddQuizItemVariableAnswer(
-        A({"Llevo esta blusa porque ____ de ", " no va bien con aquella falda."}),
-        Foo,
-        A({"ésa", "aquella"}),
-        3, 2);
+    VarAns(2, 2,
+           A("Llevo esta blusa porque ____ de ", " no va bien con aquella falda."),
+           A({"ahí"}, {"allí"}),
+           A("ésa", "aquella"));
 #else
 No llevo ese chaleco porque (éste) de aquí es más bonito.
 Estos zapatos son más cómodos que (aquellos) de allí.
