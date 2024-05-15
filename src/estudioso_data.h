@@ -4,8 +4,9 @@
 /* TODO: Figure out a way to use ArrayCount instead of passing
    PromptPartCount and VariableAnswerCount.
 */
-#define VarAns(PromptPartCount, VariableAnswerCount,    \
-               PromptParts, Variables, Answers)         \
+#define VarAns(PromptPartCount, PromptParts,            \
+               VariableAnswerCount, Variables,          \
+               Answers)                                 \
     {                                                   \
         variable_answer VariableAnswer = {              \
             PromptParts,                                \
@@ -21,7 +22,7 @@
 
 internal void InitializeDefaultQuizItems(state *State)
 {
-#if 0
+#if 1
     /* 003_hacer_y_tener */
     AddQuizText("Qué tiempo (hacer)?", "hace");
     AddQuizText("En la mañana (hacer) buen tiempo en abril.", "hace");
@@ -79,7 +80,7 @@ internal void InitializeDefaultQuizItems(state *State)
         AddQuizText("Ramón (ser/estar) periodista.", "es");
         /* Estar */
         AddQuizText("Yo (ser/estar) en paro.", "estoy");
-        AddQuizText("(Ser/Estar) triste por el examen.", "Está");
+        AddQuizText("Él (ser/estar) triste por el examen.", "está");
         AddQuizText("Mi abuela (ser/estar) muy joven para su edad.", "está");
         AddQuizText("Alfredo (ser/estar) muy moreno.", "está");
         AddQuizText("Yo (ser/estar) soltero.", "estoy");
@@ -237,7 +238,7 @@ internal void InitializeDefaultQuizItems(state *State)
     AddQuizText("En invierno (llover) mucho.", "llueve");
 #endif
 
-#if 0
+#if 1
     /* 010_mas_mas_verbos_homework.txt */
     AddQuizText("Yo (querer) visitar tu país.", "quiero");
     AddQuizText("Nosotros (empezar) las clases a las ocho de la mañana.", "empezamos");
@@ -256,9 +257,9 @@ internal void InitializeDefaultQuizItems(state *State)
     AddQuizText("¿Quién (calentar) el agua para el té en tu casa?", "calienta");
 #endif
 
-#if 0
+#if 1
     /* 011_VERBOS_homework.txt */
-    AddQuizText("Los ladrones (huir) de la policía.", "huyen");
+    AddQuizText("Anoche, los ladrones (huir) de la policía.", "huyen");
     AddQuizText("La próxima semana (concluir) las clases.", "concluyen");
     AddQuizText("Nosotros (incluir) a Juan en nuestro equipo.", "incluimos");
     AddQuizText("Mi padre (construir) una casa muy bonita.", "construye");
@@ -280,7 +281,7 @@ internal void InitializeDefaultQuizItems(state *State)
     AddQuizText("Cuando la gente (construir) una casa, necesita mucho dinero.", "construye");
 #endif
 
-#if 0
+#if 1
     /* 014_preterito_tarea.txt */
     AddQuizText("La semana pasada yo (estudiar) cuatro horas cada día.", "estudié");
     AddQuizText("Yo (llegar) a San Pedro la semana pasada.", "llegué");
@@ -299,7 +300,7 @@ internal void InitializeDefaultQuizItems(state *State)
     AddQuizText("El fin de semana pasado yo no (practicar) mucho mi español.", "practicé");
 #endif
 
-#if 0
+#if 1
     /* 015_irregular_preterito_tarea.txt */
     AddQuizText("Mi amigo (oír) música clásica toda la noche.", "oyó");
     AddQuizText("Ella (leer) una novela el fin de semana.", "leió");
@@ -312,7 +313,7 @@ internal void InitializeDefaultQuizItems(state *State)
     AddQuizText("Los estudiantes (leer) su tarea en la escuela.", "leyeron");
     AddQuizText("El año pasado una bomba (caer) en el centro del pueblo.", "cayó");
     AddQuizText("La explosión se (oír) hasta Panajachel.", "oyó");
-    AddQuizText("Esa bomba (destruir) el mercado.", "destruyó");
+    AddQuizText("Esa bomba (destruir) el mercado hace una semana.", "destruyó");
     AddQuizText("El fin de semana mis amigos (oír) música latina.", "oyeron");
     AddQuizText("Los bandidos (huir) de la policía.", "huyeron");
     AddQuizText("Mis hermanos (construir) una nueva casa.", "construyeron");
@@ -324,7 +325,7 @@ internal void InitializeDefaultQuizItems(state *State)
     AddQuizText("Hace un semana, después de comer en el restaurante ellos (dar) una propina al mesero.", "dieron");
 #endif
 
-#if 0
+#if 1
     /* 018_homework.txt */
     AddQuizText("Él (hablar) con su madre ayer.", "habló");
     AddQuizText("Yo (comer) mucho la semana pasada.", "comí");
@@ -338,23 +339,45 @@ internal void InitializeDefaultQuizItems(state *State)
     AddQuizText("Yo no (poder) trabajar hace algunos años.", "pude");
 #endif
 
+
+#define Adjetivos_Demostrativos_SM A("este", "ese", "aquell")
+#define Adjetivos_Demostrativos_SF A("esta", "esa", "aquella")
+#define Adjetivos_Demostrativos_PM A("estos", "esos", "aquellos")
+#define Adjetivos_Demostrativos_PF A("estas", "esas", "aquellas")
+
+#define Adverbios_Lugar A({"aquí"}, {"ahí"}, {"allí"})
+
 #if 1
-    VarAns(2, 2,
-           A("Llevo esta blusa porque ____ de ", " no va bien con aquella falda."),
-           A({"ahí"}, {"allí"}),
-           A("ésa", "aquella"));
-#else
-No llevo ese chaleco porque (éste) de aquí es más bonito.
-Estos zapatos son más cómodos que (aquellos) de allí.
-Voy a llevar aquel traje de baño porque es más nuevo que (éste) de aquí.
-Esos pantalones cortos son más prácticos que (aquellos) de allí.
-Aquellas sandalias son más de moda que (ésas) de ahí.
-Estos suéteres son más ligeros que (aquellos) de allí.
-Esa falda negra es más útil que (esta) de aquí de flores.
-La única bolsa que voy a llevar es (esa) de ahí.
+    VarAns(2, A("Llevo esta blusa porque ____ de ", " no va bien con aquella falda."),
+           3, Adverbios_Lugar,
+           Adjetivos_Demostrativos_SF);
+    VarAns(2, A("No llevo ese chaleco porque ____ de ", " es más bonito."),
+           3, Adverbios_Lugar,
+           Adjetivos_Demostrativos_SM);
+    VarAns(2, A("Estos zapatos son más cómodos que ____ de ", "."),
+           3, Adverbios_Lugar,
+           Adjetivos_Demostrativos_PM);
+    VarAns(2, A("Voy a llevar aquel traje de baño porque es más nuevo que ____ de ", "."),
+           3, Adverbios_Lugar,
+           Adjetivos_Demostrativos_SM);
+    VarAns(2, A("Esos pantalones cortos son más prácticos que ____ de ", "."),
+           3, Adverbios_Lugar,
+           Adjetivos_Demostrativos_PM);
+    VarAns(2, A("Aquellas sandalias son más de moda que ____ de ", "."),
+           3, Adverbios_Lugar,
+           Adjetivos_Demostrativos_PF);
+    VarAns(2, A("Estos suéteres son más ligeros que ____ de ", "."),
+           3, Adverbios_Lugar,
+           Adjetivos_Demostrativos_PM);
+    VarAns(2, A("Esa falda negra es más útil que ____ de ", " de flores."),
+           3, Adverbios_Lugar,
+           Adjetivos_Demostrativos_SF);
+    VarAns(2, A("La única bolsa que voy a llevar es ____ de ", "."),
+           3, Adverbios_Lugar,
+           Adjetivos_Demostrativos_SF);
 #endif
 
-#if 0
+#if 1
     /* Some word translations */
     AddQuizText("enero", "January");
     AddQuizText("febrero", "February");
@@ -376,7 +399,7 @@ La única bolsa que voy a llevar es (esa) de ahí.
     AddQuizText("acordeón", "accordion");
 #endif
 
-#if 0
+#if 1
     AddQuizText("la actividad", "activity");
     AddQuizText("las actividades", "activities");
     AddQuizText("actualmente", "currently"); /* nowadays */
@@ -399,6 +422,11 @@ La única bolsa que voy a llevar es (esa) de ahí.
     AddQuizText("algunos", "some"); /* ALSO: few */
 #endif
 }
+
+
+
+
+
 #if 0 /* TODO: delete these words after boiling them down to translatable words */
 LA/S mano/s
 almorzar

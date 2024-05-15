@@ -58,8 +58,6 @@ u8 *GetArenaWriteLocation(arena *Arena);
 u64 GetArenaFreeSpace(arena *Arena);
 void FreeArena(arena Arena);
 
-void CopyString(u8 *Source, u8 *Destination, s32 DestinationSize);
-
 date GetDate(void);
 
 buffer *ReadFileIntoBuffer(u8 *FilePath);
@@ -244,31 +242,6 @@ void ArenaStackPop(arena *Arena)
     Arena->ParentOffset = *WriteLocation;
 }
 /*| ^ Arena Allocator ^ |*/
-
-void CopyString(u8 *Source, u8 *Destination, s32 DestinationSize)
-{
-    /* NOTE we assume strings are null-terminated */
-    s32 I = 0;
-
-    if (!(Source && Destination)) return;
-
-    for (;;)
-    {
-        if (I >= DestinationSize)
-        {
-            break;
-        }
-
-        Destination[I] = Source[I];
-
-        if (!Source[I])
-        {
-            break;
-        }
-
-        I += 1;
-    }
-}
 
 date GetDate(void)
 {

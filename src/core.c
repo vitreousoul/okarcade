@@ -10,6 +10,8 @@ b32 StringsEqual(u8 *StringA, u8 *StringB);
 void SetMemory(u8 *Source, u8 Value, u64 Size);
 void CopyMemory(u8 *Source, u8 *Destination, u64 Size);
 
+void CopyString(u8 *Source, u8 *Destination, s32 DestinationSize);
+
 s32 GetStringLength(u8 *String);
 
 #define LogError(s) LogError_((u8 *)s, __LINE__, __FILE__)
@@ -71,6 +73,31 @@ void CopyMemory(u8 *Source, u8 *Destination, u64 Size)
     for (u64 I = 0; I < Size; I++)
     {
         Destination[I] = Source[I];
+    }
+}
+
+void CopyString(u8 *Source, u8 *Destination, s32 DestinationSize)
+{
+    /* NOTE we assume strings are null-terminated */
+    s32 I = 0;
+
+    if (!(Source && Destination)) return;
+
+    for (;;)
+    {
+        if (I >= DestinationSize)
+        {
+            break;
+        }
+
+        Destination[I] = Source[I];
+
+        if (!Source[I])
+        {
+            break;
+        }
+
+        I += 1;
     }
 }
 

@@ -1641,7 +1641,6 @@ internal void PermuteQuizItemRange(state *State, s32 BeginIndex, s32 EndIndex)
 
     if (PermutationCount)
     {
-        printf("permute %d %d\n", BeginIndex, EndIndex);
         /* NOTE: Set initial lookup index */
         for (s32 I = BeginIndex; I <= EndIndex; ++I)
         {
@@ -1891,6 +1890,7 @@ int main(void)
     }
 #endif
 
+
 #if defined(PLATFORM_WEB)
     InitRaylibCanvas();
     State.UI.FontSize = 28;
@@ -1899,6 +1899,7 @@ int main(void)
 #endif
 
     int Result = 0;
+    b32 ShouldClose = 0;
 
     srand(time(NULL));
     InitializeQuizItems(&State, 1);
@@ -1912,7 +1913,7 @@ int main(void)
     SetTargetFPS(60);
 
     int CodepointCount = 0;
-    int *Codepoints;
+    int *Codepoints = 0;
 
     {
         /* TODO: Pre-bake font bitmaps? */
@@ -1933,27 +1934,31 @@ int main(void)
            game? Not sure about this one at the moment...
         */
         u32 FontScale = 1;
+        /* TODO: Fix loading font-data-files with LoadFontFromMemory for web,
+           somehow it doesn't work anymore :(
+        */
+        State.UI.Font = GetFontDefault();
 #else
         u32 FontScale = 4;
-#endif
         State.UI.Font = LoadFontFromMemory(".ttf", FontData, ArrayCount(FontData), State.UI.FontSize*FontScale, Codepoints, CodepointCount);
+#endif
 
-        UnloadCodepoints(Codepoints);
+        if (IsFontReady(State.UI.Font))
+        {
+            UnloadCodepoints(Codepoints);
+        }
+        else
+        {
+            ShouldClose = 1;
+        }
+
     }
 
     SetQuizMode(&State, quiz_mode_Typing);
 
-    if (!IsFontReady(State.UI.Font))
-    {
-        printf("font not ready\n");
-        return 1;
-    }
-
-
-
     for (;;)
     {
-        if (WindowShouldClose())
+        if (ShouldClose || WindowShouldClose())
         {
             /* WriteSaveFileToDisk(&State, SAVE_FILE_PATH); */
             break;
