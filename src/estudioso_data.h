@@ -400,20 +400,24 @@ internal void InitializeDefaultQuizItems(state *State)
 #endif
 
 #if 1
-    AddQuizText("la actividad", "activity");
-    AddQuizText("las actividades", "activities");
+    VarAns(2, A("", ""), 3,
+           A({"el agricultor"}, {"la agricultora"}, {"los agricultores"}),
+           A( "farmer",          "farmer",           "farmers"));
+#else
+    VarAns(2, A("", ""), 2, A({"la actividad"}, {"las actividades"}), A( "activity", "activities"));
     AddQuizText("actualmente", "currently"); /* nowadays */
+
     AddQuizText("adjetivo", "adjective");
     AddQuizText("adjetivos", "adjectives");
+
     AddQuizText("adverbio", "adverb");
     AddQuizText("adverbios", "adverbs");
+
     AddQuizText("afuera", "outside");
     AddQuizText("el/la agente", "agent");
     AddQuizText("agradecer", "to thank");
     AddQuizText("agregar", "to gather");
-    AddQuizText("el agricultor", "farmer");
-    AddQuizText("la agricultora", "farmer");
-    AddQuizText("los agricultores", "farmers");
+
     AddQuizText("el agua", "water");
     AddQuizText("ahora", "now");
     AddQuizText("alergia", "allergy"); /* ALSO: allergic, allergies */
@@ -426,8 +430,8 @@ internal void InitializeDefaultQuizItems(state *State)
 
 
 
-
-#if 0 /* TODO: delete these words after boiling them down to translatable words */
+#define HIDE_WORDS 1
+#if !HIDE_WORDS /* TODO: delete these words after boiling them down to translatable words */
 LA/S mano/s
 almorzar
 alrededor

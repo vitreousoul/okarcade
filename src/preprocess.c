@@ -71,12 +71,12 @@ u8 *BlogPageTemplateOpen =
     "</head>"                                      \
     "<body>"                                       \
     /* TODO: Remove hard-coded style */
-    "<div style=\"padding: 1rem;\">"               \
+    "<main style=\"padding: 1rem;\">"              \
     "{| include ../src/layout/navigation_header.html |}";
 
 u8 *BlogPageTemplateClose =
-    (u8 *)"</body>"                             \
-    "</div>"                                    \
+    (u8 *)"</main>"                             \
+    "</body>"                                   \
     "</html>";
 
 
@@ -1097,7 +1097,7 @@ void GenerateCodePages(arena *TempString)
                     "</head>"                                                              \
                     "<body>"                                                               \
                 /* TODO: move hard-coded style */
-                        "<div style=\"padding: 1rem\">"                                    \
+                        "<main style=\"padding: 1rem\">"                                   \
                             "{" "| include ../src/layout/navigation_header.html |" "}"     \
                                 "<h2>"));
 
@@ -1115,7 +1115,7 @@ void GenerateCodePages(arena *TempString)
             u8 *CodePageData = PushArena(&CodePage, EscapedHtmlBuffer.Size);
             CopyMemory(EscapedHtmlBuffer.Data, CodePageData, EscapedHtmlBuffer.Size);
 
-            PushString(&CodePage, (u8 *)"HERE" "DOC</pre></div></body></html>");
+            PushString(&CodePage, (u8 *)"HERE" "DOC</pre></main></body></html>");
 
             WriteFileWithPath(Buffer.Data, CodePage.Data, CodePage.Offset);
             FreeBuffer(CodePageBuffer);
