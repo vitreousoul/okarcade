@@ -51,6 +51,7 @@ else
 
     SETTINGS="-std=c99 -Wall -Wextra -Wstrict-prototypes -Wold-style-definition -Wno-comment"
     SETTINGS="$SETTINGS -Wno-unused-function"
+    SETTINGS="$SETTINGS -Wno-unused-parameter"
     # SETTINGS="$SETTINGS -Wmissing-prototypes -Wmissing-declarations"
     SOURCE_FILE="./src/$TARGET_NAME.c"
 

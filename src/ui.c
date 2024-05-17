@@ -9,6 +9,7 @@ typedef enum
     ui_element_type_Slider,
     ui_element_type_Tablet,
     ui_element_type_Count,
+    ui_element_type_Text,
 } ui_element_type;
 
 typedef enum
@@ -26,6 +27,21 @@ typedef enum
 
 typedef struct
 {
+    b32 Shift;
+    b32 Control;
+    b32 Alt;
+    b32 Super;
+} modifier_keys;
+
+typedef enum
+{
+    accent_NULL,
+    accent_Acute,
+    accent_Tilde,
+} accent;
+
+typedef struct
+{
     ui_id Id;
 
     Vector2 Position;
@@ -33,7 +49,7 @@ typedef struct
 
     Vector2 Size;
     u8 *Text;
-} button;
+} button_element;
 
 typedef struct
 {
@@ -42,7 +58,7 @@ typedef struct
     Vector2 Position;
     Vector2 Size;
     f32 Value;
-} slider;
+} slider_element;
 
 typedef struct
 {
@@ -53,16 +69,37 @@ typedef struct
     Vector2 Offset;
 
     b32 MouseReleased;
-} tablet;
+} tablet_element;
+
+typedef struct
+{
+    ui_id Id;
+
+    u8 *Text;
+    s32 TextSize;
+    /* TODO: Turn booleans into flags. */
+    b32 AccentMode;
+    b32 KeyHasRepeated;
+
+    Vector2 Position;
+    Vector2 Size;
+
+    s32 Index;
+    f32 KeyRepeatTime;
+
+    accent CurrentAccent;
+
+    Color Color;
+} text_element;
 
 typedef struct
 {
     ui_element_type Type;
     union
     {
-        button Button;
-        slider Slider;
-        tablet Tablet;
+        button_element Button;
+        slider_element Slider;
+        tablet_element Tablet;
     };
 } ui_element;
 
@@ -78,6 +115,7 @@ typedef struct
     b32 MouseButtonReleased;
     Vector2 MousePosition;
 
+    modifier_keys ModifierKeys;
     b32 EnterPressed;
 
     Vector2 ActivationPosition;
@@ -88,12 +126,12 @@ typedef struct
 
 ui_id GetElementId(ui_element Element);
 
-button CreateButton(Vector2 Position, u8 *Text, s32 Id);
+button_element CreateButton(Vector2 Position, u8 *Text, s32 Id);
 
-b32 DoButton(ui *UI, button *Button);
+b32 DoButton(ui *UI, button_element *Button);
 b32 DoButtonWith(ui *UI, s32 Id, u8 *Text, Vector2 Position, alignment Alignment);
-b32 DoSlider(ui *UI, slider *Slider);
-b32 DoTablet(ui *UI, tablet *Tablet);
+b32 DoSlider(ui *UI, slider_element *Slider);
+b32 DoTablet(ui *UI, tablet_element *Tablet);
 b32 DoUiElement(ui *UI, ui_element *UiElement);
 
 
@@ -124,9 +162,9 @@ ui_id GetElementId(ui_element Element)
     return Result;
 }
 
-button CreateButton(Vector2 Position, u8 *Text, s32 Id)
+button_element CreateButton(Vector2 Position, u8 *Text, s32 Id)
 {
-    button Button;
+    button_element Button;
 
     Button.Position = Position;
     Button.Text = Text;
@@ -148,7 +186,7 @@ internal b32 PositionIsInsideRect(Vector2 Position, Rectangle Rect)
             (Position.y <= y1));
 }
 
-internal b32 PositionIsInsideSliderHandle(Vector2 Position, slider *Slider)
+internal b32 PositionIsInsideSliderHandle(Vector2 Position, slider_element *Slider)
 {
     f32 X0 = Slider->Position.x;
     f32 Y0 = Slider->Position.y;
@@ -161,7 +199,7 @@ internal b32 PositionIsInsideSliderHandle(Vector2 Position, slider *Slider)
             (Position.y <= Y1));
 }
 
-internal b32 PositionIsInsideTablet(Vector2 Position, tablet *Tablet)
+internal b32 PositionIsInsideTablet(Vector2 Position, tablet_element *Tablet)
 {
     f32 X0 = Tablet->Position.x;
     f32 Y0 = Tablet->Position.y;
@@ -199,7 +237,7 @@ internal Rectangle GetAlignedRectangle(Vector2 Position, Vector2 Size, alignment
     return Result;
 }
 
-b32 DoButton(ui *UI, button *Button)
+b32 DoButton(ui *UI, button_element *Button)
 {
     b32 ButtonPressed = 0;
     Color UnderColor = (Color){20,20,20,225};
@@ -283,7 +321,7 @@ b32 DoButton(ui *UI, button *Button)
 
 b32 DoButtonWith(ui *UI, s32 Id, u8 *Text, Vector2 Position, alignment Alignment)
 {
-    button Button;
+    button_element Button;
 
     Button.Id = Id;
     Button.Position = Position;
@@ -296,7 +334,7 @@ b32 DoButtonWith(ui *UI, s32 Id, u8 *Text, Vector2 Position, alignment Alignment
     return Pressed;
 }
 
-b32 DoSlider(ui *UI, slider *Slider)
+b32 DoSlider(ui *UI, slider_element *Slider)
 {
     b32 Changed = 0;
 
@@ -349,7 +387,7 @@ b32 DoSlider(ui *UI, slider *Slider)
     return Changed;
 }
 
-b32 DoTablet(ui *UI, tablet *Tablet)
+b32 DoTablet(ui *UI, tablet_element *Tablet)
 {
     b32 Changed = 0;
 
@@ -391,6 +429,50 @@ b32 DoTablet(ui *UI, tablet *Tablet)
     }
 
     return Changed;
+}
+
+/* TODO: Probably don't pass DeltaTime in, but have it live as a member of some arguemnt struct.
+   Or handle cursor blink timing outside of DoText? */
+u8 *DoText(ui *UI, text_element *TextElement, f32 DeltaTime)
+{
+    u8 *Result = (u8 *)"";
+    char *Text = (char *)TextElement->Text;
+    int LetterSpacing = 1;
+
+    if (Text)
+    {
+        f32 BlinkTime = UI->CursorBlinkTime;
+        f32 BlinkRate = UI->CursorBlinkRate;
+        b32 ShowCursor = BlinkTime < 0.6f * BlinkRate;
+        Vector2 TextSize = MeasureTextEx(UI->Font, Text, UI->FontSize, 1);
+
+        f32 InputX = TextElement->Position.x - (TextSize.x / 2.0f);
+        f32 InputY = TextElement->Position.y;
+
+        f32 CursorX = (SCREEN_WIDTH + TextSize.x) / 2.0f;
+        f32 CursorY = InputY;
+
+        DrawTextEx(UI->Font, Text, V2(InputX, InputY), UI->FontSize, LetterSpacing, TextElement->Color);
+
+        if (BlinkRate > 0.0f)
+        {
+            BlinkTime = BlinkTime + DeltaTime;
+            while (BlinkTime > BlinkRate)
+            {
+                BlinkTime -= BlinkRate;
+            }
+            UI->CursorBlinkTime = BlinkTime;
+
+            if (ShowCursor)
+            {
+                Color CursorColor = (Color){130,100,250,255};
+                f32 Spacing = 3.0f;
+                DrawRectangle(CursorX + Spacing, CursorY, 3, UI->FontSize, CursorColor);
+            }
+        }
+    }
+
+    return Result;
 }
 
 b32 DoUiElement(ui *UI, ui_element *UiElement)

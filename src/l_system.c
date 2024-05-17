@@ -108,9 +108,9 @@ typedef struct
     Texture2D FrameBuffer;
 
     ui UI;
-    button Buttons[button_kind_Count];
-    slider AngleSlider;
-    slider LengthSlider;
+    button_element Buttons[button_kind_Count];
+    slider_element AngleSlider;
+    slider_element LengthSlider;
     ui_element Tablet;
 
     expansion Expansion;
@@ -342,7 +342,7 @@ internal void InitTurtleState(state *State, f32 OffsetX, f32 OffsetY)
     PushExpansionItem(&State->Expansion, RootItem);
 }
 
-internal b32 UpdateSlider(state *State, slider *Slider)
+internal b32 UpdateSlider(state *State, slider_element *Slider)
 {
     ui *UI = &State->UI;
     b32 SliderUpdated = DoSlider(UI, Slider);
@@ -452,7 +452,7 @@ internal void UpdateAndRender(void *VoidAppState)
         }
         else
         {
-            tablet *Tablet = &State->Tablet.Tablet;
+            tablet_element *Tablet = &State->Tablet.Tablet;
             Vector2 OldOffset = Tablet->Offset;
             b32 TabletChanged = DoUiElement(UI, &State->Tablet);
             Vector2 DeltaOffset = AbsV2(SubtractV2(OldOffset, Tablet->Offset));

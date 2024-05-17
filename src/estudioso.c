@@ -104,14 +104,6 @@ typedef u32 key_code;
 #define Bits_Per_Key_State_Chunk (sizeof(key_state_chunk) * 8)
 #define Key_State_Chunk_Count (Total_Number_Of_Keys / (Bits_Per_Key_State_Chunk / Bits_Per_Key_State))
 
-typedef struct
-{
-    b32 Shift;
-    b32 Control;
-    b32 Alt;
-    b32 Super;
-} modifier_keys;
-
 typedef enum
 {
     key_Up,
@@ -131,13 +123,6 @@ typedef enum
     quiz_mode_Win,
     quiz_mode_Count,
 } quiz_mode;
-
-typedef enum
-{
-    accent_NULL,
-    accent_Acute,
-    accent_Tilde,
-} accent;
 
 typedef enum
 {
@@ -228,21 +213,11 @@ typedef struct
 #define Key_Press_Queue_Size 16
     u32 KeyPressQueue[Key_Press_Queue_Size];
 
-    modifier_keys ModifierKeys;
-
-    accent CurrentAccent;
-    b32 AccentMode;
     b32 ShowAnswer;
     b32 CurrentQuizItemFailed;
 
     b32 InputOccured;
     key_code LastKeyPressed;
-    f32 KeyRepeatTime;
-    b32 KeyHasRepeated;
-
-#define Test_Buffer_Count 64
-    char QuizInput[Test_Buffer_Count + 1];
-    s32 QuizInputIndex;
 
 #define Quiz_Item_Max 512
     quiz_item QuizItems[Quiz_Item_Max];
@@ -259,6 +234,7 @@ typedef struct
     quiz_mode QuizMode;
 
     ui UI;
+    text_element TextElement;
 
 #define Max_Line_Count 6
 #define Max_Line_Buffer_Size 256
@@ -652,20 +628,23 @@ internal inline b32 KeyLocationIsValid(key_location Location)
     return Location.Index >= 0 && Location.Shift >= 0;
 }
 
-internal void ClearAccentKey(state *State)
+internal void ClearAccentKey(text_element *TextElement)
 {
-    switch (State->CurrentAccent)
+    switch (TextElement->CurrentAccent)
     {
     case accent_Acute:
     case accent_Tilde:
     {
-        State->QuizInput[State->QuizInputIndex] = 0;
-        if (State->QuizInputIndex + 1 < Test_Buffer_Count)
+        if (TextElement->Text)
         {
-            State->QuizInput[State->QuizInputIndex+1] = 0;
+            TextElement->Text[TextElement->Index] = 0;
+            if (TextElement->Index + 1 < TextElement->TextSize)
+            {
+                TextElement->Text[TextElement->Index+1] = 0;
+            }
+            TextElement->AccentMode = 0;
+            TextElement->CurrentAccent = 0;
         }
-        State->AccentMode = 0;
-        State->CurrentAccent = 0;
     } break;
     default:
     {
@@ -674,21 +653,19 @@ internal void ClearAccentKey(state *State)
     }
 }
 
-internal void HandleKey(state *State, key_code Key)
+internal void HandleKey(ui *UI, text_element *TextElement, key_code Key)
 {
-    State->InputOccured = 1;
-
     if (PrintableKeys[Key])
     {
-        if (State->QuizInputIndex + 1 < Test_Buffer_Count)
+        if (TextElement->Index + 1 < TextElement->TextSize)
         {
-            if (State->AccentMode)
+            if (TextElement->AccentMode)
             {
                 unsigned char SecondByte = 0;
 
-                if (State->QuizInputIndex + 2 < Test_Buffer_Count)
+                if (TextElement->Index + 2 < TextElement->TextSize)
                 {
-                    if (State->CurrentAccent == accent_Acute)
+                    if (TextElement->CurrentAccent == accent_Acute)
                     {
                         b32 DoNotUpdate = 0;
 
@@ -704,96 +681,96 @@ internal void HandleKey(state *State, key_code Key)
 
                         if (DoNotUpdate)
                         {
-                            ClearAccentKey(State);
+                            ClearAccentKey(TextElement);
                         }
                         else
                         {
-                            if (!State->ModifierKeys.Shift)
+                            if (!UI->ModifierKeys.Shift)
                             {
                                 SecondByte += 32;
                             }
 
-                            State->QuizInput[State->QuizInputIndex] = 0xC3;
-                            State->QuizInput[State->QuizInputIndex+1] = SecondByte;
-                            State->QuizInputIndex += 2;
+                            TextElement->Text[TextElement->Index] = 0xC3;
+                            TextElement->Text[TextElement->Index+1] = SecondByte;
+                            TextElement->Index += 2;
                         }
                     }
-                    else if (State->CurrentAccent == accent_Tilde && Key == KEY_N)
+                    else if (TextElement->CurrentAccent == accent_Tilde && Key == KEY_N)
                     {
                         char SecondByte = 0x91;
 
-                        if (!State->ModifierKeys.Shift)
+                        if (!UI->ModifierKeys.Shift)
                         {
                             SecondByte += 32;
                         }
 
-                        State->QuizInput[State->QuizInputIndex] = 0xC3;
-                        State->QuizInput[State->QuizInputIndex+1] = SecondByte;
-                        State->QuizInputIndex += 2;
+                        TextElement->Text[TextElement->Index] = 0xC3;
+                        TextElement->Text[TextElement->Index+1] = SecondByte;
+                        TextElement->Index += 2;
                     }
                     else
                     {
-                        ClearAccentKey(State);
+                        ClearAccentKey(TextElement);
                     }
                 }
 
-                State->AccentMode = 0;
-                State->CurrentAccent = 0;
+                TextElement->AccentMode = 0;
+                TextElement->CurrentAccent = 0;
             }
-            else if (State->ModifierKeys.Alt)
+            else if (UI->ModifierKeys.Alt)
             {
                 switch (Key)
                 {
                 case KEY_E:
                 {
-                    if (State->QuizInputIndex + 2 < Test_Buffer_Count)
+                    if (TextElement->Index + 2 < TextElement->TextSize)
                     {
                         /* NOTE: Acute accent '´' */
-                        State->QuizInput[State->QuizInputIndex] = 0xC2;
-                        State->QuizInput[State->QuizInputIndex+1] = 0xB4;
-                        State->AccentMode = 1;
-                        State->CurrentAccent = accent_Acute;
+                        TextElement->Text[TextElement->Index] = 0xC2;
+                        TextElement->Text[TextElement->Index+1] = 0xB4;
+                        TextElement->AccentMode = 1;
+                        TextElement->CurrentAccent = accent_Acute;
                     }
                 } break;
                 case KEY_N:
                 {
-                    if (State->QuizInputIndex + 2 < Test_Buffer_Count)
+                    if (TextElement->Index + 2 < TextElement->TextSize)
                     {
                         /* NOTE: Tilde '˜' */
-                        /* State->QuizInput[State->QuizInputIndex] = '~'; */
-                        State->QuizInput[State->QuizInputIndex] = 0xCB;
-                        State->QuizInput[State->QuizInputIndex+1] = 0x9C;
-                        State->AccentMode = 1;
-                        State->CurrentAccent = accent_Tilde;
+                        /* TextElement->Text[TextElement->Index] = '~'; */
+                        TextElement->Text[TextElement->Index] = 0xCB;
+                        TextElement->Text[TextElement->Index+1] = 0x9C;
+                        TextElement->AccentMode = 1;
+                        TextElement->CurrentAccent = accent_Tilde;
                     }
                 } break;
                 case KEY_SLASH:
                 {
-                    if (State->ModifierKeys.Shift &&
-                        State->QuizInputIndex + 2 < Test_Buffer_Count)
+                    if (UI->ModifierKeys.Shift &&
+                        TextElement->Index + 2 < TextElement->TextSize)
                     {
                         /* NOTE: Inverted question mark '¿' */
-                        State->QuizInput[State->QuizInputIndex] = 0xC2;
-                        State->QuizInput[State->QuizInputIndex+1] = 0xBF;
-                        State->QuizInputIndex = State->QuizInputIndex + 2;
+                        TextElement->Text[TextElement->Index] = 0xC2;
+                        TextElement->Text[TextElement->Index+1] = 0xBF;
+                        TextElement->Index = TextElement->Index + 2;
                     }
                 } break;
                 }
             }
-            else if (State->ModifierKeys.Shift && Key == KEY_SLASH)
+            else if (UI->ModifierKeys.Shift && Key == KEY_SLASH)
             {
-                State->QuizInput[State->QuizInputIndex] = '?';
-                State->QuizInputIndex = State->QuizInputIndex + 1;
+                TextElement->Text[TextElement->Index] = '?';
+                TextElement->Index = TextElement->Index + 1;
             }
             else
             {
-                if (!State->ModifierKeys.Shift && IS_UPPER_CASE(Key))
+                if (!UI->ModifierKeys.Shift && IS_UPPER_CASE(Key))
                 {
                     Key += 32;
                 }
 
-                State->QuizInput[State->QuizInputIndex] = Key;
-                State->QuizInputIndex = State->QuizInputIndex + 1;
+                TextElement->Text[TextElement->Index] = Key;
+                TextElement->Index = TextElement->Index + 1;
             }
         }
     }
@@ -803,9 +780,9 @@ internal void HandleKey(state *State, key_code Key)
         {
         case KEY_BACKSPACE:
         {
-            if (State->AccentMode)
+            if (TextElement->AccentMode)
             {
-                ClearAccentKey(State);
+                ClearAccentKey(TextElement);
             }
             else
             {
@@ -813,45 +790,45 @@ internal void HandleKey(state *State, key_code Key)
 
                 for (;;)
                 {
-                    if (State->QuizInputIndex > 0)
+                    if (TextElement->Index > 0)
                     {
-                        State->QuizInputIndex = State->QuizInputIndex - 1;
+                        TextElement->Index = TextElement->Index - 1;
                     }
 
-                    if (State->QuizInputIndex < 0)
+                    if (TextElement->Index < 0)
                     {
                         break;
                     }
 
-                    char Char = State->QuizInput[State->QuizInputIndex];
+                    char Char = TextElement->Text[TextElement->Index];
 
                     if (Is_Utf8_Tail_Byte(Char))
                     {
-                        State->QuizInput[State->QuizInputIndex] = 0;
+                        TextElement->Text[TextElement->Index] = 0;
                         TailBytesSkipped += 1;
                     }
                     else if (TailBytesSkipped == 1 && Is_Utf8_Header_Byte2(Char))
                     {
-                        if (State->QuizInputIndex < 0) break;
-                        State->QuizInput[State->QuizInputIndex] = 0;
+                        if (TextElement->Index < 0) break;
+                        TextElement->Text[TextElement->Index] = 0;
                         break;
                     }
                     else if (TailBytesSkipped == 2 && Is_Utf8_Header_Byte3(Char))
                     {
-                        if (State->QuizInputIndex < 0) break;
-                        State->QuizInput[State->QuizInputIndex] = 0;
+                        if (TextElement->Index < 0) break;
+                        TextElement->Text[TextElement->Index] = 0;
                         break;
                     }
                     else if (TailBytesSkipped == 3 && Is_Utf8_Header_Byte4(Char))
                     {
-                        if (State->QuizInputIndex < 0) break;
-                        State->QuizInput[State->QuizInputIndex] = 0;
+                        if (TextElement->Index < 0) break;
+                        TextElement->Text[TextElement->Index] = 0;
                         break;
                     }
                     else
                     {
                         /* NOTE: Delete an ASCII character. */
-                        State->QuizInput[State->QuizInputIndex] = 0;
+                        TextElement->Text[TextElement->Index] = 0;
                         break;
                     }
                 }
@@ -868,10 +845,10 @@ internal void HandleUserInput(state *State)
     b32 KeysWerePressed = 0;
 
     {
-        State->ModifierKeys.Shift = IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT);
-        State->ModifierKeys.Control = IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL);
-        State->ModifierKeys.Alt = IsKeyDown(KEY_LEFT_ALT) || IsKeyDown(KEY_RIGHT_ALT);
-        State->ModifierKeys.Super = IsKeyDown(KEY_LEFT_SUPER) || IsKeyDown(KEY_RIGHT_SUPER);
+        State->UI.ModifierKeys.Shift = IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT);
+        State->UI.ModifierKeys.Control = IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL);
+        State->UI.ModifierKeys.Alt = IsKeyDown(KEY_LEFT_ALT) || IsKeyDown(KEY_RIGHT_ALT);
+        State->UI.ModifierKeys.Super = IsKeyDown(KEY_LEFT_SUPER) || IsKeyDown(KEY_RIGHT_SUPER);
     }
 
     {
@@ -902,7 +879,7 @@ internal void HandleUserInput(state *State)
             break;
         }
 
-        if (State->ModifierKeys.Control && Key == KEY_H)
+        if (State->UI.ModifierKeys.Control && Key == KEY_H)
         {
             State->ShowAnswer = 1;
             KeysWerePressed = 1;
@@ -913,29 +890,31 @@ internal void HandleUserInput(state *State)
             State->KeyPressQueue[QueueIndex] = Key;
             QueueIndex += 1;
             KeysWerePressed = 1;
-            State->KeyRepeatTime = 0.0f;
-            State->KeyHasRepeated = 0;
+            State->TextElement.KeyRepeatTime = 0.0f;
+            State->TextElement.KeyHasRepeated = 0;
             State->LastKeyPressed = Key;
 
-            HandleKey(State, Key);
+            HandleKey(&State->UI, &State->TextElement, Key);
+            State->InputOccured = 1;
         }
     }
 
     if (!KeysWerePressed && IsKeyDown(State->LastKeyPressed))
     {
         /* NOTE: Handle keyboard repeat */
-        State->KeyRepeatTime += State->DeltaTime;
+        State->TextElement.KeyRepeatTime += State->DeltaTime;
 
-        b32 InitialKeyRepeat = !State->KeyHasRepeated && State->KeyRepeatTime > 0.3f;
+        b32 InitialKeyRepeat = !State->TextElement.KeyHasRepeated && State->TextElement.KeyRepeatTime > 0.3f;
         /* NOTE: If the key repeat time is short enough, we may need to handle multiple repeats in a single frame. */
-        b32 TheOtherKeyRepeats = State->KeyHasRepeated && State->KeyRepeatTime > 0.04f;
+        b32 TheOtherKeyRepeats = State->TextElement.KeyHasRepeated && State->TextElement.KeyRepeatTime > 0.04f;
 
         if (InitialKeyRepeat || TheOtherKeyRepeats)
         {
-            State->KeyRepeatTime = 0.0f;
-            State->KeyHasRepeated = 1;
+            State->TextElement.KeyRepeatTime = 0.0f;
+            State->TextElement.KeyHasRepeated = 1;
 
-            HandleKey(State, State->LastKeyPressed);
+            HandleKey(&State->UI, &State->TextElement, State->LastKeyPressed);
+            State->InputOccured = 1;
         }
     }
 
@@ -998,13 +977,13 @@ internal b32 StringsMatch(char *A, char *B)
     }
 }
 
-internal void ClearQuizInput(state *State)
+internal void ClearTextElement(text_element *TextElement)
 {
-    for (s32 I = 0; I <= State->QuizInputIndex; ++I)
+    for (s32 I = 0; I <= TextElement->TextSize; ++I)
     {
-        State->QuizInput[I] = 0;
+        TextElement->Text[I] = 0;
     }
-    State->QuizInputIndex = 0;
+    TextElement->Index = 0;
 }
 
 debug_variable b32 FrameIndex = 0;
@@ -1118,8 +1097,8 @@ internal void GetNextRandomQuizItem(state *State)
 
     State->ShowAnswer = 0;
 
-    ClearQuizInput(State);
-    State->QuizInputIndex = 0;
+    ClearTextElement(&State->TextElement);
+    State->TextElement.Index = 0;
     State->CurrentQuizItemFailed = 0;
 
     { /* NOTE: Randomly pick index for variable-answer quiz-items. */
@@ -1340,17 +1319,13 @@ internal void DrawQuizItem(state *State, u32 LetterSpacing)
     f32 MaxPromptWidth = MinF32(500.0f, SCREEN_WIDTH - 2.0f * BorderPadding);
 
     Vector2 AnswerSize = MeasureTextEx(State->UI.Font, (char *)Answer, State->UI.FontSize, 1);
-    Vector2 InputSize = MeasureTextEx(State->UI.Font, State->QuizInput, State->UI.FontSize, 1);
 
     f32 AnswerOffsetX = AnswerSize.x / 2.0f;
     f32 AnswerX = SCREEN_HALF_WIDTH - AnswerOffsetX;
     f32 AnswerY = SCREEN_HALF_HEIGHT + (1 * LineHeight);
 
-    f32 InputX = SCREEN_HALF_WIDTH - (InputSize.x / 2.0f);
-    f32 InputY = SCREEN_HALF_HEIGHT;
-
-    f32 CursorX = SCREEN_HALF_WIDTH + (InputSize.x / 2.0f);
-    f32 CursorY = InputY;
+    /* f32 CursorX = SCREEN_HALF_WIDTH + (InputSize.x / 2.0f); */
+    /* f32 CursorY = InputY; */
 
     if (State->ShowAnswer)
     {
@@ -1405,34 +1380,12 @@ internal void DrawQuizItem(state *State, u32 LetterSpacing)
         DrawTextEx(State->UI.Font, ConjugationText, TextPosition, State->UI.FontSize, LetterSpacing, CONJUGATION_TYPE_COLOR);
     }
 
-    DrawTextEx(State->UI.Font, State->QuizInput, V2(InputX, InputY), State->UI.FontSize, LetterSpacing, FONT_COLOR);
-
-    { /* Draw cursor */
-        f32 BlinkTime = State->UI.CursorBlinkTime;
-        f32 BlinkRate = State->UI.CursorBlinkRate;
-        f32 TimeWithCursorInvisible = 0.4f * BlinkRate;
-
-        BlinkTime = BlinkTime + State->DeltaTime;
-        while (BlinkTime > BlinkRate)
-        {
-            BlinkTime -= BlinkRate;
-        }
-        State->UI.CursorBlinkTime = BlinkTime;
-
-        if (State->InputOccured)
-        {
-            State->UI.CursorBlinkTime = TimeWithCursorInvisible;
-        }
-
-        b32 ShowCursor = BlinkTime >= TimeWithCursorInvisible;
-
-        if (ShowCursor)
-        {
-            Color CursorColor = (Color){130,100,250,255};
-            f32 Spacing = 3.0f;
-            DrawRectangle(CursorX + Spacing, CursorY, 3, State->UI.FontSize, CursorColor);
-        }
+    if (State->InputOccured)
+    {
+        State->UI.CursorBlinkTime = 0.0f;
     }
+
+    DoText(&State->UI, &State->TextElement, State->DeltaTime);
 
     Vector2 NextButtonPosition = V2(SCREEN_WIDTH - BorderPadding, SCREEN_HEIGHT - BorderPadding);
     b32 NextPressed = DoButtonWith(&State->UI, ui_Next, (u8 *)"Next", NextButtonPosition, alignment_BottomRight);
@@ -1717,7 +1670,7 @@ internal void DrawWinMessage(state *State, u32 LetterSpacing)
         if (IsKeyPressed(KEY_ENTER))
         {
             ResetQuizItems(State);
-            ClearQuizInput(State);
+            ClearTextElement(&State->TextElement);
 
             SetQuizMode(State, quiz_mode_Typing);
 
@@ -1767,7 +1720,7 @@ internal void HandleQuizItem(state *State, quiz_item *QuizItem)
     {
         if (State->QuizMode == quiz_mode_Typing)
         {
-            if (StringsMatch((char *)Answer, State->QuizInput))
+            if (StringsMatch((char *)Answer, (char *)State->TextElement.Text))
             {
                 SetQuizMode(State, quiz_mode_Correct);
                 OkPlaySound(State->Correct);
@@ -1861,6 +1814,12 @@ int main(void)
 
     state State = {0};
     State.UI.CursorBlinkRate = 1.0f;
+
+    u8 TextBuffer[1024] = {0};
+    State.TextElement.TextSize = 1024;
+    State.TextElement.Text = TextBuffer;
+    State.TextElement.Position = V2(SCREEN_WIDTH / 2.0f, SCREEN_HEIGHT / 2.0f);
+    State.TextElement.Color = (Color){255, 255, 255, 255};
 
 #if !PLATFORM_WEB
     /* TODO: Update raylib binary to see if we can init audio device on web!
