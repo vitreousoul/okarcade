@@ -94,7 +94,7 @@ internal void InitializeDefaultQuizItems(state *State)
         /* AddQuizText("(Ser/Estar) a domingo.", "Estamos"); */
         /* AddQuizText("(Ser/Estar) a 1 de abril.", "Estamos"); */
         /* AddQuizText("(Ser/Estar) en primavera.", "Estamos"); */
-        AddQuizText("¿A qué día (ser/estar) hoy?", "estamos");
+        /* AddQuizText("¿A qué día (ser/estar) hoy?", "estamos"); */
         AddQuizText("(Ser/Estar) bien irse de vacaciones una vez al año.", "Está");
         AddQuizText("Marco siempre (ser/estar) de buen humor.", "está");
         AddQuizText("Marisa (ser/estar) ahora de camarera en Ibiza.", "está");
@@ -305,7 +305,7 @@ internal void InitializeDefaultQuizItems(state *State)
     AddQuizText("Mi amigo (oír) música clásica toda la noche.", "oyó");
     AddQuizText("Ella (leer) una novela el fin de semana.", "leió");
     AddQuizText("Mi gato (huir) de los perros anoche.", "huió");
-    AddQuizText("Los niños no (creer) la historia.", "creyeron");
+    AddQuizText("Los niños no (creer) la historia de la semana pasada.", "creyeron");
     AddQuizText("La semana pasada un avión (caer) en el lago.", "cayó");
     AddQuizText("Mis padres (construir) esta casa hace diez años.", "construyeron");
     AddQuizText("En el año 1976 un terremoto (destruir) muchas casas en Guatemala.", "destruyó");
@@ -331,7 +331,7 @@ internal void InitializeDefaultQuizItems(state *State)
     AddQuizText("Yo (comer) mucho la semana pasada.", "comí");
     AddQuizText("Mis padres (vivir) en florida hace cuarenta años.", "vivieron");
     AddQuizText("Nosotros (nadar) en el lago ayer.", "nadamos");
-    AddQuizText("Yo (tener) mucho frio.", "tuve");
+    AddQuizText("Anoche, yo (tener) mucho frio.", "tuve");
     AddQuizText("Tú (leer) muchos libros el año pasado.", "leíste");
     AddQuizText("Ellos (construir) esta casa hace 80 años.", "construyeron");
     AddQuizText("Ella (conducir) al trabajo ayer.", "condujo");
