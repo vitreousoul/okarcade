@@ -69,7 +69,7 @@ EM_JS(void, UpdateCanvasDimensions, (f32 TargetWidth, f32 TargetHeight), {
     }
 });
 
-EM_JS(s32, GetCanvasWidth, (), {
+EM_JS(s32, GetCanvasWidth, (void), {
     var canvas = document.getElementById("canvas");
     if (canvas) {
         var rect = canvas.getBoundingClientRect();
@@ -79,7 +79,7 @@ EM_JS(s32, GetCanvasWidth, (), {
     }
 });
 
-EM_JS(s32, GetCanvasHeight, (), {
+EM_JS(s32, GetCanvasHeight, (void), {
     var canvas = document.getElementById("canvas");
     if (canvas) {
         var rect = canvas.getBoundingClientRect();

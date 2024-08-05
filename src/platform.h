@@ -8,6 +8,8 @@
 
 #define PATH_SEPARATOR '/'
 
+#include "../lib/ryn_memory.h"
+
 typedef struct
 {
     u8 *Name;
@@ -26,14 +28,6 @@ typedef struct file_list file_list;
 
 typedef struct
 {
-    u64 Offset;
-    u64 Capacity;
-    u8 *Data;
-    u64 ParentOffset;
-} arena;
-
-typedef struct
-{
     s32 Year;
     s32 Month;
     s32 Day;
@@ -46,24 +40,15 @@ typedef struct
 
 void *AllocateMemory(u64 Size);
 void FreeMemory(void *Ref);
-void *AllocateVirtualMemory(size Size);
 
 void GetResourceUsage(void);
-
-arena CreateArena(u64 Size);
-b32 IsArenaUsable(arena Arena);
-void *PushArena(arena *Arena, u64 Size);
-s32 WriteArena(arena *Arena, u8 *Data, u64 Size);
-u8 *GetArenaWriteLocation(arena *Arena);
-u64 GetArenaFreeSpace(arena *Arena);
-void FreeArena(arena Arena);
 
 date GetDate(void);
 
 buffer *ReadFileIntoBuffer(u8 *FilePath);
 u64 GetFileSize(u8 *FilePath);
 u64 ReadFileIntoData(u8 *FilePath, u8 *Bytes, u64 MaxBytes);
-u64 ReadFileIntoAllocator(arena *Arena, u8 *FilePath);
+u64 ReadFileIntoAllocator(ryn_memory_arena *Arena, u8 *FilePath);
 void FreeBuffer(buffer *Buffer);
 
 file OpenFile(u8 *FilePath);
@@ -75,7 +60,7 @@ void WriteFileFromBuffer(u8 *FilePath, buffer *Buffer);
 void EnsureDirectoryExists(u8 *DirectoryPath);
 void EnsurePathDirectoriesExist(u8 *Path);
 
-arena WalkDirectory(u8 *Path);
+ryn_memory_arena WalkDirectory(u8 *Path);
 
 void *AllocateMemory(u64 Size)
 {
@@ -87,43 +72,6 @@ void FreeMemory(void *Ref)
 {
     /* just use free for now... */
     free(Ref);
-}
-
-void *AllocateVirtualMemory(size Size)
-{
-    /* TODO allow setting specific address for debugging with stable pointer values */
-    u8 *Address = 0;
-    int Protections = PROT_READ | PROT_WRITE;
-    int Flags = MAP_ANON | MAP_PRIVATE;
-    int FileDescriptor = 0;
-    int Offset = 0;
-
-    u8 *Result = mmap(Address, Size, Protections, Flags, FileDescriptor, Offset);
-
-    if (Result == MAP_FAILED)
-    {
-        char *ErrorName = 0;
-
-        switch(errno)
-        {
-
-        case EACCES: ErrorName = "EACCES"; break;
-        case EBADF: ErrorName = "EBADF"; break;
-        case EINVAL: ErrorName = "EINVAL"; break;
-        case ENODEV: ErrorName = "ENODEV"; break;
-        case ENOMEM: ErrorName = "ENOMEM"; break;
-        case ENXIO: ErrorName = "ENXIO"; break;
-        case EOVERFLOW: ErrorName = "EOVERFLOW"; break;
-        default: ErrorName = "<Unknown errno>"; break;
-        }
-
-        printf("Error in AllocateVirtualMemory: failed to map memory with errno = \"%s\"\n", ErrorName);
-        return 0;
-    }
-    else
-    {
-        return Result;
-    }
 }
 
 void GetResourceUsage(void)
@@ -142,107 +90,6 @@ void GetResourceUsage(void)
     }
 }
 
-/*| v Arena Allocator v |*/
-arena CreateArena(u64 Size)
-{
-    arena Arena;
-
-    Arena.Offset = 0;
-    Arena.Capacity = Size;
-    Arena.Data = AllocateVirtualMemory(Size);
-    Arena.ParentOffset = 0;
-
-    return Arena;
-}
-
-void *PushArena(arena *Arena, u64 Size)
-{
-    u8 *Result = 0;
-
-    if ((Size + Arena->Offset) > Arena->Capacity)
-    {
-        printf("Error in PushArena: allocator is full\n");
-    }
-    else
-    {
-        Result = &Arena->Data[Arena->Offset];
-        Arena->Offset += Size;
-    }
-
-    return Result;
-}
-
-u64 GetArenaFreeSpace(arena *Arena)
-{
-    Assert(Arena->Capacity >= Arena->Offset);
-    u64 FreeSpace = Arena->Capacity - Arena->Offset;
-    return FreeSpace;
-}
-
-arena CreateSubArena(arena *Arena, u64 Size)
-{
-    arena SubArena = {0};
-
-    if (Size <= GetArenaFreeSpace(Arena))
-    {
-        SubArena.Capacity = Size;
-        SubArena.Data = GetArenaWriteLocation(Arena);
-        PushArena(Arena, Size);
-    }
-
-    return SubArena;
-}
-
-inline b32 IsArenaUsable(arena Arena)
-{
-    b32 IsUsable = Arena.Capacity && Arena.Data;
-    return IsUsable;
-}
-
-s32 WriteArena(arena *Arena, u8 *Data, u64 Size)
-{
-    s32 ErrorCode = 0;
-
-    u8 *WhereToWrite = PushArena(Arena, Size);
-
-    if (WhereToWrite)
-    {
-        CopyMemory(Data, WhereToWrite, Size);
-    }
-    else
-    {
-        ErrorCode = 1;
-    }
-
-    return ErrorCode;
-}
-
-u8 *GetArenaWriteLocation(arena *Arena)
-{
-    u8 *WriteLocation = Arena->Data + Arena->Offset;
-    return WriteLocation;
-}
-
-void FreeArena(arena Arena)
-{
-    munmap(Arena.Data, Arena.Capacity);
-}
-
-void ArenaStackPush(arena *Arena)
-{
-    u64 NewParentOffset = Arena->Offset;
-    WriteArena(Arena, (u8 *)&Arena->ParentOffset, sizeof(Arena->ParentOffset));
-    Arena->ParentOffset = NewParentOffset;
-}
-
-void ArenaStackPop(arena *Arena)
-{
-    Arena->Offset = Arena->ParentOffset;
-    u64 *WriteLocation = (u64 *)GetArenaWriteLocation(Arena);
-    Arena->ParentOffset = *WriteLocation;
-}
-/*| ^ Arena Allocator ^ |*/
-
 date GetDate(void)
 {
     date Date;
@@ -259,9 +106,9 @@ date GetDate(void)
 }
 
 #define PushString(a, s) PushString_((a), (s), GetStringLength(s))
-internal u8 *PushString_(arena *Arena, u8 *String, s32 StringLength)
+internal u8 *PushString_(ryn_memory_arena *Arena, u8 *String, s32 StringLength)
 {
-    u8 *WhereToWrite = PushArena(Arena, StringLength);
+    u8 *WhereToWrite = ryn_memory_PushArena(Arena, StringLength);
     CopyMemory(String, WhereToWrite, StringLength);
     return WhereToWrite;
 }
@@ -330,7 +177,7 @@ u64 ReadFileIntoData(u8 *FilePath, u8 *Bytes, u64 MaxBytes)
     return FileSize;
 }
 
-u64 ReadFileIntoAllocator(arena *Allocator, u8 *FilePath)
+u64 ReadFileIntoAllocator(ryn_memory_arena *Allocator, u8 *FilePath)
 {
     u64 BytesWritten = 0;
     u64 FileSize = GetFileSize(FilePath);
@@ -470,9 +317,9 @@ internal b32 IsWalkableFile(u8 *FileName)
 }
 
 /* TODO: pass in allocator, to give caller more control */
-arena WalkDirectory(u8 *Path)
+ryn_memory_arena WalkDirectory(u8 *Path)
 {
-    arena Allocator = CreateArena(Gigabytes(1));
+    ryn_memory_arena Allocator = ryn_memory_CreateArena(Gigabytes(1));
     /* NOTE: we call the variable "Paths", but it's only every inteded to contain 1 path. */
     char *Paths[] = { (char *)Path, 0 };
     u32 FtsFlags = FTS_PHYSICAL | FTS_NOCHDIR | FTS_XDEV;
@@ -500,7 +347,7 @@ arena WalkDirectory(u8 *Path)
                     b32 IsFirstAllocation = Allocator.Offset == 0;
                     s32 FilePathLength = strlen((char *)FilePath);
                     size FileItemSize = sizeof(file_list) + FilePathLength + 1;
-                    file_list *FileItem = PushArena(&Allocator, FileItemSize);
+                    file_list *FileItem = ryn_memory_PushArena(&Allocator, FileItemSize);
 
                     CopyMemory(FilePath, FileItem->Name, FilePathLength);
                     FileItem->Name[FileItemSize] = 0;

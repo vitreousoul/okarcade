@@ -38,21 +38,22 @@ elif [ $DEBUG -eq 1 ]; then
     TARGET="-g3 -O0 -o dist/$TARGET_NAME.out"
 fi
 
+SETTINGS="-std=c99 -Wall -Wextra -Wstrict-prototypes -Wold-style-definition -Wno-comment"
+SETTINGS="$SETTINGS -Wno-unused-function"
+SETTINGS="$SETTINGS -Wno-unused-parameter"
+# SETTINGS="$SETTINGS -Wmissing-prototypes -Wmissing-declarations"
+
 if [ $WEB -eq 1 ]; then
     RAYLIB_LIB="./lib/libraylibweb.a"
     RAYLIB_INCLUDE="-I. -I./lib/raylib.h -L. -L$RAYLIB_LIB"
     WEB_CONFIG="-s USE_GLFW=3 -s ASYNCIFY"
     SHELL_FILE="--shell-file gen/l_system.html"
 
-    emcc -o site/l_system.html src/l_system.c -Os -Wall $RAYLIB_LIB $RAYLIB_INCLUDE $WEB_CONFIG -DPLATFORM_WEB $SHELL_FILE
+    emcc -o site/l_system.html src/l_system.c -Os -Wall $SETTINGS $RAYLIB_LIB $RAYLIB_INCLUDE $WEB_CONFIG -DPLATFORM_WEB $SHELL_FILE
 else
     GRAPHICS_FRAMEWORKS="-framework CoreVideo -framework IOKit -framework Cocoa -framework GLUT -framework OpenGL"
     GRAPHICS_LIB="lib/libraylib.a"
 
-    SETTINGS="-std=c99 -Wall -Wextra -Wstrict-prototypes -Wold-style-definition -Wno-comment"
-    SETTINGS="$SETTINGS -Wno-unused-function"
-    SETTINGS="$SETTINGS -Wno-unused-parameter"
-    # SETTINGS="$SETTINGS -Wmissing-prototypes -Wmissing-declarations"
     SOURCE_FILE="./src/$TARGET_NAME.c"
 
     $COMPILER $GRAPHICS_FRAMEWORKS $GRAPHICS_LIB $SETTINGS $SOURCE_FILE $TARGET

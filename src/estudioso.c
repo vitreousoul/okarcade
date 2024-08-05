@@ -147,6 +147,7 @@ typedef enum
     quiz_item_Conjugation,
     quiz_item_VariableAnswer,
     quiz_item_Translation,
+    quiz_item_Definition,
     quiz_item_Count,
 } quiz_item_type;
 
@@ -182,6 +183,13 @@ typedef struct
 
 typedef struct
 {
+    char *Prompt;
+    char *Answers[Max_Variable_Answers];
+    s32 AnswerCount;
+} definition_answer;
+
+typedef struct
+{
     quiz_item_type Type;
     b32 Complete;
     s16 PassCount;
@@ -192,6 +200,7 @@ typedef struct
         quiz_text Text;
         quiz_conjugation Conjugation;
         variable_answer VariableAnswer;
+        definition_answer Definition;
     };
 } quiz_item;
 
@@ -415,6 +424,15 @@ internal void AddQuizVariableAnswer_(state *State, variable_answer VA)
 
         QuizItem.VariableAnswer.Answers[I] = VA.Answers[I];
     }
+
+    AddQuizItem(State, QuizItem);
+}
+
+internal void AddDefinitionQuizItem(state *State, definition_answer DefinitionAnswer)
+{
+    quiz_item QuizItem = {0};
+    QuizItem.Type = quiz_item_Definition;
+    QuizItem.Definition = DefinitionAnswer;
 
     AddQuizItem(State, QuizItem);
 }
@@ -1266,6 +1284,11 @@ internal void DrawQuizItem(state *State, u32 LetterSpacing)
         Prompt = QuizItem->Conjugation.Prompt;
         Answer = QuizItem->Conjugation.Answer;
     } break;
+    case quiz_item_Definition:
+    {
+        Prompt = (u8 *)QuizItem->Definition.Prompt;
+        Answer = (u8 *)"";
+    } break;
     case quiz_item_VariableAnswer:
     {
         variable_answer VA = QuizItem->VariableAnswer;
@@ -1318,10 +1341,6 @@ internal void DrawQuizItem(state *State, u32 LetterSpacing)
 
     f32 MaxPromptWidth = MinF32(500.0f, SCREEN_WIDTH - 2.0f * BorderPadding);
 
-    Vector2 AnswerSize = MeasureTextEx(State->UI.Font, (char *)Answer, State->UI.FontSize, 1);
-
-    f32 AnswerOffsetX = AnswerSize.x / 2.0f;
-    f32 AnswerX = SCREEN_HALF_WIDTH - AnswerOffsetX;
     f32 AnswerY = SCREEN_HALF_HEIGHT + (1 * LineHeight);
 
     /* f32 CursorX = SCREEN_HALF_WIDTH + (InputSize.x / 2.0f); */
@@ -1329,7 +1348,29 @@ internal void DrawQuizItem(state *State, u32 LetterSpacing)
 
     if (State->ShowAnswer)
     {
-        DrawTextEx(State->UI.Font, (char *)Answer, V2(AnswerX, AnswerY), State->UI.FontSize, LetterSpacing, ANSWER_COLOR);
+        if (QuizItem->Type == quiz_item_Definition)
+        {
+            f32 Y = AnswerY;
+
+            for (s32 I = 0; I < QuizItem->Definition.AnswerCount; ++I)
+            {
+                char *Answer = QuizItem->Definition.Answers[I];
+                Vector2 AnswerSize = MeasureTextEx(State->UI.Font, (char *)Answer, State->UI.FontSize, 1);
+                f32 AnswerOffsetX = AnswerSize.x / 2.0f;
+                f32 AnswerX = SCREEN_HALF_WIDTH - AnswerOffsetX;
+
+                DrawTextEx(State->UI.Font, Answer, V2(AnswerX, Y), State->UI.FontSize, LetterSpacing, ANSWER_COLOR);
+                Y += State->UI.FontSize + 4.0f;
+            }
+        }
+        else
+        {
+            Vector2 AnswerSize = MeasureTextEx(State->UI.Font, (char *)Answer, State->UI.FontSize, 1);
+            f32 AnswerOffsetX = AnswerSize.x / 2.0f;
+            f32 AnswerX = SCREEN_HALF_WIDTH - AnswerOffsetX;
+
+            DrawTextEx(State->UI.Font, (char *)Answer, V2(AnswerX, AnswerY), State->UI.FontSize, LetterSpacing, ANSWER_COLOR);
+        }
     }
 
 #if DEBUG_GRAPHICS
@@ -1696,6 +1737,25 @@ internal void DrawUnknownQuizItem(state *State)
     }
 }
 
+internal void HandleCorrectAnswer(state *State, quiz_item *QuizItem)
+{
+    SetQuizMode(State, quiz_mode_Correct);
+    OkPlaySound(State->Correct);
+    QuizItem->Complete = 1;
+    QuizItem->PassCount += 1;
+}
+
+internal void HandleWrongAnswer(state *State, quiz_item *QuizItem)
+{
+    OkPlaySound(State->Wrong);
+
+    if (!State->CurrentQuizItemFailed)
+    {
+        QuizItem->FailCount += 1;
+        State->CurrentQuizItemFailed = 1;
+    }
+}
+
 internal void HandleQuizItem(state *State, quiz_item *QuizItem)
 {
     int LetterSpacing = 1;
@@ -1720,22 +1780,31 @@ internal void HandleQuizItem(state *State, quiz_item *QuizItem)
     {
         if (State->QuizMode == quiz_mode_Typing)
         {
-            if (StringsMatch((char *)Answer, (char *)State->TextElement.Text))
+            b32 IsCorrect = 0;
+
+            if (QuizItem->Type == quiz_item_Definition)
             {
-                SetQuizMode(State, quiz_mode_Correct);
-                OkPlaySound(State->Correct);
-                QuizItem->Complete = 1;
-                QuizItem->PassCount += 1;
+                for (s32 I = 0; I < QuizItem->Definition.AnswerCount; ++I)
+                {
+                    if (StringsMatch(QuizItem->Definition.Answers[I], (char *)State->TextElement.Text))
+                    {
+                        IsCorrect = 1;
+                        break;
+                    }
+                }
             }
             else
             {
-                OkPlaySound(State->Wrong);
+                IsCorrect = StringsMatch((char *)Answer, (char *)State->TextElement.Text);
+            }
 
-                if (!State->CurrentQuizItemFailed)
-                {
-                    QuizItem->FailCount += 1;
-                    State->CurrentQuizItemFailed = 1;
-                }
+            if (IsCorrect)
+            {
+                HandleCorrectAnswer(State, QuizItem);
+            }
+            else
+            {
+                HandleWrongAnswer(State, QuizItem);
             }
         }
         else if (State->QuizMode == quiz_mode_Correct)
@@ -1778,6 +1847,7 @@ internal void UpdateAndRender(state *State, b32 ForceDraw)
         switch(QuizItem->Type)
         {
         case quiz_item_Conjugation:
+        case quiz_item_Definition:
         case quiz_item_Text:
         case quiz_item_VariableAnswer:
         {
@@ -1887,12 +1957,6 @@ int main(void)
         Codepoints = LoadCodepoints(TextWithAllCodepoints, &CodepointCount);
 
 #if PLATFORM_WEB
-        /* TODO: It initially seemed that scaling fonts at all on the web produced blurry text.
-           Investigate whether that is _really_ true, and if so, set up web fonts so that they
-           are loaded and drawn as 1:1 fonts. This means loading fonts per font sizes in the
-           game? Not sure about this one at the moment...
-        */
-        u32 FontScale = 1;
         /* TODO: Fix loading font-data-files with LoadFontFromMemory for web,
            somehow it doesn't work anymore :(
         */

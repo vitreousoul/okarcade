@@ -19,6 +19,15 @@
         AddQuizVariableAnswer_(State, VariableAnswer);  \
     }
 
+#define DefAns(Prompt, Answers, Count) \
+    { \
+        definition_answer Answer = { \
+            Prompt,                  \
+            Answers,                 \
+            Count                    \
+        };\
+        AddDefinitionQuizItem(State, Answer);    \
+    }
 
 internal void InitializeDefaultQuizItems(state *State)
 {
@@ -73,7 +82,7 @@ internal void InitializeDefaultQuizItems(state *State)
         AddQuizText("En el norte ya (ser/estar) de noche.", "es");
         AddQuizText("Las camas (ser/estar) hechas por Claudia.", "son");
         AddQuizText("Esa máquina (ser/estar) para Gabriel.", "es");
-        AddQuizText("¿Cuánto es? (Ser/Estar) 120 euros.", "Son");
+        AddQuizText("¿Cuánto es? (Ser/Estar) 120 euros.", "Son"); /* TODO: Should the answer be "son" even though the question is about a single item? */
         AddQuizText("Ese anillo (ser/estar) de plata.", "es");
         AddQuizText("Ese anillo (ser/estar) de Perú.", "es");
         AddQuizText("Juana (ser/estar) ingeniera.", "es");
@@ -310,7 +319,7 @@ internal void InitializeDefaultQuizItems(state *State)
     AddQuizText("Mis padres (construir) esta casa hace diez años.", "construyeron");
     AddQuizText("En el año 1976 un terremoto (destruir) muchas casas en Guatemala.", "destruyó");
     AddQuizText("Después del huracán Stan mucha gente (contribuir) con los damnificados.", "contribuyeron");
-    AddQuizText("Los estudiantes (leer) su tarea en la escuela.", "leyeron");
+    AddQuizText("Los estudiantes (leer) su tarea en la escuela hace un mes.", "leyeron");
     AddQuizText("El año pasado una bomba (caer) en el centro del pueblo.", "cayó");
     AddQuizText("La explosión se (oír) hasta Panajachel.", "oyó");
     AddQuizText("Esa bomba (destruir) el mercado hace una semana.", "destruyó");
@@ -403,7 +412,7 @@ internal void InitializeDefaultQuizItems(state *State)
     VarAns(2, A("", ""), 3,
            A({"el agricultor"}, {"la agricultora"}, {"los agricultores"}),
            A( "farmer",          "farmer",           "farmers"));
-#else
+
     VarAns(2, A("", ""), 2, A({"la actividad"}, {"las actividades"}), A( "activity", "activities"));
     AddQuizText("actualmente", "currently"); /* nowadays */
 
@@ -416,7 +425,7 @@ internal void InitializeDefaultQuizItems(state *State)
     AddQuizText("afuera", "outside");
     AddQuizText("el/la agente", "agent");
     AddQuizText("agradecer", "to thank");
-    AddQuizText("agregar", "to gather");
+    DefAns("agregar", A("to gather", "to add", "to incorporate"), 3);
 
     AddQuizText("el agua", "water");
     AddQuizText("ahora", "now");
@@ -425,6 +434,8 @@ internal void InitializeDefaultQuizItems(state *State)
     AddQuizText("alguno", "any"); /* ALSO: one */
     AddQuizText("algunos", "some"); /* ALSO: few */
 #endif
+
+    DefAns("almorzar", A("to have lunch", "to eat lunch"), 2);
 }
 
 
@@ -433,7 +444,6 @@ internal void InitializeDefaultQuizItems(state *State)
 #define HIDE_WORDS 1
 #if !HIDE_WORDS /* TODO: delete these words after boiling them down to translatable words */
 LA/S mano/s
-almorzar
 alrededor
 alto
 alumno

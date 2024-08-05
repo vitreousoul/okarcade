@@ -42,6 +42,8 @@ int SCREEN_HEIGHT = 700;
 
 global_variable Color BackgroundColor = (Color){22, 102, 92, 255};
 
+#define Circle(x, y, r) (circle){{{(x), (y), (r)}}}
+
 #define TILE_SIZE 24
 #define MAP_WIDTH 16
 #define MAP_HEIGHT 16
@@ -324,8 +326,11 @@ typedef enum
 #define DEBUG_DRAW_COMMAND_MAX 1024
 global_variable debug_draw_command DebugDrawCommands[DEBUG_DRAW_COMMAND_MAX] = {0};
 global_variable s32 DebugDrawCommandCount = 0;
+
+#if !PLATFORM_WEB
 global_variable char DebugTextBuffer[1024];
 global_variable u64 CPUFreq = 1;
+#endif
 
 internal void ResetDebugDrawCommands(void)
 {
@@ -402,7 +407,7 @@ internal line WorldToScreenLine(game_state *GameState, line Line)
 internal circle WorldToScreenCircle(game_state *GameState, circle Circle)
 {
     Vector2 CirclePosition = WorldToScreenPosition(GameState, V2(Circle.X, Circle.Y));
-    circle Result = (circle){CirclePosition.x, CirclePosition.y, Circle.R};
+    circle Result = Circle(CirclePosition.x, CirclePosition.y, Circle.R);
     return Result;
 }
 
@@ -508,7 +513,6 @@ internal void DrawFrameRateHistory(void)
 
 internal s32 AddCollisionArea(game_state *GameState, entity *Entity)
 {
-    collision_area *CollisionArea = 0;
     collision_area NullArea = {0};
 
     s32 Index = GameState->CollisionAreaCount;
@@ -551,7 +555,7 @@ internal entity *AddEntity(game_state *GameState, sprite_type SpriteType)
             Entity->Health = 4;
             Entity->CollisionAreaIndex = AddCollisionArea(GameState, Entity);
             GameState->CollisionAreas[Entity->CollisionAreaIndex].Type = collision_type_Circle;
-            GameState->CollisionAreas[Entity->CollisionAreaIndex].Circle = (circle){0.0f, -3.0f, 15.0f};
+            GameState->CollisionAreas[Entity->CollisionAreaIndex].Circle = Circle(0.0f, -3.0f, 15.0f);
         } break;
         case sprite_type_Eel:
         {
@@ -563,7 +567,7 @@ internal entity *AddEntity(game_state *GameState, sprite_type SpriteType)
             Entity->Position = V2(0.0f, 0.0f);
             Entity->CollisionAreaIndex = AddCollisionArea(GameState, Entity);
             GameState->CollisionAreas[Entity->CollisionAreaIndex].Type = collision_type_Circle;
-            GameState->CollisionAreas[Entity->CollisionAreaIndex].Circle = (circle){40.0f, 20.0f, 32.0f};
+            GameState->CollisionAreas[Entity->CollisionAreaIndex].Circle = Circle(40.0f, 20.0f, 32.0f);
         } break;
         case sprite_type_Coral:
         {
@@ -601,7 +605,7 @@ internal entity *AddEntity(game_state *GameState, sprite_type SpriteType)
             Entity->Position = V2(0.0f, 0.0f);
             Entity->CollisionAreaIndex = AddCollisionArea(GameState, Entity);
             GameState->CollisionAreas[Entity->CollisionAreaIndex].Type = collision_type_Circle;
-            GameState->CollisionAreas[Entity->CollisionAreaIndex].Circle = (circle){0.0f, 0.0f, 162.0f};
+            GameState->CollisionAreas[Entity->CollisionAreaIndex].Circle = Circle(0.0f, 0.0f, 162.0f);
         } break;
         case sprite_type_Crab:
         {
@@ -613,7 +617,7 @@ internal entity *AddEntity(game_state *GameState, sprite_type SpriteType)
             Entity->Position = MultiplyV2S(V2(9.0f, 7.0f), TILE_SIZE * TEXTURE_MAP_SCALE);
             Entity->CollisionAreaIndex = AddCollisionArea(GameState, Entity);
             GameState->CollisionAreas[Entity->CollisionAreaIndex].Type = collision_type_Circle;
-            GameState->CollisionAreas[Entity->CollisionAreaIndex].Circle = (circle){0.0f, 0.0f, 32.0f};
+            GameState->CollisionAreas[Entity->CollisionAreaIndex].Circle = Circle(0.0f, 0.0f, 32.0f);
         } break;
         default: break;
         }
@@ -688,12 +692,12 @@ internal void HandleUserInput(game_state *GameState)
     {
         b32 ShiftIsDown = IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT);
 
-        if (IsKeyPressed(KEY_LEFT) || ShiftIsDown && IsKeyDown(KEY_LEFT))
+        if (IsKeyPressed(KEY_LEFT) || (ShiftIsDown && IsKeyDown(KEY_LEFT)))
         {
             DebugGameStatesIndex = (DebugGameStatesIndex - 1) & DebugGameStatesMask;
             DebugCopyGameState = 1;
         }
-        else if (IsKeyPressed(KEY_RIGHT) || ShiftIsDown && IsKeyDown(KEY_RIGHT))
+        else if (IsKeyPressed(KEY_RIGHT) || (ShiftIsDown && IsKeyDown(KEY_RIGHT)))
         {
             DebugGameStatesIndex = (DebugGameStatesIndex + 1) & DebugGameStatesMask;
             DebugCopyGameState = 1;
@@ -701,8 +705,8 @@ internal void HandleUserInput(game_state *GameState)
 
 
         { /* TODO: Remove this or use a debug-if... */
-            if (IsKeyPressed(KEY_RIGHT) || ShiftIsDown && IsKeyDown(KEY_RIGHT) ||
-                IsKeyPressed(KEY_LEFT) || ShiftIsDown && IsKeyDown(KEY_LEFT))
+            if (IsKeyPressed(KEY_RIGHT) || (ShiftIsDown && IsKeyDown(KEY_RIGHT)) ||
+                IsKeyPressed(KEY_LEFT) || (ShiftIsDown && IsKeyDown(KEY_LEFT)))
             {
                 entity *DebugPlayer = &DebugGameStates[DebugGameStatesIndex].Entities[0];
                 printf("[%d] player position %p:\n", DebugGameStatesIndex, DebugPlayer);
@@ -773,7 +777,7 @@ internal void DrawSprite(game_state *GameState, entity *Entity)
 
 internal inline circle GetOffsetCircle(circle Circle, Vector2 Offset)
 {
-    circle Result = (circle){ Circle.X + Offset.x, Circle.Y + Offset.y, Circle.R };
+    circle Result = Circle( Circle.X + Offset.x, Circle.Y + Offset.y, Circle.R );
     return Result;
 }
 
@@ -821,10 +825,10 @@ internal minkowski_circle_and_rectangle MinkowskiSumCircleAndRectangle(circle Ci
     f32 RW = Rectangle.width;
     f32 RH = Rectangle.height;
 
-    Shape.Circles[0] = (circle){RX,      RY,      CR};
-    Shape.Circles[1] = (circle){RX + RW, RY,      CR};
-    Shape.Circles[2] = (circle){RX + RW, RY + RH, CR};
-    Shape.Circles[3] = (circle){RX,      RY + RH, CR};
+    Shape.Circles[0] = Circle(RX,      RY,      CR);
+    Shape.Circles[1] = Circle(RX + RW, RY,      CR);
+    Shape.Circles[2] = Circle(RX + RW, RY + RH, CR);
+    Shape.Circles[3] = Circle(RX,      RY + RH, CR);
 
     Shape.Lines[0] = (line){{RX - CR,      RY},           {RX - CR,      RY + RH}};
     Shape.Lines[1] = (line){{RX + RW + CR, RY},           {RX + RW + CR, RY + RH}};
@@ -847,8 +851,8 @@ internal minkowski_circle_and_line MinkowskiSumCircleAndLine(circle Circle, line
     Vector2 LineOffsetPlus = MultiplyV2S(Normal0, Circle.R);
     Vector2 LineOffsetMinus = MultiplyV2S(Normal0, -Circle.R);
 
-    CircleAndLine.Circles[0] = (circle){Line.Start.x, Line.Start.y, Circle.R};
-    CircleAndLine.Circles[1] = (circle){Line.End.x, Line.End.y, Circle.R};
+    CircleAndLine.Circles[0] = Circle(Line.Start.x, Line.Start.y, Circle.R);
+    CircleAndLine.Circles[1] = Circle(Line.End.x, Line.End.y, Circle.R);
 
     CircleAndLine.Lines[0] = (line){AddV2(Line.Start, LineOffsetPlus),
                                     AddV2(Line.End, LineOffsetPlus)};
@@ -1134,8 +1138,6 @@ internal collision_result GetCollisionPointForRectangle(Vector2 P, Rectangle R)
 
     f32 MinimumDistance = 99999999999.0f;
 
-    s32 CollisionI;
-
     for (s32 I = 0; I < 4; ++I)
     {
         collision_result Collision = CollideLineAndLine(Line, Lines[I]);
@@ -1149,7 +1151,6 @@ internal collision_result GetCollisionPointForRectangle(Vector2 P, Rectangle R)
                 MinimumDistance = Distance;
                 Result = Collision;
                 Result.Normal = Normals[I];
-                CollisionI = I;
             }
         }
     }
@@ -1450,7 +1451,6 @@ internal collision_result CollideEntity(game_state *GameState, entity *Entity, f
     if (!EntityDoesNotCollide && Area->Type == collision_type_Circle)
     {
         f32 MinimumDistance = 999999999999999.0f;
-        f32 SignedDistance = 0.0f;
 
         for (s32 I = 0; I < MAX_COLLISION_GEOMETRY_COUNT; ++I)
         {
@@ -1688,8 +1688,6 @@ internal void GatherCollisionGeometry(game_state *GameState, s32 EntityIndex, f3
         GameState->CollisionGeometry[I].Type = 0;
     }
 
-    s32 CollisionGeometryIndex = 0;
-
     for (s32 I = 0; I < GameState->EntityCount; ++I)
     {
         entity *TestEntity = GameState->Entities + I;
@@ -1726,7 +1724,7 @@ internal void GatherCollisionGeometry(game_state *GameState, s32 EntityIndex, f3
                 {
                     line Line = Lines[J];
 
-                    collision_area NewArea = (collision_area){collision_type_Line, TestEntity->Sprites[0].Type, Line};
+                    collision_area NewArea = (collision_area){collision_type_Line, TestEntity->Sprites[0].Type, {Line}};
                     AddCollisionGeometry(GameState, &NewArea);
                 }
             }
@@ -1947,57 +1945,57 @@ internal void ResetGame(game_state *GameState)
 
     { /* init ui */
         GameState->StartElements[0] = (ui_element){
-            ui_element_type_Button, UiId++,
+            ui_element_type_Button, {{UiId++,
             V2(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 30),
             alignment_CenterCenter,
             V2(0, 0),
             (u8 *)"Play Game"
-        };
+        }}};
 
 #if !PLATFORM_WEB
         GameState->StartElements[1] = (ui_element){
-            ui_element_type_Button, UiId++,
+            ui_element_type_Button, {{UiId++,
             V2(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 30),
             alignment_CenterCenter,
             V2(0, 0),
             (u8 *)"Quit"
-        };
+        }}};
 #endif
 
         GameState->GameOverElements[0] = (ui_element){
-            ui_element_type_Button, UiId++,
+            ui_element_type_Button, {{UiId++,
             V2(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 30),
             alignment_CenterCenter,
             V2(0, 0),
             (u8 *)"Play Again"
-        };
+        }}};
 
 #if !PLATFORM_WEB
         GameState->GameOverElements[1] = (ui_element){
-            ui_element_type_Button, UiId++,
+            ui_element_type_Button, {{UiId++,
             V2(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 30),
             alignment_CenterCenter,
             V2(0, 0),
             (u8 *)"Quit"
-        };
+        }}};
 #endif
 
         GameState->WinElements[0] = (ui_element){
-            ui_element_type_Button, UiId++,
+            ui_element_type_Button, {{UiId++,
             V2(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 30),
             alignment_CenterCenter,
             V2(0, 0),
             (u8 *)"Play Again"
-        };
+        }}};
 
 #if !PLATFORM_WEB
         GameState->WinElements[1] = (ui_element){
-            ui_element_type_Button, UiId++,
+            ui_element_type_Button, {{UiId++,
             V2(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 30),
             alignment_CenterCenter,
             V2(0, 0),
             (u8 *)"Quit"
-        };
+        }}};
 #endif
     }
 
