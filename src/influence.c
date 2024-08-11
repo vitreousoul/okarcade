@@ -25,6 +25,19 @@
 
 typedef enum
 {
+    part_of_speech_Adjective    = 0x1,   /* describes things */
+    part_of_speech_Adverb       = 0x2,   /* tell us about actions */
+    part_of_speech_Conjunction  = 0x4,   /* join things */
+    part_of_speech_Determiner   = 0x8,   /* specify things or say how many */
+    part_of_speech_Interjection = 0x10,  /* express emotions */
+    part_of_speech_Noun         = 0x20,  /* name things */
+    part_of_speech_Preposition  = 0x40,  /* show relationships between words */
+    part_of_speech_Pronoun      = 0x80,  /* replace nouns */
+    part_of_speech_Verb         = 0x100, /* are actions */
+} part_of_speech_flag;
+
+typedef enum
+{
     emotion_Joy,
     emotion_Sadness,
     emotion_Fear,
