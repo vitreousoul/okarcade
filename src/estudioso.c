@@ -67,7 +67,6 @@ global_variable int SCREEN_HEIGHT = 600;
 
 #define ArrayCount(a) (sizeof(a)/sizeof((a)[0]))
 
-#define IS_SPACE(c) ((c) == ' ' || (c) == '\t' || (c) == '\n' || (c) == '\r')
 #define IS_UPPER_CASE(c) ((c) >= 65 && (c) <= 90)
 
 #define SCREEN_HALF_WIDTH (SCREEN_WIDTH / 2)
@@ -77,12 +76,6 @@ global_variable int SCREEN_HEIGHT = 600;
 #define FONT_COLOR (Color){250,240,245,255}
 #define ANSWER_COLOR (Color){200,240,205,255}
 #define CONJUGATION_TYPE_COLOR (Color){240,240,205,255}
-
-#define Is_Utf8_Header_Byte1(b) (((b) & 0x80) == 0x00)
-#define Is_Utf8_Header_Byte2(b) (((b) & 0xE0) == 0xC0)
-#define Is_Utf8_Header_Byte3(b) (((b) & 0xF0) == 0xE0)
-#define Is_Utf8_Header_Byte4(b) (((b) & 0xF8) == 0xF0)
-#define Is_Utf8_Tail_Byte(b)    (((b) & 0xC0) == 0x80)
 
 #define Key_State_Chunk_Size_Log2 5
 #define Key_State_Chunk_Size (1 << Key_State_Chunk_Size_Log2)
@@ -244,11 +237,6 @@ typedef struct
 
     ui UI;
     text_element TextElement;
-
-#define Max_Line_Count 6
-#define Max_Line_Buffer_Size 256
-    u8 LineBuffer[Max_Line_Count][Max_Line_Buffer_Size];
-    s32 LineBufferIndex;
 
     Sound Correct;
     Sound Wrong;
@@ -1157,110 +1145,6 @@ internal quiz_item *GetActiveQuizItem(state *State)
     return Item;
 }
 
-internal f32 GetCenteredTextX(state *State, u8 *Text, s32 LetterSpacing)
-{
-    Vector2 TextSize = MeasureTextEx(State->UI.Font, (char *)Text, State->UI.FontSize, LetterSpacing);
-    f32 X = (SCREEN_WIDTH - TextSize.x) / 2.0f;
-
-    return X;
-}
-
-internal void DrawWrappedText(state *State, u8 *Text, f32 MaxWidth, f32 Y, f32 LineHeight, f32 LetterSpacing)
-{
-    /* NOTE: Assumes that Y passed in is the Y position for the _last_ line.
-       We probably want to allow the caller to specify which direction the lines grow.
-    */
-    Vector2 TextSize = MeasureTextEx(State->UI.Font, (char *)Text, State->UI.FontSize, 1);
-    State->LineBufferIndex = 0;
-
-    if (TextSize.x < MaxWidth)
-    {
-        f32 X = GetCenteredTextX(State, Text, LetterSpacing);
-        DrawTextEx(State->UI.Font, (char *)Text, V2(X, Y), State->UI.FontSize, LetterSpacing, FONT_COLOR);
-    }
-    else
-    {
-        s32 I = 0;
-        s32 J = 0;
-        s32 Offset = 0;
-
-        /* TODO: @Speed We should be able do better than a linear search */
-        while (Text[I] && State->LineBufferIndex < Max_Line_Count)
-        {
-            J = I - Offset;
-            Assert(J >= 0 && J < Max_Line_Buffer_Size);
-
-            u8 *Line = State->LineBuffer[State->LineBufferIndex];
-
-            Line[J] = Text[I];
-            Line[J + 1] = 0;
-            Assert(J > 0 || !IS_SPACE(Line[J]));
-            Vector2 LineSize = MeasureTextEx(State->UI.Font, (char *)Line, State->UI.FontSize, LetterSpacing);
-
-            if (LineSize.x > MaxWidth)
-            {
-                b32 SpaceFound = 0;
-
-                /* NOTE: Seek back to the last space, and break the line there */
-                while (J >= 0)
-                {
-                    if (IS_SPACE(Line[J]))
-                    {
-                        SpaceFound = 1;
-                        Line[J] = 0;
-                        Offset += J + 1;
-                        I = Offset;
-
-                        ++State->LineBufferIndex;
-
-                        break;
-                    }
-                    else
-                    {
-                        while (Is_Utf8_Tail_Byte(Line[J--]));
-                    }
-                }
-
-                /* NOTE: No space was found, which means we have a word that is longer than
-                   the maximum line width. Break the word and put a dash at the end of the line.
-                */
-                if (!SpaceFound)
-                {
-                    s32 LastCharIndex = I - Offset;
-                    Line[LastCharIndex] = '-';
-
-                    Offset = I;
-                }
-
-                Assert(Offset == I);
-            }
-            else
-            {
-                ++I;
-            }
-        }
-
-        f32 OffsetY = Y - (LineHeight * State->LineBufferIndex);
-
-        /* NOTE: Draw the accumulated lines */
-        for (s32 LineIndex = 0; LineIndex < State->LineBufferIndex; ++LineIndex)
-        {
-            u8 *Line = State->LineBuffer[LineIndex];
-            f32 X = GetCenteredTextX(State, Line, LetterSpacing);
-            DrawTextEx(State->UI.Font, (char *)Line, V2(X, OffsetY), State->UI.FontSize, LetterSpacing, FONT_COLOR);
-            OffsetY += LineHeight;
-        }
-
-        /* NOTE: Draw any text remaining after the last line. */
-        if (I > Offset)
-        {
-            u8 *RemainingText = Text + Offset;
-            f32 X = GetCenteredTextX(State, RemainingText, LetterSpacing);
-            DrawTextEx(State->UI.Font, (char *)RemainingText, V2(X, OffsetY), State->UI.FontSize, LetterSpacing, FONT_COLOR);
-        }
-    }
-}
-
 internal void DrawQuizItem(state *State, u32 LetterSpacing)
 {
     quiz_item *QuizItem = GetActiveQuizItem(State);
@@ -1389,15 +1273,15 @@ internal void DrawQuizItem(state *State, u32 LetterSpacing)
 
 
     f32 WrappedTextY = SCREEN_HALF_HEIGHT - (2.0f * LineHeight);
-    DrawWrappedText(State, Prompt, MaxPromptWidth, WrappedTextY, LineHeight, LetterSpacing);
+    DrawWrappedText(&State->UI, Prompt, MaxPromptWidth, WrappedTextY, LineHeight, LetterSpacing, FONT_COLOR);
 
     if (State->QuizMode == quiz_mode_Correct)
     {
         char *CorrectString = "Correct";
         /* TODO: Scale up the Correct font size... but that requires increasing the font size that is loaded on web, to reduce blurry text... */
         f32 CorrectFontSize = State->UI.FontSize;
-        f32 X = GetCenteredTextX(State, (u8 *)CorrectString, LetterSpacing);
-        f32 OffsetY = (State->LineBufferIndex + 4) * LineHeight;
+        f32 X = GetCenteredTextX(&State->UI, (u8 *)CorrectString, LetterSpacing);
+        f32 OffsetY = (State->UI.LineBufferIndex + 4) * LineHeight;
         Vector2 CorrectPosition = V2(X, SCREEN_HALF_HEIGHT - OffsetY);
 
         DrawTextEx(State->UI.Font, CorrectString, CorrectPosition, CorrectFontSize, LetterSpacing, (Color){20, 200, 40, 255});

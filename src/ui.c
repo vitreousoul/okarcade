@@ -1,5 +1,13 @@
 #define BUTTON_PADDING 8
 
+#define IS_SPACE(c) ((c) == ' ' || (c) == '\t' || (c) == '\n' || (c) == '\r')
+
+#define Is_Utf8_Header_Byte1(b) (((b) & 0x80) == 0x00)
+#define Is_Utf8_Header_Byte2(b) (((b) & 0xE0) == 0xC0)
+#define Is_Utf8_Header_Byte3(b) (((b) & 0xF0) == 0xE0)
+#define Is_Utf8_Header_Byte4(b) (((b) & 0xF8) == 0xF0)
+#define Is_Utf8_Tail_Byte(b)    (((b) & 0xC0) == 0x80)
+
 typedef s32 ui_id;
 
 typedef enum
@@ -122,11 +130,19 @@ typedef struct
 
     f32 CursorBlinkRate;
     f32 CursorBlinkTime;
+
+    /* TODO: Dynamically allocate the line buffer. */
+#define Max_Line_Count 6
+#define Max_Line_Buffer_Size 256
+    u8 LineBuffer[Max_Line_Count][Max_Line_Buffer_Size];
+    s32 LineBufferIndex;
 } ui;
 
 ui_id GetElementId(ui_element Element);
 
 button_element CreateButton(Vector2 Position, u8 *Text, s32 Id);
+
+void DrawWrappedText(ui *Ui, u8 *Text, f32 MaxWidth, f32 Y, f32 LineHeight, f32 LetterSpacing, Color FontColor);
 
 b32 DoButton(ui *UI, button_element *Button);
 b32 DoButtonWith(ui *UI, s32 Id, u8 *Text, Vector2 Position, alignment Alignment);
@@ -235,6 +251,110 @@ internal Rectangle GetAlignedRectangle(Vector2 Position, Vector2 Size, alignment
     Result = R2(Position.x + Offset.x, Position.y + Offset.y, Size.x, Size.y);
 
     return Result;
+}
+
+internal f32 GetCenteredTextX(ui *Ui, u8 *Text, s32 LetterSpacing)
+{
+    Vector2 TextSize = MeasureTextEx(Ui->Font, (char *)Text, Ui->FontSize, LetterSpacing);
+    f32 X = (SCREEN_WIDTH - TextSize.x) / 2.0f;
+
+    return X;
+}
+
+void DrawWrappedText(ui *Ui, u8 *Text, f32 MaxWidth, f32 Y, f32 LineHeight, f32 LetterSpacing, Color FontColor)
+{
+    /* NOTE: Assumes that Y passed in is the Y position for the _last_ line.
+       We probably want to allow the caller to specify which direction the lines grow.
+    */
+    Vector2 TextSize = MeasureTextEx(Ui->Font, (char *)Text, Ui->FontSize, 1);
+    Ui->LineBufferIndex = 0;
+
+    if (TextSize.x < MaxWidth)
+    {
+        f32 X = GetCenteredTextX(Ui, Text, LetterSpacing);
+        DrawTextEx(Ui->Font, (char *)Text, V2(X, Y), Ui->FontSize, LetterSpacing, FontColor);
+    }
+    else
+    {
+        s32 I = 0;
+        s32 J = 0;
+        s32 Offset = 0;
+
+        /* TODO: @Speed We should be able do better than a linear search */
+        while (Text[I] && Ui->LineBufferIndex < Max_Line_Count)
+        {
+            J = I - Offset;
+            Assert(J >= 0 && J < Max_Line_Buffer_Size);
+
+            u8 *Line = Ui->LineBuffer[Ui->LineBufferIndex];
+
+            Line[J] = Text[I];
+            Line[J + 1] = 0;
+            Assert(J > 0 || !IS_SPACE(Line[J]));
+            Vector2 LineSize = MeasureTextEx(Ui->Font, (char *)Line, Ui->FontSize, LetterSpacing);
+
+            if (LineSize.x > MaxWidth)
+            {
+                b32 SpaceFound = 0;
+
+                /* NOTE: Seek back to the last space, and break the line there */
+                while (J >= 0)
+                {
+                    if (IS_SPACE(Line[J]))
+                    {
+                        SpaceFound = 1;
+                        Line[J] = 0;
+                        Offset += J + 1;
+                        I = Offset;
+
+                        ++Ui->LineBufferIndex;
+
+                        break;
+                    }
+                    else
+                    {
+                        while (Is_Utf8_Tail_Byte(Line[J--]));
+                    }
+                }
+
+                /* NOTE: No space was found, which means we have a word that is longer than
+                   the maximum line width. Break the word and put a dash at the end of the line.
+                */
+                if (!SpaceFound)
+                {
+                    s32 LastCharIndex = I - Offset;
+                    Line[LastCharIndex] = '-';
+
+                    Offset = I;
+                }
+
+                Assert(Offset == I);
+            }
+            else
+            {
+                ++I;
+            }
+        }
+
+        f32 OffsetY = Y - (LineHeight * Ui->LineBufferIndex);
+
+        /* NOTE: Draw the accumulated lines */
+        for (s32 LineIndex = 0; LineIndex < Ui->LineBufferIndex; ++LineIndex)
+        {
+            u8 *Line = Ui->LineBuffer[LineIndex];
+            f32 X = GetCenteredTextX(Ui, Line, LetterSpacing);
+            DrawTextEx(Ui->Font, (char *)Line, V2(X, OffsetY), Ui->FontSize, LetterSpacing, FontColor);
+            OffsetY += LineHeight;
+        }
+
+        /* NOTE: Draw any text remaining after the last line. */
+        if (I > Offset)
+        {
+            u8 *RemainingText = Text + Offset;
+            f32 X = GetCenteredTextX(Ui, RemainingText, LetterSpacing);
+            DrawTextEx(Ui->Font, (char *)RemainingText, V2(X, OffsetY), Ui->FontSize, LetterSpacing, FontColor);
+        }
+    }
 }
 
 b32 DoButton(ui *UI, button_element *Button)
