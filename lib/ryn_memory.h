@@ -36,31 +36,33 @@
 
 typedef struct
 {
-    u64 Offset;
-    u64 Capacity;
-    u8 *Data;
-    u64 ParentOffset;
+    ryn_memory_u64 Offset;
+    ryn_memory_u64 Capacity;
+    ryn_memory_u8 *Data;
+    ryn_memory_u64 ParentOffset;
 } ryn_memory_arena;
 
-void *ryn_memory_AllocateVirtualMemory(size Size);
+void *ryn_memory_AllocateVirtualMemory(ryn_memory_size Size);
 
-ryn_memory_arena ryn_memory_CreateArena(u64 Size);
-void *ryn_memory_PushArena(ryn_memory_arena *Arena, u64 Size);
-u64 ryn_memory_GetArenaFreeSpace(ryn_memory_arena *Arena);
+ryn_memory_arena ryn_memory_CreateArena(ryn_memory_u64 Size);
+void *ryn_memory_PushArena(ryn_memory_arena *Arena, ryn_memory_u64 Size);
+ryn_memory_u64 ryn_memory_GetArenaFreeSpace(ryn_memory_arena *Arena);
 ryn_memory_arena ryn_memory_CreateSubArena(ryn_memory_arena *Arena, ryn_memory_u64 Size);
-b32 ryn_memory_IsArenaUsable(ryn_memory_arena Arena);
-s32 ryn_memory_WriteArena(ryn_memory_arena *Arena, u8 *Data, u64 Size);
-u8 *ryn_memory_GetArenaWriteLocation(ryn_memory_arena *Arena);
+ryn_memory_b32 ryn_memory_IsArenaUsable(ryn_memory_arena Arena);
+ryn_memory_s32 ryn_memory_WriteArena(ryn_memory_arena *Arena, ryn_memory_u8 *Data, ryn_memory_u64 Size);
+ryn_memory_u8 *ryn_memory_GetArenaWriteLocation(ryn_memory_arena *Arena);
 void ryn_memory_FreeArena(ryn_memory_arena Arena);
 
+#define ryn_memory_PushStruct(arena, type) \
+    (ryn_memory_PushArena((arena), sizeof(type)))
 
 /* TODO: Add the ability to compile asserts out. */
 #define ryn_memory_Assert(p) ryn_memory_Assert_(p, __FILE__, __LINE__)
-internal void ryn_memory_Assert_(ryn_memory_b32 Proposition, char *FilePath, ryn_memory_s32 LineNumber)
+void ryn_memory_Assert_(ryn_memory_b32 Proposition, char *FilePath, ryn_memory_s32 LineNumber)
 {
     if (!Proposition)
     {
-        b32 *NullPtr = 0;
+        ryn_memory_b32 *NullPtr = 0;
         printf("Assertion failed on line %d in %s\n", LineNumber, FilePath);
         /* this should break the program... */
         Proposition = *NullPtr;
@@ -81,13 +83,13 @@ void ryn_memory_CopyMemory(ryn_memory_u8 *Source, ryn_memory_u8 *Destination, ry
 void *ryn_memory_AllocateVirtualMemory(ryn_memory_size Size)
 {
     /* TODO allow setting specific address for debugging with stable pointer values */
-    u8 *Address = 0;
+    ryn_memory_u8 *Address = 0;
     int Protections = PROT_READ | PROT_WRITE;
     int Flags = MAP_ANON | MAP_PRIVATE;
     int FileDescriptor = 0;
     int Offset = 0;
 
-    u8 *Result = mmap(Address, Size, Protections, Flags, FileDescriptor, Offset);
+    ryn_memory_u8 *Result = mmap(Address, Size, Protections, Flags, FileDescriptor, Offset);
 
     if (Result == MAP_FAILED)
     {
@@ -129,7 +131,7 @@ ryn_memory_arena ryn_memory_CreateArena(ryn_memory_u64 Size)
 
 void *ryn_memory_PushArena(ryn_memory_arena *Arena, ryn_memory_u64 Size)
 {
-    u8 *Result = 0;
+    ryn_memory_u8 *Result = 0;
 
     if ((Size + Arena->Offset) > Arena->Capacity)
     {
@@ -144,10 +146,10 @@ void *ryn_memory_PushArena(ryn_memory_arena *Arena, ryn_memory_u64 Size)
     return Result;
 }
 
-u64 ryn_memory_GetArenaFreeSpace(ryn_memory_arena *Arena)
+ryn_memory_u64 ryn_memory_GetArenaFreeSpace(ryn_memory_arena *Arena)
 {
     ryn_memory_Assert(Arena->Capacity >= Arena->Offset);
-    u64 FreeSpace = Arena->Capacity - Arena->Offset;
+    ryn_memory_u64 FreeSpace = Arena->Capacity - Arena->Offset;
     return FreeSpace;
 }
 

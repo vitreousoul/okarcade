@@ -82,7 +82,7 @@ internal command_line_arg_type ParseCommandLineArgs(s32 ArgCount, char **Args)
     return CommandLineArgs;
 }
 
-internal void GenerateByteArray(arena *TempArena, u8 *DestinationPath, u8 *ByteArrayName, u8 *ByteArray, size Size)
+internal void GenerateByteArray(ryn_memory_arena *TempArena, u8 *DestinationPath, u8 *ByteArrayName, u8 *ByteArray, size Size)
 {
     /* TODO: Compress the data. */
     u8 HexData[16];
@@ -95,8 +95,8 @@ internal void GenerateByteArray(arena *TempArena, u8 *DestinationPath, u8 *ByteA
         return;
     }
 
-    ArenaStackPush(TempArena);
-    arena ChunkArena = CreateSubArena(TempArena, 1024);
+    ryn_memory_ArenaStackPush(TempArena);
+    ryn_memory_arena ChunkArena = ryn_memory_CreateSubArena(TempArena, 1024);
     PushString(&ChunkArena, (u8 *)"u8 ");
     PushString(&ChunkArena, ByteArrayName);
     PushString(&ChunkArena, (u8 *)"[] = {");
@@ -117,7 +117,7 @@ internal void GenerateByteArray(arena *TempArena, u8 *DestinationPath, u8 *ByteA
             StringLength += 1;
         }
 
-        if (StringLength > GetArenaFreeSpace(&ChunkArena))
+        if (StringLength > ryn_memory_GetArenaFreeSpace(&ChunkArena))
         {
             WriteFile(File, ChunkArena.Data, ChunkArena.Offset);
             ChunkArena.Offset = 0;
@@ -138,14 +138,14 @@ internal void GenerateByteArray(arena *TempArena, u8 *DestinationPath, u8 *ByteA
 
     u8 *FileEndString = (u8 *)"};\0";
     WriteFile(File, FileEndString, GetStringLength(FileEndString));
-    ArenaStackPop(TempArena);
+    ryn_memory_ArenaStackPop(TempArena);
 }
 
-internal void GenerateSoundData(arena *TempArena)
+internal void GenerateSoundData(ryn_memory_arena *TempArena)
 {
     u8 *SfxCorrectSourcePath = (u8 *)"../assets/sfx_correct.wav";
     u8 *SfxCorrectDestinationPath = (u8 *)"../gen/sfx_correct.h";
-    u64 BeginningOffset = TempArena->Offset;
+    /* u64 BeginningOffset = TempArena->Offset; */
 
     buffer *Buffer = ReadFileIntoBuffer(SfxCorrectSourcePath);
 
@@ -160,7 +160,7 @@ internal void GenerateSoundData(arena *TempArena)
     }
 }
 
-internal void GenerateFontData(arena TempString)
+internal void GenerateFontData(ryn_memory_arena TempString)
 {
     /* TODO: Use GenerateByteArray */
     u8 HexData[16] = {};
@@ -169,7 +169,7 @@ internal void GenerateFontData(arena TempString)
     u8 *FontFilePath = (u8 *)"../assets/Roboto-Regular.ttf";
     u8 *FontDataPath = (u8 *)"../gen/roboto_regular.h";
 
-    u8 *DataOutput = GetArenaWriteLocation(&TempString);
+    u8 *DataOutput = ryn_memory_GetArenaWriteLocation(&TempString);
     buffer *Buffer = ReadFileIntoBuffer(FontFilePath);
 
     PushString(&TempString, (u8 *)"u8 FontData[] = {");
@@ -196,63 +196,71 @@ internal void GenerateFontData(arena TempString)
     TempString.Offset = BeginningOffset;
 }
 
-internal void GenerateGameAssets(arena TempString)
+internal void GenerateGameAssets(ryn_memory_arena TempString)
 {
     /* NOTE: for now GenerateGameAssets just generates assets for scuba. */
-    u8 *ScubaAssetPath = (u8 *)"../assets/scuba.png";
-    u8 *ScubaDataPath = (u8 *)"../gen/scuba.h";
+#define AssetPairCount 2
+    char *AssetPairs[AssetPairCount][2] = {
+        {"../assets/scuba.png", "../gen/scuba.h"},
+        {"../assets/influence.png", "../gen/influence.h"}
+    };
 
-    int TextureWidth, TextureHeight, BitsPerChannel;
-    u8 *TextureData = stbi_load((char *)ScubaAssetPath, &TextureWidth, &TextureHeight, &BitsPerChannel, 0);
-
-    if (!TextureData)
+    for (s32 I = 0; I < AssetPairCount; ++I)
     {
-        LogError("loading scuba texture");
-    }
-    else
-    {
-        /* TODO: compress the asset data!!!!!! */
-        u8 *ScubaOutput = GetArenaWriteLocation(&TempString);
-        u64 BeginningOffset = TempString.Offset;
-        u8 HexData[16] = {};
+        int TextureWidth, TextureHeight, BitsPerChannel;
+        char *AssetPath = AssetPairs[I][0];
+        char *DataPath = AssetPairs[I][1];
+        u8 *TextureData = stbi_load((char *)AssetPath, &TextureWidth, &TextureHeight, &BitsPerChannel, 0);
 
-        PushString(&TempString, (u8 *)"/* NOTE: The first two u32 values in ScubaAssetData are for image-width and image-height respectively. */\n");
-        PushString(&TempString, (u8 *)"u32 ScubaAssetData[] = {    \n");
-
-        { /* write texture width/height to data */
-            sprintf((char *)HexData, "0x%08x,", TextureWidth);
-            PushString(&TempString, HexData);
-
-            sprintf((char *)HexData, "0x%08x,", TextureHeight);
-            PushString(&TempString, HexData);
-        }
-
-        for (s32 Y = 0; Y < TextureHeight * 4; ++Y)
+        if (!TextureData)
         {
-            for (s32 X = 0; X < TextureWidth; X += 4)
-            {
-                s32 PixelIndex = Y * TextureWidth + X;
-                b32 IsLastPixel = PixelIndex - 1 == TextureWidth * TextureHeight;
+            LogError("loading scuba texture");
+        }
+        else
+        {
+            /* TODO: compress the asset data!!!!!! */
+            u8 *ScubaOutput = ryn_memory_GetArenaWriteLocation(&TempString);
+            u64 BeginningOffset = TempString.Offset;
+            u8 HexData[16] = {};
 
-                u32 R = TextureData[PixelIndex];
-                u32 G = TextureData[PixelIndex + 1];
-                u32 B = TextureData[PixelIndex + 2];
-                u32 A = TextureData[PixelIndex + 3];
+            PushString(&TempString, (u8 *)"/* NOTE: The first two u32 values in AssetData are for image-width and image-height respectively. */\n");
+            PushString(&TempString, (u8 *)"u32 AssetData[] = {    \n");
 
-                u32 Pixel = (R << 24) | (G << 16) | (B << 8) | A;
-                char *FormatString = IsLastPixel ? "0x%08x" : "0x%08x,";
-                sprintf((char *)HexData, FormatString, Pixel);
+            { /* write texture width/height to data */
+                sprintf((char *)HexData, "0x%08x,", TextureWidth);
+                PushString(&TempString, HexData);
 
+                sprintf((char *)HexData, "0x%08x,", TextureHeight);
                 PushString(&TempString, HexData);
             }
 
-            PushString(&TempString, (u8 *)"\n    ");
+            for (s32 Y = 0; Y < TextureHeight * 4; ++Y)
+            {
+                for (s32 X = 0; X < TextureWidth; X += 4)
+                {
+                    s32 PixelIndex = Y * TextureWidth + X;
+                    b32 IsLastPixel = PixelIndex - 1 == TextureWidth * TextureHeight;
+
+                    u32 R = TextureData[PixelIndex];
+                    u32 G = TextureData[PixelIndex + 1];
+                    u32 B = TextureData[PixelIndex + 2];
+                    u32 A = TextureData[PixelIndex + 3];
+
+                    u32 Pixel = (R << 24) | (G << 16) | (B << 8) | A;
+                    char *FormatString = IsLastPixel ? "0x%08x" : "0x%08x,";
+                    sprintf((char *)HexData, FormatString, Pixel);
+
+                    PushString(&TempString, HexData);
+                }
+
+                PushString(&TempString, (u8 *)"\n    ");
+            }
+
+            PushString(&TempString, (u8 *)"\n};\0");
+
+            u64 FileSize = TempString.Offset - BeginningOffset;
+            WriteFileWithPath((u8 *)DataPath, ScubaOutput, FileSize);
         }
-
-        PushString(&TempString, (u8 *)"\n};\0");
-
-        u64 FileSize = TempString.Offset - BeginningOffset;
-        WriteFileWithPath(ScubaDataPath, ScubaOutput, FileSize);
     }
 
     GenerateFontData(TempString);
@@ -269,7 +277,7 @@ int main(s32 ArgCount, char **Args)
     int Result = 0;
     command_line_arg_type CommandLineArgType = ParseCommandLineArgs(ArgCount, Args);
 
-    arena TempString = CreateArena(Gigabytes(1));
+    ryn_memory_arena TempString = ryn_memory_CreateArena(Gigabytes(1));
 
     switch(CommandLineArgType)
     {

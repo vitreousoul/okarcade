@@ -2412,12 +2412,12 @@ internal game_state InitGameState(Texture2D ScubaTexture)
 internal b32 LoadScubaTexture(Texture2D *Texture)
 {
     b32 Error = 0;
-    s32 AssetSize = ArrayCount(ScubaAssetData);
+    s32 AssetSize = ArrayCount(AssetData);
 
     if (AssetSize > 2)
     {
-        u32 AssetWidth = ScubaAssetData[0];
-        u32 AssetHeight = ScubaAssetData[1];
+        u32 AssetWidth = AssetData[0];
+        u32 AssetHeight = AssetData[1];
         u64 PixelCount = AssetWidth * AssetHeight;
 
         Image ScubaImage = GenImageColor(AssetWidth, AssetHeight, (Color){255,0,255,255});
@@ -2430,10 +2430,10 @@ internal b32 LoadScubaTexture(Texture2D *Texture)
             {
                 /* NOTE: We could pack our colors and just cast the u32,
                  * but for now we break the color components out and re-write them. */
-                u8 R = (ScubaAssetData[I] >> 24) & 0xff;
-                u8 G = (ScubaAssetData[I] >> 16) & 0xff;
-                u8 B = (ScubaAssetData[I] >>  8) & 0xff;
-                u8 A = (ScubaAssetData[I]      ) & 0xff;
+                u8 R = (AssetData[I] >> 24) & 0xff;
+                u8 G = (AssetData[I] >> 16) & 0xff;
+                u8 B = (AssetData[I] >>  8) & 0xff;
+                u8 A = (AssetData[I]      ) & 0xff;
                 Color PixelColor = (Color){R, G, B, A};
 
                 ImageDrawPixel(&ScubaImage, X, Y, PixelColor);

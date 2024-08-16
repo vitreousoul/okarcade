@@ -16,8 +16,10 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#include "../src/types.h"
 #include "../lib/ryn_memory.h"
+
+#include "../src/types.h"
+#include "../src/core.c"
 
 #define Kilobyte (1024)
 #define Megabyte (1024*1024)
@@ -38,6 +40,7 @@ typedef enum
 
 typedef enum
 {
+    /* TODO: Fill out the other four emotions from Plutchick wheel. */
     emotion_Joy,
     emotion_Sadness,
     emotion_Fear,
@@ -93,7 +96,15 @@ typedef struct
 
 int main(void)
 {
-    ryn_memory_arena Arena = ryn_memory_CreateArena(10*Megabyte);
+    u64 ArenaSize = 10*Megabyte;
+    Assert(sizeof(world) < ArenaSize);
+    ryn_memory_arena Arena = ryn_memory_CreateArena(ArenaSize);
+    world *World = ryn_memory_PushStruct(&Arena, world);
+
     printf("Arena.Capacity %llu\n", Arena.Capacity);
+    printf("Arena.Offset %llu\n", Arena.Offset);
+    printf("sizeof(world) %lu\n", sizeof(world));
+    printf("World %p\n", World);
+
     return 0;
 }
