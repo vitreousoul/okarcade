@@ -17,6 +17,7 @@
 #include <stdio.h>
 
 #include "../lib/ryn_memory.h"
+#include "../lib/ryn_string.h"
 
 #include "../src/types.h"
 #include "../src/core.c"
@@ -37,6 +38,43 @@ typedef enum
     part_of_speech_Pronoun      = 0x80,  /* replace nouns */
     part_of_speech_Verb         = 0x100, /* are actions */
 } part_of_speech_flag;
+
+typedef enum
+{
+    sentence_type_Declarative   = 0x1,
+    sentence_type_Interrogative = 0x2,
+    sentence_type_Imperative    = 0x4,
+    sentence_type_Exclamatory   = 0x8,
+} sentence_type;
+
+typedef u32 word_id;
+
+typedef struct word_list word_list;
+
+struct word_list
+{
+    word_list *Next;
+    word_id Id;
+};
+
+typedef struct
+{
+    part_of_speech_flag PartOfSpeech;
+    word_list Words;
+} part_of_speech;
+
+typedef struct part_of_speech_list part_of_speech_list;
+struct part_of_speech_list
+{
+    part_of_speech_list *Next;
+    part_of_speech Part;
+};
+
+typedef struct
+{
+    sentence_type Type;
+    part_of_speech_list FirstPartOfSpeech;
+} sentence;
 
 typedef enum
 {
@@ -89,22 +127,83 @@ typedef struct
 #define Max_Entities 64
 #define Relationship_Count (Max_Entities * Max_Entities)
 
+#define Word_Table_Size 128
 typedef struct
 {
     relationship Relationships[Relationship_Count];
+    ryn_string WordTable[Word_Table_Size];
 } world;
+
+internal ryn_string GetWord(world *World, word_id Id)
+{
+    ryn_string String = World->WordTable[Id];
+    return String;
+}
+
+#define PushWord(c_string) \
+    Assert(I < Word_Table_Size); \
+    World->WordTable[I++] = CreateString(c_string);
+
+internal void InitializeWordTable(world *World)
+{
+    s32 I = 0;
+
+    PushWord("hello");
+    PushWord("world");
+}
+#undef PushWord
+
+internal void DebugPrintString(ryn_string String)
+{
+    for (u64 I = 0; I < String.Size; ++I)
+    {
+        printf("%c", String.String[I]);
+    }
+}
+
+internal void DebugPrintSentence(world *World, sentence *Sentence)
+{
+    if (Sentence != 0)
+    {
+        part_of_speech_list *Part = &Sentence->FirstPartOfSpeech;
+        while (Part != 0)
+        {
+            word_list *Word = &Part->Part.Words;
+            while (Word != 0)
+            {
+                ryn_string WordString = GetWord(World, Word->Id);
+                DebugPrintString(WordString);
+                printf(" ");
+                Word = Word->Next;
+            }
+            Part = Part->Next;
+        }
+        printf("\n");
+    }
+}
 
 int main(void)
 {
-    u64 ArenaSize = 10*Megabyte;
-    Assert(sizeof(world) < ArenaSize);
-    ryn_memory_arena Arena = ryn_memory_CreateArena(ArenaSize);
+    u64 MaxArenaSize = 10*Megabyte;
+    Assert(sizeof(world) < MaxArenaSize);
+    ryn_memory_arena Arena = ryn_memory_CreateArena(sizeof(world));
     world *World = ryn_memory_PushStruct(&Arena, world);
 
-    printf("Arena.Capacity %llu\n", Arena.Capacity);
-    printf("Arena.Offset %llu\n", Arena.Offset);
+    InitializeWordTable(World);
+
+    sentence Sentence = {0};
+    Sentence.FirstPartOfSpeech.Part.PartOfSpeech = part_of_speech_Interjection;
+    Sentence.FirstPartOfSpeech.Part.Words.Id = 0;
+
+    part_of_speech_list SecondPartOfSpeech = {0};
+    SecondPartOfSpeech.Part.PartOfSpeech = part_of_speech_Noun;
+    SecondPartOfSpeech.Part.Words.Id = 1;
+
+    Sentence.FirstPartOfSpeech.Next = &SecondPartOfSpeech;
+
     printf("sizeof(world) %lu\n", sizeof(world));
-    printf("World %p\n", World);
+
+    DebugPrintSentence(World, &Sentence);
 
     return 0;
 }
