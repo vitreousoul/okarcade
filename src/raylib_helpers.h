@@ -4,7 +4,9 @@
 f32 Min(f32 ValueA, f32 ValueB);
 f32 Max(f32 ValueA, f32 ValueB);
 
-Vector2 V2(f32 X, f32 Y);
+#define V2(x, y) ((Vector2){x, y})
+
+Vector2 _V2(f32 X, f32 Y);
 Vector2 ClampV2(Vector2 VectorA, f32 Min, f32 Max);
 
 
@@ -20,11 +22,6 @@ inline f32 Max(f32 ValueA, f32 ValueB)
 {
     f32 Result = ValueA > ValueB ? ValueA : ValueB;
     return Result;
-}
-
-inline Vector2 V2(f32 X, f32 Y)
-{
-    return (Vector2){X,Y};
 }
 
 inline Vector2 ClampV2(Vector2 V, f32 Min, f32 Max)

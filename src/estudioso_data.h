@@ -325,7 +325,7 @@ internal void InitializeDefaultQuizItems(state *State)
     AddQuizText("Esa bomba (destruir) el mercado hace una semana.", "destruyó");
     AddQuizText("El fin de semana mis amigos (oír) música latina.", "oyeron");
     AddQuizText("Los bandidos (huir) de la policía.", "huyeron");
-    AddQuizText("Mis hermanos (construir) una nueva casa.", "construyeron");
+    AddQuizText("Mis hermanos (construir) una nueva casa el año pasado.", "construyeron");
     AddQuizText("Mi hermana (ir) a Europa el año pasado.", "fue");
     AddQuizText("Yo le (dar) un regalo a mi padre el día de su cumpleaños.", "di");
     AddQuizText("Yo no (ver) a otros estudiantes en la fiesta anoche.", "vi");

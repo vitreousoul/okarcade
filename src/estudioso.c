@@ -1273,7 +1273,10 @@ internal void DrawQuizItem(state *State, u32 LetterSpacing)
 
 
     f32 WrappedTextY = SCREEN_HALF_HEIGHT - (2.0f * LineHeight);
-    DrawWrappedText(&State->UI, Prompt, MaxPromptWidth, WrappedTextY, LineHeight, LetterSpacing, FONT_COLOR);
+    f32 X = SCREEN_HALF_WIDTH;
+    DrawWrappedText(&State->UI, Prompt, MaxPromptWidth,
+                    X, WrappedTextY, LineHeight, LetterSpacing,
+                    FONT_COLOR, alignment_CenterCenter);
 
     if (State->QuizMode == quiz_mode_Correct)
     {

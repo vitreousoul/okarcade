@@ -15,12 +15,21 @@
 
 #include <stdint.h>
 #include <stdio.h>
+#include <math.h>
+
+#include "../lib/raylib.h"
 
 #include "../lib/ryn_memory.h"
 #include "../lib/ryn_string.h"
 
+#define SCREEN_WIDTH 960
+#define SCREEN_HEIGHT 540
+
 #include "../src/types.h"
 #include "../src/core.c"
+#include "../src/math.c"
+#include "../src/raylib_helpers.h"
+#include "../src/ui.c"
 
 #define Kilobyte (1024)
 #define Megabyte (1024*1024)
@@ -69,6 +78,11 @@ struct part_of_speech_list
     part_of_speech_list *Next;
     part_of_speech Part;
 };
+
+typedef struct
+{
+    part_of_speech Subject;
+} context;
 
 typedef struct
 {
@@ -130,6 +144,7 @@ typedef struct
 #define Word_Table_Size 128
 typedef struct
 {
+    ui Ui;
     relationship Relationships[Relationship_Count];
     ryn_string WordTable[Word_Table_Size];
 } world;
@@ -191,19 +206,46 @@ int main(void)
 
     InitializeWordTable(World);
 
-    sentence Sentence = {0};
-    Sentence.FirstPartOfSpeech.Part.PartOfSpeech = part_of_speech_Interjection;
-    Sentence.FirstPartOfSpeech.Part.Words.Id = 0;
+    InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Influence");
+    SetTargetFPS(60);
 
-    part_of_speech_list SecondPartOfSpeech = {0};
-    SecondPartOfSpeech.Part.PartOfSpeech = part_of_speech_Noun;
-    SecondPartOfSpeech.Part.Words.Id = 1;
+    { /* NOTE: Initialize world. */
+        World->Ui.Font = GetFontDefault();
+        World->Ui.FontSize = 16.0f;
+    }
 
-    Sentence.FirstPartOfSpeech.Next = &SecondPartOfSpeech;
+    f32 LetterSpacing = 1.0f;
 
-    printf("sizeof(world) %lu\n", sizeof(world));
+    while (!WindowShouldClose())
+    {
+        ui *Ui = &World->Ui;
+        f32 LineHeight = Ui->FontSize + 0.1f*Ui->FontSize;
 
-    DebugPrintSentence(World, &Sentence);
+
+        BeginDrawing();
+
+        u8 *Text = (u8 *)"This is some text that should be wrapping in some way...";
+        Color FontColor = (Color){255, 255, 255, 255};
+        f32 MaxTextWidth = 140.0f;
+        DrawWrappedText(Ui, Text, MaxTextWidth, 20.0f, 30.0f, LineHeight, LetterSpacing, FontColor);
+        DrawRectangleLines(20.0f, 30.0f, MaxTextWidth, 10.0f, (Color){0, 255, 255, 255});
+
+        EndDrawing();
+    }
+
+    /* sentence Sentence = {0}; */
+    /* Sentence.FirstPartOfSpeech.Part.PartOfSpeech = part_of_speech_Interjection; */
+    /* Sentence.FirstPartOfSpeech.Part.Words.Id = 0; */
+
+    /* part_of_speech_list SecondPartOfSpeech = {0}; */
+    /* SecondPartOfSpeech.Part.PartOfSpeech = part_of_speech_Noun; */
+    /* SecondPartOfSpeech.Part.Words.Id = 1; */
+
+    /* Sentence.FirstPartOfSpeech.Next = &SecondPartOfSpeech; */
+
+    /* printf("sizeof(world) %lu\n", sizeof(world)); */
+
+    /* DebugPrintSentence(World, &Sentence); */
 
     return 0;
 }
