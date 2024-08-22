@@ -14,6 +14,7 @@
 
 #if ryn_memory_Operating_System == ryn_memory_Mac
 #include <sys/mman.h>
+#include "memory.h"
 #include <errno.h>
 #endif
 
@@ -55,6 +56,9 @@ void ryn_memory_FreeArena(ryn_memory_arena Arena);
 
 #define ryn_memory_PushStruct(arena, type) \
     (ryn_memory_PushArena((arena), sizeof(type)))
+
+#define ryn_memory_PushZeroStruct(arena, type) \
+    (ryn_memory_PushZeroArena((arena), sizeof(type)))
 
 /* TODO: Add the ability to compile asserts out. */
 #define ryn_memory_Assert(p) ryn_memory_Assert_(p, __FILE__, __LINE__)
@@ -135,7 +139,7 @@ void *ryn_memory_PushArena(ryn_memory_arena *Arena, ryn_memory_u64 Size)
 
     if ((Size + Arena->Offset) > Arena->Capacity)
     {
-        printf("Error in PushArena: allocator is full\n");
+        printf("Error in ryn_memory_PushArena: allocator is full\n");
     }
     else
     {
@@ -145,7 +149,23 @@ void *ryn_memory_PushArena(ryn_memory_arena *Arena, ryn_memory_u64 Size)
 
     return Result;
 }
+void *ryn_memory_PushZeroArena(ryn_memory_arena *Arena, ryn_memory_u64 Size)
+{
+    ryn_memory_u8 *Result = 0;
 
+    if ((Size + Arena->Offset) > Arena->Capacity)
+    {
+        printf("Error in ryn_memory_PushZeroArena: allocator is full\n");
+    }
+    else
+    {
+        Result = &Arena->Data[Arena->Offset];
+        Arena->Offset += Size;
+        memset(Result, 0, Size);
+    }
+
+    return Result;
+}
 ryn_memory_u64 ryn_memory_GetArenaFreeSpace(ryn_memory_arena *Arena)
 {
     ryn_memory_Assert(Arena->Capacity >= Arena->Offset);

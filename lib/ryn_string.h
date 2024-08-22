@@ -1,6 +1,8 @@
 #ifndef __RYN_STRING__
 #define __RYN_STRING__
 
+#include <stdarg.h>
+
 #include <stdint.h>
 #define ryn_string_u8 uint8_t
 #define ryn_string_u16 uint16_t
@@ -14,6 +16,7 @@
 #define ryn_string_b32 uint32_t
 #define ryn_string_f32 float
 #define ryn_string_size size_t
+
 
 typedef struct
 {

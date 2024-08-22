@@ -31,9 +31,17 @@
 #include "../src/raylib_helpers.h"
 #include "../src/ui.c"
 
+#include "../gen/influence.h"
+
 #define Kilobyte (1024)
 #define Megabyte (1024*1024)
 #define Gigabyte (1024*1024*1024)
+
+typedef struct
+{
+    s32 x;
+    s32 y;
+} v2s32;
 
 typedef enum
 {
@@ -107,19 +115,60 @@ typedef struct
 
 typedef enum
 {
-    need_flag_Physiological     = 0x1,
-    need_flag_Safety            = 0x2,
-    need_flag_Love              = 0x4,
-    need_flag_Esteem            = 0x8,
-    need_flag_Cognitive         = 0x10,
-    need_flag_SelfActualization = 0x20,
-    need_flag_Transcendence     = 0x40,
-} need_flag;
+    /* air, food, drink, shelter, warmth, sex, sleep, etc. */
+    need_kind_Physiological = 0x1,
 
-typedef struct
+    /* protection from elements, security, order, law, stability, freedom from fear. */
+    need_kind_Safety = 0x2,
+
+    /* friendship, intimacy, trust, and acceptance, receiving and giving affection and love. */
+    need_kind_Love = 0x4,
+
+    /* (i) esteem for oneself and (ii) the need to be accepted and valued by others . */
+    need_kind_Esteem = 0x8,
+
+    /* knowledge and understanding, curiosity, exploration, need for meaning and predictability. */
+    need_kind_Cognitive = 0x10,
+
+    /* appreciation and search for beauty, balance, form, etc. */
+    need_kind_SelfActualization = 0x20,
+
+    /* A person is motivated by values that transcend beyond the personal self. */
+    need_kind_Transcendence = 0x40,
+} need_kind;
+
+#define Need_Type_XList\
+    X(Drink,    need_kind_Physiological)\
+    X(Food,     need_kind_Physiological)\
+    X(Sleep,    need_kind_Physiological)\
+    X(Shelter,  need_kind_Physiological)\
+    X(Security, need_kind_Safety       )\
+    X(Trust,    need_kind_Love         )
+
+#define X(need, kind) need_type_##need,
+typedef enum
 {
-    s32 Id;
-} entity_id;
+    Need_Type_XList
+    need_type__Count
+} need_type;
+#undef X
+
+#define X(need, kind) [need_type_##need] = kind,
+need_kind NeedKindTable[need_type__Count] = {
+    Need_Type_XList
+};
+#undef X
+
+typedef struct need need;
+
+struct need
+{
+    need_type Type;
+    need_kind Kind;
+    need *Next;
+};
+
+typedef s32 entity_id;
 
 typedef struct
 {
@@ -133,9 +182,24 @@ typedef struct
 
 typedef struct
 {
-    entity_id Id;
+    v2s32 Chunk;
+    Vector2 Offset;
+} world_position;
 
+typedef enum
+{
+    entity_id__Null,
+    entity_id_Player,
+    entity_id_Somebody,
+    entity_id__Count,
+} entity_id_name;
+
+typedef struct
+{
+    entity_id Id;
     emotion Emotion;
+    need Needs;
+    world_position WorldPosition;
 } entity;
 
 #define Max_Entities 64
@@ -147,6 +211,9 @@ typedef struct
     ui Ui;
     relationship Relationships[Relationship_Count];
     ryn_string WordTable[Word_Table_Size];
+    entity Entities[Max_Entities];
+    Vector2 CameraPosition;
+    Texture2D AssetTexture;
 } world;
 
 internal ryn_string GetWord(world *World, word_id Id)
@@ -155,16 +222,56 @@ internal ryn_string GetWord(world *World, word_id Id)
     return String;
 }
 
+internal entity *GetEntity(world *World, entity_id Id)
+{
+    Assert(Id > 0 && Id < Max_Entities);
+    return World->Entities + Id;
+}
+
 #define PushWord(c_string) \
     Assert(I < Word_Table_Size); \
     World->WordTable[I++] = CreateString(c_string);
+
+#define Adjective    part_of_speech_Adjective
+#define Adverb       part_of_speech_Adverb
+#define Conjunction  part_of_speech_Conjunction
+#define Determiner   part_of_speech_Determiner
+#define Interjection part_of_speech_Interjection
+#define Noun         part_of_speech_Noun
+#define Preposition  part_of_speech_Preposition
+#define Pronoun      part_of_speech_Pronoun
+#define Verb         part_of_speech_Verb
+
+#define All_Words_List \
+    X(hello, (Interjection | Noun | Verb)) \
+    X(world, (Noun)) \
+    X(there, (Adverb | Pronoun | Noun | Adjective | Interjection)) \
+    X(WORD_COUNT, 0)
+
+#undef Adjective
+#undef Adverb
+#undef Conjunction
+#undef Determiner
+#undef Interjection
+#undef Noun
+#undef Preposition
+#undef Pronoun
+#undef Verb
+
+#define X(word, pos) _##word,
+typedef enum
+{
+    All_Words_List
+} word;
+#undef X
 
 internal void InitializeWordTable(world *World)
 {
     s32 I = 0;
 
-    PushWord("hello");
-    PushWord("world");
+    #define X(word, pos) PushWord(#word);
+    All_Words_List
+    #undef X
 }
 #undef PushWord
 
@@ -197,55 +304,154 @@ internal void DebugPrintSentence(world *World, sentence *Sentence)
     }
 }
 
+internal void DrawEntity(world *World, entity_id EntityId)
+{
+    f32 TileSize = 20;
+
+    if (IsTextureReady(World->AssetTexture))
+    {
+        entity *Entity = GetEntity(World, EntityId);
+        Rectangle Source = {0.0f, 0.0f, 100.0f, 200.0f};
+        b32 ShouldDraw = 1;
+
+        switch (EntityId)
+        {
+        case entity_id_Player: break;
+        case entity_id_Somebody: Source.x = 0; break;
+        default: ShouldDraw = 0; break;
+        }
+
+        if (ShouldDraw)
+        {
+            Vector2 ScreenHalfSize = MultiplyV2S(V2(SCREEN_WIDTH, SCREEN_HEIGHT), 0.5f);
+            Vector2 ScreenPosition = AddV2(ScreenHalfSize,
+                                           SubtractV2(Entity->WorldPosition.Offset, World->CameraPosition));
+            Rectangle Destination = (Rectangle){ScreenPosition.x, ScreenPosition.y, TileSize, 2.0f*TileSize};
+            DrawTexturePro(World->AssetTexture, Source, Destination, V2(0, 0), 0, (Color){255, 255, 255, 255});
+        }
+    }
+    else
+    {
+        printf("Asset texture not ready\n");
+    }
+}
+
+internal void DrawWorld(world *World)
+{
+    DrawEntity(World, entity_id_Player);
+    DrawEntity(World, entity_id_Somebody);
+}
+
+internal b32 LoadAssetTexture(world *World)
+{
+    b32 Error = 0;
+#if 0
+    s32 AssetSize = ArrayCount(AssetData);
+
+    if (AssetSize > 2)
+    {
+        u32 AssetWidth = AssetData[0];
+        u32 AssetHeight = AssetData[1];
+        u64 PixelCount = AssetWidth * AssetHeight;
+
+        Image Image = GenImageColor(AssetWidth, AssetHeight, (Color){255,0,255,255});
+
+        for (u64 I = 2; I < PixelCount + 2; ++I)
+        {
+            u32 X = (I - 2) % AssetWidth;
+            u32 Y = (I - 2) / AssetWidth;
+            if (X < AssetWidth && X >= 0 && Y < AssetHeight && Y >= 0)
+            {
+                /* NOTE: We could pack our colors and just cast the u32,
+                 * but for now we break the color components out and re-write them. */
+                u8 R = (AssetData[I] >> 24) & 0xff;
+                u8 G = (AssetData[I] >> 16) & 0xff;
+                u8 B = (AssetData[I] >>  8) & 0xff;
+                u8 A = (AssetData[I]      ) & 0xff;
+                Color PixelColor = (Color){R, G, B, A};
+
+                ImageDrawPixel(&Image, X, Y, PixelColor);
+            }
+            else
+            {
+                printf("[Error] Out of bounds asset access.");
+                break;
+            }
+        }
+
+        World->AssetTexture = LoadTextureFromImage(Image);
+    }
+    else
+    {
+        printf("[Error] Asset is too small to be useful, there was likely an error generating game assets.");
+    }
+#else
+    World->AssetTexture = LoadTexture("../assets/influence.png");
+#endif
+
+    return Error;
+}
+
+internal void InitializeWorld(world *World)
+{
+    entity *Player = GetEntity(World, entity_id_Player);
+    entity *Somebody = GetEntity(World, entity_id_Somebody);
+
+    LoadAssetTexture(World);
+
+    Player->WorldPosition.Offset = V2(10.0f, 20.0f);
+    Somebody->WorldPosition.Offset = V2(180.0f, 60.0f);
+
+    World->CameraPosition = Player->WorldPosition.Offset;
+}
+
 int main(void)
 {
-    u64 MaxArenaSize = 10*Megabyte;
+    u64 MaxArenaSize = 1*Megabyte;
     Assert(sizeof(world) < MaxArenaSize);
-    ryn_memory_arena Arena = ryn_memory_CreateArena(sizeof(world));
-    world *World = ryn_memory_PushStruct(&Arena, world);
 
-    InitializeWordTable(World);
+    ryn_memory_arena Arena = ryn_memory_CreateArena(sizeof(world));
+    ryn_memory_arena FrameArena = ryn_memory_CreateArena(Megabyte);
+    world *World = ryn_memory_PushStruct(&Arena, world);
 
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Influence");
     SetTargetFPS(60);
+
+    InitializeWorld(World);
+    InitializeWordTable(World);
+
 
     { /* NOTE: Initialize world. */
         World->Ui.Font = GetFontDefault();
         World->Ui.FontSize = 16.0f;
     }
 
-    f32 LetterSpacing = 1.0f;
+    sentence Sentence = {0};
+    {
+        Sentence.FirstPartOfSpeech.Part.PartOfSpeech = part_of_speech_Interjection;
+        Sentence.FirstPartOfSpeech.Part.Words.Id = _world;
+
+        part_of_speech_list SecondPartOfSpeech = {0};
+        SecondPartOfSpeech.Part.PartOfSpeech = part_of_speech_Noun;
+        SecondPartOfSpeech.Part.Words.Id = _hello;
+
+        Sentence.FirstPartOfSpeech.Next = &SecondPartOfSpeech;
+    }
 
     while (!WindowShouldClose())
     {
-        ui *Ui = &World->Ui;
-        f32 LineHeight = Ui->FontSize + 0.1f*Ui->FontSize;
-
-
         BeginDrawing();
 
-        u8 *Text = (u8 *)"This is some text that should be wrapping in some way...";
-        Color FontColor = (Color){255, 255, 255, 255};
-        f32 MaxTextWidth = 140.0f;
-        DrawWrappedText(Ui, Text, MaxTextWidth, 20.0f, 30.0f, LineHeight, LetterSpacing, FontColor);
-        DrawRectangleLines(20.0f, 30.0f, MaxTextWidth, 10.0f, (Color){0, 255, 255, 255});
+        ClearBackground((Color){40,0,50,255});
+        DrawWorld(World);
 
         EndDrawing();
     }
 
-    /* sentence Sentence = {0}; */
-    /* Sentence.FirstPartOfSpeech.Part.PartOfSpeech = part_of_speech_Interjection; */
-    /* Sentence.FirstPartOfSpeech.Part.Words.Id = 0; */
-
-    /* part_of_speech_list SecondPartOfSpeech = {0}; */
-    /* SecondPartOfSpeech.Part.PartOfSpeech = part_of_speech_Noun; */
-    /* SecondPartOfSpeech.Part.Words.Id = 1; */
-
-    /* Sentence.FirstPartOfSpeech.Next = &SecondPartOfSpeech; */
-
     /* printf("sizeof(world) %lu\n", sizeof(world)); */
 
-    /* DebugPrintSentence(World, &Sentence); */
+    DebugPrintSentence(World, &Sentence);
+    printf("Word count %d\n", _WORD_COUNT);
 
     return 0;
 }
