@@ -22,8 +22,9 @@
 #include "../lib/ryn_memory.h"
 #include "../lib/ryn_string.h"
 
-#define SCREEN_WIDTH 960
-#define SCREEN_HEIGHT 540
+#define Screen_Width 960
+#define Screen_Height 540
+#define Tile_Size 20
 
 #include "../src/types.h"
 #include "../src/core.c"
@@ -36,12 +37,6 @@
 #define Kilobyte (1024)
 #define Megabyte (1024*1024)
 #define Gigabyte (1024*1024*1024)
-
-typedef struct
-{
-    s32 x;
-    s32 y;
-} v2s32;
 
 typedef enum
 {
@@ -182,7 +177,7 @@ typedef struct
 
 typedef struct
 {
-    v2s32 Chunk;
+    v2s32 Tile;
     Vector2 Offset;
 } world_position;
 
@@ -205,9 +200,15 @@ typedef struct
 #define Max_Entities 64
 #define Relationship_Count (Max_Entities * Max_Entities)
 
+typedef struct
+{
+    v2s32 Direction;
+} user_input;
+
 #define Word_Table_Size 128
 typedef struct
 {
+    user_input UserInput;
     ui Ui;
     relationship Relationships[Relationship_Count];
     ryn_string WordTable[Word_Table_Size];
@@ -306,8 +307,6 @@ internal void DebugPrintSentence(world *World, sentence *Sentence)
 
 internal void DrawEntity(world *World, entity_id EntityId)
 {
-    f32 TileSize = 20;
-
     if (IsTextureReady(World->AssetTexture))
     {
         entity *Entity = GetEntity(World, EntityId);
@@ -323,10 +322,11 @@ internal void DrawEntity(world *World, entity_id EntityId)
 
         if (ShouldDraw)
         {
-            Vector2 ScreenHalfSize = MultiplyV2S(V2(SCREEN_WIDTH, SCREEN_HEIGHT), 0.5f);
+            Vector2 ScreenHalfSize = MultiplyV2S(V2(Screen_Width, Screen_Height), 0.5f);
+            Vector2 Position = MultiplyV2S(V2(Entity->WorldPosition.Tile.x, Entity->WorldPosition.Tile.y), Tile_Size);
             Vector2 ScreenPosition = AddV2(ScreenHalfSize,
-                                           SubtractV2(Entity->WorldPosition.Offset, World->CameraPosition));
-            Rectangle Destination = (Rectangle){ScreenPosition.x, ScreenPosition.y, TileSize, 2.0f*TileSize};
+                                           SubtractV2(Position, World->CameraPosition));
+            Rectangle Destination = (Rectangle){ScreenPosition.x, ScreenPosition.y, Tile_Size, 2.0f*Tile_Size};
             DrawTexturePro(World->AssetTexture, Source, Destination, V2(0, 0), 0, (Color){255, 255, 255, 255});
         }
     }
@@ -399,10 +399,63 @@ internal void InitializeWorld(world *World)
 
     LoadAssetTexture(World);
 
-    Player->WorldPosition.Offset = V2(10.0f, 20.0f);
-    Somebody->WorldPosition.Offset = V2(180.0f, 60.0f);
+    Player->WorldPosition.Tile = (v2s32){1, 2};
+    Somebody->WorldPosition.Tile = (v2s32){8, 5};
 
     World->CameraPosition = Player->WorldPosition.Offset;
+}
+
+internal void TestUpdatePlayer(world *World)
+{
+    v2s32 *Direction = &World->UserInput.Direction;
+
+    if (Direction->x ^ Direction->y)
+    {
+        entity *Player = GetEntity(World, entity_id_Player);
+        v2s32 NewTile = Addv2s32(*Direction, Player->WorldPosition.Tile);
+        b32 PlayerCanMove = 1;
+
+        for (s32 I = 1; I < Max_Entities; ++I)
+        {
+            if (I != entity_id_Player)
+            {
+                entity *TestEntity = GetEntity(World, I);
+
+                if (AreEqualv2s32(TestEntity->WorldPosition.Tile, NewTile))
+                {
+                    PlayerCanMove = 0;
+                    break;
+                }
+            }
+        }
+
+        if (PlayerCanMove)
+        {
+            Player->WorldPosition.Tile = NewTile;
+        }
+    }
+}
+
+internal void HandleUserInput(world *World)
+{
+    World->UserInput.Direction = (v2s32){0,0};
+
+    if (IsKeyPressed(KEY_W))
+    {
+        World->UserInput.Direction.y -= 1;
+    }
+    else if (IsKeyPressed(KEY_D))
+    {
+        World->UserInput.Direction.x += 1;
+    }
+    else if (IsKeyPressed(KEY_S))
+    {
+        World->UserInput.Direction.y += 1;
+    }
+    else if (IsKeyPressed(KEY_A))
+    {
+        World->UserInput.Direction.x -= 1;
+    }
 }
 
 int main(void)
@@ -414,7 +467,7 @@ int main(void)
     ryn_memory_arena FrameArena = ryn_memory_CreateArena(Megabyte);
     world *World = ryn_memory_PushStruct(&Arena, world);
 
-    InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Influence");
+    InitWindow(Screen_Width, Screen_Height, "Influence");
     SetTargetFPS(60);
 
     InitializeWorld(World);
@@ -440,11 +493,12 @@ int main(void)
 
     while (!WindowShouldClose())
     {
-        BeginDrawing();
+        HandleUserInput(World);
+        TestUpdatePlayer(World);
 
+        BeginDrawing();
         ClearBackground((Color){40,0,50,255});
         DrawWorld(World);
-
         EndDrawing();
     }
 

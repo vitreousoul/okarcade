@@ -256,7 +256,7 @@ internal Rectangle GetAlignedRectangle(Vector2 Position, Vector2 Size, alignment
 internal f32 GetCenteredTextX(ui *Ui, u8 *Text, s32 LetterSpacing)
 {
     Vector2 TextSize = MeasureTextEx(Ui->Font, (char *)Text, Ui->FontSize, LetterSpacing);
-    f32 X = (SCREEN_WIDTH - TextSize.x) / 2.0f;
+    f32 X = (Screen_Width - TextSize.x) / 2.0f;
 
     return X;
 }
@@ -583,7 +583,7 @@ u8 *DoText(ui *UI, text_element *TextElement, f32 DeltaTime)
         f32 InputX = TextElement->Position.x - (TextSize.x / 2.0f);
         f32 InputY = TextElement->Position.y;
 
-        f32 CursorX = (SCREEN_WIDTH + TextSize.x) / 2.0f;
+        f32 CursorX = (Screen_Width + TextSize.x) / 2.0f;
         f32 CursorY = InputY;
 
         DrawTextEx(UI->Font, Text, V2(InputX, InputY), UI->FontSize, LetterSpacing, TextElement->Color);
