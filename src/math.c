@@ -38,6 +38,7 @@ f32 DistanceV2(Vector2 A, Vector2 B);
 Vector2 NormalizeV2(Vector2 Vector);
 
 v2s32 Addv2s32(v2s32 A, v2s32 B);
+v2s32 Subtractv2s32(v2s32 A, v2s32 B);
 b32 AreEqualv2s32(v2s32 A, v2s32 B);
 
 f32 MinF32(f32 A, f32 B)
@@ -217,6 +218,12 @@ Vector2 NormalizeV2(Vector2 Vector)
 v2s32 Addv2s32(v2s32 A, v2s32 B)
 {
     v2s32 Result = (v2s32){A.x + B.x, A.y + B.y};
+    return Result;
+}
+
+v2s32 Subtractv2s32(v2s32 A, v2s32 B)
+{
+    v2s32 Result = (v2s32){A.x - B.x, A.y - B.y};
     return Result;
 }
 

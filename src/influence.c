@@ -38,6 +38,10 @@
 #define Megabyte (1024*1024)
 #define Gigabyte (1024*1024*1024)
 
+#define SelfReferenceStruct(name)\
+    typedef struct name name;\
+    struct name
+
 typedef enum
 {
     part_of_speech_Adjective    = 0x1,   /* describes things */
@@ -61,9 +65,7 @@ typedef enum
 
 typedef u32 word_id;
 
-typedef struct word_list word_list;
-
-struct word_list
+SelfReferenceStruct(word_list)
 {
     word_list *Next;
     word_id Id;
@@ -92,6 +94,12 @@ typedef struct
     sentence_type Type;
     part_of_speech_list FirstPartOfSpeech;
 } sentence;
+
+SelfReferenceStruct(sentence_list)
+{
+    sentence Sentence;
+    sentence_list *Next;
+};
 
 typedef enum
 {
@@ -205,17 +213,34 @@ typedef struct
     v2s32 Direction;
 } user_input;
 
+SelfReferenceStruct(message)
+{
+    sentence_list Sentences;
+    message *Next;
+};
+
+typedef struct
+{
+    message *FirstMessage;
+} conversation;
+
+
 #define Word_Table_Size 128
 typedef struct
 {
-    user_input UserInput;
-    ui Ui;
     relationship Relationships[Relationship_Count];
     ryn_string WordTable[Word_Table_Size];
     entity Entities[Max_Entities];
     Vector2 CameraPosition;
     Texture2D AssetTexture;
+    conversation Conversation;
 } world;
+typedef struct
+{
+    world World;
+    ui Ui;
+    user_input UserInput;
+} game;
 
 internal ryn_string GetWord(world *World, word_id Id)
 {
@@ -342,6 +367,13 @@ internal void DrawWorld(world *World)
     DrawEntity(World, entity_id_Somebody);
 }
 
+internal void UpdateConversation(world *World)
+{
+    if (!World->Conversation.FirstMessage)
+    {
+    }
+}
+
 internal b32 LoadAssetTexture(world *World)
 {
     b32 Error = 0;
@@ -405,25 +437,36 @@ internal void InitializeWorld(world *World)
     World->CameraPosition = Player->WorldPosition.Offset;
 }
 
-internal void TestUpdatePlayer(world *World)
+internal void TestUpdatePlayer(world *World, user_input *UserInput)
 {
-    v2s32 *Direction = &World->UserInput.Direction;
+    v2s32 *Direction = &UserInput->Direction;
 
     if (Direction->x ^ Direction->y)
     {
         entity *Player = GetEntity(World, entity_id_Player);
         v2s32 NewTile = Addv2s32(*Direction, Player->WorldPosition.Tile);
         b32 PlayerCanMove = 1;
+        entity_id AdjacentEntityId = 0;
 
-        for (s32 I = 1; I < Max_Entities; ++I)
+        for (s32 Id = 1; Id < Max_Entities; ++Id)
         {
-            if (I != entity_id_Player)
+            if (Id != entity_id_Player)
             {
-                entity *TestEntity = GetEntity(World, I);
+                entity *TestEntity = GetEntity(World, Id);
+                /* v2s32 Tile = Player->WorldPosition.Tile; */
+                v2s32 TestTile = TestEntity->WorldPosition.Tile;
 
-                if (AreEqualv2s32(TestEntity->WorldPosition.Tile, NewTile))
+                v2s32 Difference = Subtractv2s32(NewTile, TestTile);
+
+                if (Difference.x == 0 && Difference.y == 0)
                 {
                     PlayerCanMove = 0;
+                    break;
+                }
+                else if ((Difference.x > -2 && Difference.x < 2) &&
+                         (Difference.y > -2 && Difference.y < 2))
+                {
+                    AdjacentEntityId = Id;
                     break;
                 }
             }
@@ -433,39 +476,45 @@ internal void TestUpdatePlayer(world *World)
         {
             Player->WorldPosition.Tile = NewTile;
         }
+
+        if (AdjacentEntityId)
+        {
+            UpdateConversation(World);
+        }
     }
 }
 
-internal void HandleUserInput(world *World)
+internal void HandleUserInput(world *World, user_input *UserInput)
 {
-    World->UserInput.Direction = (v2s32){0,0};
+    UserInput->Direction = (v2s32){0,0};
 
     if (IsKeyPressed(KEY_W))
     {
-        World->UserInput.Direction.y -= 1;
+        UserInput->Direction.y -= 1;
     }
     else if (IsKeyPressed(KEY_D))
     {
-        World->UserInput.Direction.x += 1;
+        UserInput->Direction.x += 1;
     }
     else if (IsKeyPressed(KEY_S))
     {
-        World->UserInput.Direction.y += 1;
+        UserInput->Direction.y += 1;
     }
     else if (IsKeyPressed(KEY_A))
     {
-        World->UserInput.Direction.x -= 1;
+        UserInput->Direction.x -= 1;
     }
 }
 
 int main(void)
 {
     u64 MaxArenaSize = 1*Megabyte;
-    Assert(sizeof(world) < MaxArenaSize);
+    Assert(sizeof(game) < MaxArenaSize);
 
-    ryn_memory_arena Arena = ryn_memory_CreateArena(sizeof(world));
+    ryn_memory_arena Arena = ryn_memory_CreateArena(sizeof(game));
     ryn_memory_arena FrameArena = ryn_memory_CreateArena(Megabyte);
-    world *World = ryn_memory_PushStruct(&Arena, world);
+    game *Game = ryn_memory_PushStruct(&Arena, game);
+    world *World = &Game->World;
 
     InitWindow(Screen_Width, Screen_Height, "Influence");
     SetTargetFPS(60);
@@ -475,8 +524,8 @@ int main(void)
 
 
     { /* NOTE: Initialize world. */
-        World->Ui.Font = GetFontDefault();
-        World->Ui.FontSize = 16.0f;
+        Game->Ui.Font = GetFontDefault();
+        Game->Ui.FontSize = 16.0f;
     }
 
     sentence Sentence = {0};
@@ -493,8 +542,8 @@ int main(void)
 
     while (!WindowShouldClose())
     {
-        HandleUserInput(World);
-        TestUpdatePlayer(World);
+        HandleUserInput(World, &Game->UserInput);
+        TestUpdatePlayer(World, &Game->UserInput);
 
         BeginDrawing();
         ClearBackground((Color){40,0,50,255});
