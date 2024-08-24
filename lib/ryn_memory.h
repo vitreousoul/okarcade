@@ -46,7 +46,7 @@ typedef struct
 void *ryn_memory_AllocateVirtualMemory(ryn_memory_size Size);
 
 ryn_memory_arena ryn_memory_CreateArena(ryn_memory_u64 Size);
-void *ryn_memory_PushArena(ryn_memory_arena *Arena, ryn_memory_u64 Size);
+void *ryn_memory_PushSize(ryn_memory_arena *Arena, ryn_memory_u64 Size);
 ryn_memory_u64 ryn_memory_GetArenaFreeSpace(ryn_memory_arena *Arena);
 ryn_memory_arena ryn_memory_CreateSubArena(ryn_memory_arena *Arena, ryn_memory_u64 Size);
 ryn_memory_b32 ryn_memory_IsArenaUsable(ryn_memory_arena Arena);
@@ -55,7 +55,7 @@ ryn_memory_u8 *ryn_memory_GetArenaWriteLocation(ryn_memory_arena *Arena);
 void ryn_memory_FreeArena(ryn_memory_arena Arena);
 
 #define ryn_memory_PushStruct(arena, type) \
-    (ryn_memory_PushArena((arena), sizeof(type)))
+    (ryn_memory_PushSize((arena), sizeof(type)))
 
 #define ryn_memory_PushZeroStruct(arena, type) \
     (ryn_memory_PushZeroArena((arena), sizeof(type)))
@@ -133,13 +133,13 @@ ryn_memory_arena ryn_memory_CreateArena(ryn_memory_u64 Size)
     return Arena;
 }
 
-void *ryn_memory_PushArena(ryn_memory_arena *Arena, ryn_memory_u64 Size)
+void *ryn_memory_PushSize(ryn_memory_arena *Arena, ryn_memory_u64 Size)
 {
     ryn_memory_u8 *Result = 0;
 
     if ((Size + Arena->Offset) > Arena->Capacity)
     {
-        printf("Error in ryn_memory_PushArena: allocator is full\n");
+        printf("Error in ryn_memory_PushSize: allocator is full\n");
     }
     else
     {
@@ -181,7 +181,7 @@ ryn_memory_arena ryn_memory_CreateSubArena(ryn_memory_arena *Arena, ryn_memory_u
     {
         SubArena.Capacity = Size;
         SubArena.Data = ryn_memory_GetArenaWriteLocation(Arena);
-        ryn_memory_PushArena(Arena, Size);
+        ryn_memory_PushSize(Arena, Size);
     }
 
     return SubArena;
@@ -196,7 +196,7 @@ inline ryn_memory_b32 ryn_memory_IsArenaUsable(ryn_memory_arena Arena)
 ryn_memory_s32 ryn_memory_WriteArena(ryn_memory_arena *Arena, ryn_memory_u8 *Data, ryn_memory_u64 Size)
 {
     ryn_memory_s32 ErrorCode = 0;
-    ryn_memory_u8 *WhereToWrite = ryn_memory_PushArena(Arena, Size);
+    ryn_memory_u8 *WhereToWrite = ryn_memory_PushSize(Arena, Size);
 
     if (WhereToWrite)
     {

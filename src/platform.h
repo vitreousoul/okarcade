@@ -108,7 +108,7 @@ date GetDate(void)
 #define PushString(a, s) PushString_((a), (s), GetStringLength(s))
 internal u8 *PushString_(ryn_memory_arena *Arena, u8 *String, s32 StringLength)
 {
-    u8 *WhereToWrite = ryn_memory_PushArena(Arena, StringLength);
+    u8 *WhereToWrite = ryn_memory_PushSize(Arena, StringLength);
     CopyMemory(String, WhereToWrite, StringLength);
     return WhereToWrite;
 }
@@ -347,7 +347,7 @@ ryn_memory_arena WalkDirectory(u8 *Path)
                     b32 IsFirstAllocation = Allocator.Offset == 0;
                     s32 FilePathLength = strlen((char *)FilePath);
                     size FileItemSize = sizeof(file_list) + FilePathLength + 1;
-                    file_list *FileItem = ryn_memory_PushArena(&Allocator, FileItemSize);
+                    file_list *FileItem = ryn_memory_PushSize(&Allocator, FileItemSize);
 
                     CopyMemory(FilePath, FileItem->Name, FilePathLength);
                     FileItem->Name[FileItemSize] = 0;

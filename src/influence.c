@@ -32,13 +32,11 @@
 #include "../src/raylib_helpers.h"
 #include "../src/ui.c"
 
-#include "../gen/influence.h"
-
 #define Kilobyte (1024)
 #define Megabyte (1024*1024)
 #define Gigabyte (1024*1024*1024)
 
-#define SelfReferenceStruct(name)\
+#define ref_struct(name)\
     typedef struct name name;\
     struct name
 
@@ -57,28 +55,30 @@ typedef enum
 
 typedef enum
 {
-    sentence_type_Declarative   = 0x1,
-    sentence_type_Interrogative = 0x2,
-    sentence_type_Imperative    = 0x4,
-    sentence_type_Exclamatory   = 0x8,
+    sentence_type__Null,
+    sentence_type_Declarative,
+    sentence_type_Interrogative,
+    sentence_type_Imperative,
+    sentence_type_Exclamatory,
 } sentence_type;
 
 typedef u32 word_id;
 
-SelfReferenceStruct(word_list)
+#define Word_Chunk_Size 64
+ref_struct(word_chunk)
 {
-    word_list *Next;
-    word_id Id;
+    word_chunk *Next;
+    word_id Words[Word_Chunk_Size];
+    s32 Count;
 };
 
 typedef struct
 {
     part_of_speech_flag PartOfSpeech;
-    word_list Words;
+    word_chunk Words;
 } part_of_speech;
 
-typedef struct part_of_speech_list part_of_speech_list;
-struct part_of_speech_list
+ref_struct(part_of_speech_list)
 {
     part_of_speech_list *Next;
     part_of_speech Part;
@@ -95,7 +95,7 @@ typedef struct
     part_of_speech_list FirstPartOfSpeech;
 } sentence;
 
-SelfReferenceStruct(sentence_list)
+ref_struct(sentence_list)
 {
     sentence Sentence;
     sentence_list *Next;
@@ -211,12 +211,14 @@ typedef struct
 typedef struct
 {
     v2s32 Direction;
+    v2s32 ConversationDirection;
 } user_input;
 
-SelfReferenceStruct(message)
+ref_struct(message)
 {
     sentence_list Sentences;
     message *Next;
+    message *Responses;
 };
 
 typedef struct
@@ -224,27 +226,46 @@ typedef struct
     message *FirstMessage;
 } conversation;
 
+typedef enum
+{
+    world_mode_Null,
+    world_mode_Walking,
+    world_mode_Talking,
+} world_mode;
+
+#define Message_Pool_Size 1024
+typedef struct
+{
+    message Messages[Message_Pool_Size];
+    message *Free;
+    s32 Index;
+} message_pool;
 
 #define Word_Table_Size 128
 typedef struct
 {
     relationship Relationships[Relationship_Count];
-    ryn_string WordTable[Word_Table_Size];
     entity Entities[Max_Entities];
     Vector2 CameraPosition;
     Texture2D AssetTexture;
     conversation Conversation;
+    world_mode Mode;
+    message_pool MessagePool;
 } world;
+
+global_variable ryn_string WordTable[Word_Table_Size];
+
 typedef struct
 {
     world World;
     ui Ui;
     user_input UserInput;
+    ryn_memory_arena FrameArena;
 } game;
 
-internal ryn_string GetWord(world *World, word_id Id)
+internal ryn_string GetWord(word_id Id)
 {
-    ryn_string String = World->WordTable[Id];
+    ryn_string String = WordTable[Id];
     return String;
 }
 
@@ -253,10 +274,6 @@ internal entity *GetEntity(world *World, entity_id Id)
     Assert(Id > 0 && Id < Max_Entities);
     return World->Entities + Id;
 }
-
-#define PushWord(c_string) \
-    Assert(I < Word_Table_Size); \
-    World->WordTable[I++] = CreateString(c_string);
 
 #define Adjective    part_of_speech_Adjective
 #define Adverb       part_of_speech_Adverb
@@ -269,6 +286,7 @@ internal entity *GetEntity(world *World, entity_id Id)
 #define Verb         part_of_speech_Verb
 
 #define All_Words_List \
+    X(NULL, 0) \
     X(hello, (Interjection | Noun | Verb)) \
     X(world, (Noun)) \
     X(there, (Adverb | Pronoun | Noun | Adjective | Interjection)) \
@@ -288,41 +306,51 @@ internal entity *GetEntity(world *World, entity_id Id)
 typedef enum
 {
     All_Words_List
+    word__Count
 } word;
 #undef X
+
+#define AddWordToTable__(c_string) \
+    Assert(I < Word_Table_Size);\
+    WordTable[I] = ryn_string_CreateString(c_string);\
+    WordTable[I++].Size -= 1;
 
 internal void InitializeWordTable(world *World)
 {
     s32 I = 0;
 
-    #define X(word, pos) PushWord(#word);
+    #define X(word, pos) AddWordToTable__(#word);
     All_Words_List
     #undef X
 }
-#undef PushWord
 
 internal void DebugPrintString(ryn_string String)
 {
     for (u64 I = 0; I < String.Size; ++I)
     {
-        printf("%c", String.String[I]);
+        printf("%c", String.Bytes[I]);
     }
 }
 
-internal void DebugPrintSentence(world *World, sentence *Sentence)
+internal void DebugPrintSentence(sentence *Sentence)
 {
     if (Sentence != 0)
     {
         part_of_speech_list *Part = &Sentence->FirstPartOfSpeech;
         while (Part != 0)
         {
-            word_list *Word = &Part->Part.Words;
-            while (Word != 0)
+            word_chunk *Words = &Part->Part.Words;
+            while (Words != 0)
             {
-                ryn_string WordString = GetWord(World, Word->Id);
-                DebugPrintString(WordString);
-                printf(" ");
-                Word = Word->Next;
+                for (s32 I = 0; I < Words->Count; ++I)
+                {
+                    word_id WordId = Words->Words[I];
+                    ryn_string WordString = GetWord(WordId);
+                    DebugPrintString(WordString);
+                    printf(" ");
+                }
+
+                Words = Words->Next;
             }
             Part = Part->Next;
         }
@@ -330,8 +358,10 @@ internal void DebugPrintSentence(world *World, sentence *Sentence)
     }
 }
 
-internal void DrawEntity(world *World, entity_id EntityId)
+internal void DrawEntity(game *Game, entity_id EntityId)
 {
+    world *World = &Game->World;
+
     if (IsTextureReady(World->AssetTexture))
     {
         entity *Entity = GetEntity(World, EntityId);
@@ -361,16 +391,89 @@ internal void DrawEntity(world *World, entity_id EntityId)
     }
 }
 
-internal void DrawWorld(world *World)
+internal void PushWord(ryn_memory_arena *Arena, word Word, u8 TrailingCharacter)
 {
-    DrawEntity(World, entity_id_Player);
-    DrawEntity(World, entity_id_Somebody);
+    Assert(Word >= 0 && Word < word__Count);
+    ryn_string String = WordTable[Word];
+    u64 Size = String.Size;
+    u64 PushSize = Size;
+
+    if (TrailingCharacter)
+    {
+        PushSize += 1;
+    }
+
+    u8 *At = ryn_memory_PushSize(Arena, PushSize);
+
+    for (u64 I = 0; I < Size; ++I)
+    {
+        At[I] = String.Bytes[I];
+    }
+
+    if (TrailingCharacter)
+    {
+        At[Size] = TrailingCharacter;
+    }
 }
 
-internal void UpdateConversation(world *World)
+internal void DrawMessage(game *Game, message *Message)
 {
-    if (!World->Conversation.FirstMessage)
+    sentence_list *Sentences = &Message->Sentences;
+    ryn_memory_arena *FrameArena = &Game->FrameArena;
+    u64 MessageOffset = FrameArena->Offset;
+
+    do
     {
+        part_of_speech_list *Parts = &Sentences->Sentence.FirstPartOfSpeech;
+
+        do
+        {
+            part_of_speech Part = Parts->Part;
+
+            for (s32 I = 0; I < Part.Words.Count; ++I)
+            {
+                PushWord(FrameArena, Part.Words.Words[I], ' ');
+            }
+
+            Parts = Parts->Next;
+        } while (Parts);
+
+        Sentences = Sentences->Next;
+    } while (Sentences);
+
+    u8 *NullCharacter = ryn_memory_PushSize(FrameArena, 1);
+    *NullCharacter = 0;
+
+    f32 MaxWidth = 0.8f * Screen_Width;
+    f32 PaddingX = 0.5f*(Screen_Width - MaxWidth);
+    f32 PaddingY = 0.8f * Screen_Height;
+    u8 *Text = FrameArena->Data + MessageOffset;
+    f32 LineHeight = Game->Ui.FontSize + 4.0f;
+    f32 LetterSpacing = 1.0f;
+    Color FontColor = (Color){230, 240, 220, 255};
+
+    DrawWrappedText(&Game->Ui, Text, MaxWidth, PaddingX, PaddingY, LineHeight, LetterSpacing, FontColor, alignment_BottomCenter);
+}
+
+internal void DrawConversation(game *Game)
+{
+    world *World = &Game->World;
+
+    if (World->Conversation.FirstMessage)
+    {
+        message *Message = World->Conversation.FirstMessage;
+        DrawMessage(Game, Message);
+    }
+}
+
+internal void DrawWorld(game *Game)
+{
+    DrawEntity(Game, entity_id_Player);
+    DrawEntity(Game, entity_id_Somebody);
+
+    if (Game->World.Mode == world_mode_Talking)
+    {
+        DrawConversation(Game);
     }
 }
 
@@ -426,6 +529,8 @@ internal b32 LoadAssetTexture(world *World)
 
 internal void InitializeWorld(world *World)
 {
+    World->Mode = world_mode_Walking;
+
     entity *Player = GetEntity(World, entity_id_Player);
     entity *Somebody = GetEntity(World, entity_id_Somebody);
 
@@ -437,49 +542,122 @@ internal void InitializeWorld(world *World)
     World->CameraPosition = Player->WorldPosition.Offset;
 }
 
+internal message *CreateMessage(world *World)
+{
+    message *Message = 0;
+
+    if (World->MessagePool.Free)
+    {
+        Message = World->MessagePool.Free;
+        World->MessagePool.Free = World->MessagePool.Free->Next;
+    }
+    else if (World->MessagePool.Index < Message_Pool_Size)
+    {
+        Message = World->MessagePool.Messages + World->MessagePool.Index;
+    }
+
+    return Message;
+}
+
+internal sentence GenerateSentence(sentence_type Type)
+{
+    sentence Sentence = {};
+    Sentence.Type = Type;
+
+    switch (Type)
+    {
+    case sentence_type_Declarative:
+    {
+        NotImplemented;
+    } break;
+    case sentence_type_Interrogative:
+    {
+        NotImplemented;
+    } break;
+    case sentence_type_Imperative:
+    {
+        NotImplemented;
+    } break;
+    case sentence_type_Exclamatory:
+    {
+        Sentence.FirstPartOfSpeech.Part.PartOfSpeech = part_of_speech_Interjection;
+        u64 Count = 0;
+        Sentence.FirstPartOfSpeech.Part.Words.Words[Count++] = _hello;
+        Sentence.FirstPartOfSpeech.Part.Words.Words[Count++] = _there;
+        Sentence.FirstPartOfSpeech.Part.Words.Words[Count++] = _world;
+        Sentence.FirstPartOfSpeech.Part.Words.Count = Count;
+    } break;
+    default:
+    {
+        NotImplemented;
+    } break;
+    }
+
+    return Sentence;
+}
+
 internal void TestUpdatePlayer(world *World, user_input *UserInput)
 {
-    v2s32 *Direction = &UserInput->Direction;
-
-    if (Direction->x ^ Direction->y)
+    if (World->Mode == world_mode_Walking)
     {
-        entity *Player = GetEntity(World, entity_id_Player);
-        v2s32 NewTile = Addv2s32(*Direction, Player->WorldPosition.Tile);
-        b32 PlayerCanMove = 1;
-        entity_id AdjacentEntityId = 0;
+        v2s32 *Direction = &UserInput->Direction;
 
-        for (s32 Id = 1; Id < Max_Entities; ++Id)
+        if (Direction->x ^ Direction->y)
         {
-            if (Id != entity_id_Player)
+            entity *Player = GetEntity(World, entity_id_Player);
+            v2s32 NewTile = Addv2s32(*Direction, Player->WorldPosition.Tile);
+            b32 PlayerCanMove = 1;
+            entity_id AdjacentEntityId = 0;
+
+            for (s32 Id = 1; Id < Max_Entities; ++Id)
             {
-                entity *TestEntity = GetEntity(World, Id);
-                /* v2s32 Tile = Player->WorldPosition.Tile; */
-                v2s32 TestTile = TestEntity->WorldPosition.Tile;
-
-                v2s32 Difference = Subtractv2s32(NewTile, TestTile);
-
-                if (Difference.x == 0 && Difference.y == 0)
+                if (Id != entity_id_Player)
                 {
-                    PlayerCanMove = 0;
-                    break;
-                }
-                else if ((Difference.x > -2 && Difference.x < 2) &&
-                         (Difference.y > -2 && Difference.y < 2))
-                {
-                    AdjacentEntityId = Id;
-                    break;
+                    entity *TestEntity = GetEntity(World, Id);
+                    /* v2s32 Tile = Player->WorldPosition.Tile; */
+                    v2s32 TestTile = TestEntity->WorldPosition.Tile;
+
+                    v2s32 Difference = Subtractv2s32(NewTile, TestTile);
+
+                    if (Difference.x == 0 && Difference.y == 0)
+                    {
+                        PlayerCanMove = 0;
+                        break;
+                    }
+                    else if ((Difference.x > -2 && Difference.x < 2) &&
+                             (Difference.y > -2 && Difference.y < 2))
+                    {
+                        AdjacentEntityId = Id;
+                        break;
+                    }
                 }
             }
-        }
 
-        if (PlayerCanMove)
-        {
-            Player->WorldPosition.Tile = NewTile;
-        }
+            if (PlayerCanMove)
+            {
+                Player->WorldPosition.Tile = NewTile;
+            }
 
-        if (AdjacentEntityId)
+            if (AdjacentEntityId)
+            {
+                World->Mode = world_mode_Talking;
+            }
+        }
+    }
+    else if (World->Mode == world_mode_Talking)
+    {
+        if (!World->Conversation.FirstMessage)
         {
-            UpdateConversation(World);
+            message *Message = CreateMessage(World);
+            sentence_list Greeting = {};
+            Greeting.Sentence = GenerateSentence(sentence_type_Exclamatory);
+            Message->Sentences = Greeting;
+            Assert(Message != 0);
+            World->Conversation.FirstMessage = Message;
+        }
+        else
+        {
+
         }
     }
 }
@@ -487,6 +665,7 @@ internal void TestUpdatePlayer(world *World, user_input *UserInput)
 internal void HandleUserInput(world *World, user_input *UserInput)
 {
     UserInput->Direction = (v2s32){0,0};
+    UserInput->ConversationDirection = (v2s32){0,0};
 
     if (IsKeyPressed(KEY_W))
     {
@@ -504,6 +683,23 @@ internal void HandleUserInput(world *World, user_input *UserInput)
     {
         UserInput->Direction.x -= 1;
     }
+
+    if (IsKeyPressed(KEY_I))
+    {
+        UserInput->ConversationDirection.y -= 1;
+    }
+    else if (IsKeyPressed(KEY_L))
+    {
+        UserInput->ConversationDirection.x += 1;
+    }
+    else if (IsKeyPressed(KEY_K))
+    {
+        UserInput->ConversationDirection.y += 1;
+    }
+    else if (IsKeyPressed(KEY_J))
+    {
+        UserInput->ConversationDirection.x -= 1;
+    }
 }
 
 int main(void)
@@ -511,10 +707,12 @@ int main(void)
     u64 MaxArenaSize = 1*Megabyte;
     Assert(sizeof(game) < MaxArenaSize);
 
+
     ryn_memory_arena Arena = ryn_memory_CreateArena(sizeof(game));
-    ryn_memory_arena FrameArena = ryn_memory_CreateArena(Megabyte);
+
     game *Game = ryn_memory_PushStruct(&Arena, game);
     world *World = &Game->World;
+    Game->FrameArena = ryn_memory_CreateArena(Megabyte);
 
     InitWindow(Screen_Width, Screen_Height, "Influence");
     SetTargetFPS(60);
@@ -531,11 +729,13 @@ int main(void)
     sentence Sentence = {0};
     {
         Sentence.FirstPartOfSpeech.Part.PartOfSpeech = part_of_speech_Interjection;
-        Sentence.FirstPartOfSpeech.Part.Words.Id = _world;
+        Sentence.FirstPartOfSpeech.Part.Words.Words[0] = _world;
+        Sentence.FirstPartOfSpeech.Part.Words.Count = 1;
 
         part_of_speech_list SecondPartOfSpeech = {0};
         SecondPartOfSpeech.Part.PartOfSpeech = part_of_speech_Noun;
-        SecondPartOfSpeech.Part.Words.Id = _hello;
+        SecondPartOfSpeech.Part.Words.Words[0] = _hello;
+        SecondPartOfSpeech.Part.Words.Count = 1;
 
         Sentence.FirstPartOfSpeech.Next = &SecondPartOfSpeech;
     }
@@ -547,13 +747,14 @@ int main(void)
 
         BeginDrawing();
         ClearBackground((Color){40,0,50,255});
-        DrawWorld(World);
+        DrawWorld(Game);
+        Game->FrameArena.Offset = 0;
         EndDrawing();
     }
 
     /* printf("sizeof(world) %lu\n", sizeof(world)); */
 
-    DebugPrintSentence(World, &Sentence);
+    /* DebugPrintSentence(&Sentence); */
     printf("Word count %d\n", _WORD_COUNT);
 
     return 0;

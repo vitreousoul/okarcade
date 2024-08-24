@@ -20,7 +20,7 @@
 
 typedef struct
 {
-    ryn_string_u8 *String;
+    ryn_string_u8 *Bytes;
     ryn_string_u64 Size;
 } ryn_string;
 
@@ -40,7 +40,7 @@ typedef struct
     ryn_string_u64 TotalSize;
 } ryn_string_list;
 
-ryn_string CreateString(char *CString)
+ryn_string ryn_string_CreateString(char *CString)
 {
     ryn_string Result = {0};
 
@@ -48,7 +48,7 @@ ryn_string CreateString(char *CString)
     {
         ryn_string_s32 StringSize = 0;
         while ((CString[StringSize++] != 0));
-        Result.String = (ryn_string_u8 *)CString;
+        Result.Bytes = (ryn_string_u8 *)CString;
         Result.Size = StringSize;
     }
 

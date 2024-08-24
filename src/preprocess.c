@@ -776,7 +776,7 @@ internal void GenerateBlogPages(ryn_memory_arena *TempString, pre_processor *Pre
     buffer BlogPageTemplate;
 
     BlogPageTemplate.Size = GetFileSize(BlogPageTemplateFilePath);
-    BlogPageTemplate.Data = ryn_memory_PushArena(TempString, BlogPageTemplate.Size + 1);
+    BlogPageTemplate.Data = ryn_memory_PushSize(TempString, BlogPageTemplate.Size + 1);
 
     if (!BlogPageTemplate.Data)
     {
@@ -794,7 +794,7 @@ internal void GenerateBlogPages(ryn_memory_arena *TempString, pre_processor *Pre
     for (file_list *CurrentFile = SortedFileList; CurrentFile; CurrentFile = CurrentFile->Next)
     {
         File.Size = GetFileSize(CurrentFile->Name);
-        File.Data = ryn_memory_PushArena(TempString, File.Size + 1);
+        File.Data = ryn_memory_PushSize(TempString, File.Size + 1);
 
         if (File.Data)
         {
@@ -881,7 +881,7 @@ internal buffer EscapeHtmlString(ryn_memory_arena *TempString, u8 *HtmlString, s
         {
             u8 *BeginData = HtmlString + HtmlStringBegin;
             s32 Size = I - HtmlStringBegin;
-            u8 *Data = ryn_memory_PushArena(TempString, Size);
+            u8 *Data = ryn_memory_PushSize(TempString, Size);
 
             CopyMemory(BeginData, Data, Size);
             PushString(TempString, EscapeString);
@@ -1112,7 +1112,7 @@ void GenerateCodePages(ryn_memory_arena *TempString)
             buffer *CodePageBuffer = ReadFileIntoBuffer(CurrentFile->Name);
             buffer EscapedHtmlBuffer = EscapeHtmlString(TempString, CodePageBuffer->Data, CodePageBuffer->Size);
 
-            u8 *CodePageData = ryn_memory_PushArena(&CodePage, EscapedHtmlBuffer.Size);
+            u8 *CodePageData = ryn_memory_PushSize(&CodePage, EscapedHtmlBuffer.Size);
             CopyMemory(EscapedHtmlBuffer.Data, CodePageData, EscapedHtmlBuffer.Size);
 
             PushString(&CodePage, (u8 *)"HERE" "DOC</pre></main></body></html>");
