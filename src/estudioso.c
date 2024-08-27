@@ -47,11 +47,11 @@
 #include "../gen/sfx_correct.h"
 
 #if 0
-global_variable int SCREEN_WIDTH = TARGET_SCREEN_WIDTH;
-global_variable int SCREEN_HEIGHT = TARGET_SCREEN_HEIGHT;
+global_variable int Screen_Width = TARGET_SCREEN_WIDTH;
+global_variable int Screen_Height = TARGET_SCREEN_HEIGHT;
 #else
-global_variable int SCREEN_WIDTH = 800;
-global_variable int SCREEN_HEIGHT = 600;
+global_variable int Screen_Width = 800;
+global_variable int Screen_Height = 600;
 #endif
 
 #include "math.c"
@@ -69,43 +69,13 @@ global_variable int SCREEN_HEIGHT = 600;
 
 #define IS_UPPER_CASE(c) ((c) >= 65 && (c) <= 90)
 
-#define SCREEN_HALF_WIDTH (SCREEN_WIDTH / 2)
-#define SCREEN_HALF_HEIGHT (SCREEN_HEIGHT / 2)
+#define SCREEN_HALF_WIDTH (Screen_Width / 2)
+#define SCREEN_HALF_HEIGHT (Screen_Height / 2)
 
 #define BACKGROUND_COLOR (Color){40,50,40,255}
 #define FONT_COLOR (Color){250,240,245,255}
 #define ANSWER_COLOR (Color){200,240,205,255}
 #define CONJUGATION_TYPE_COLOR (Color){240,240,205,255}
-
-#define Key_State_Chunk_Size_Log2 5
-#define Key_State_Chunk_Size (1 << Key_State_Chunk_Size_Log2)
-#define Key_State_Chunk_Size_Mask (Key_State_Chunk_Size - 1)
-
-#define Key_State_Chunk_Count_Log2 5
-#define Key_State_Chunk_Count_Mask ((1 << Key_State_Chunk_Count_Log2) - 1)
-
-typedef u32 key_state_chunk;
-typedef u32 key_code;
-
-#define Total_Number_Of_Keys_Log2 9
-#define Total_Number_Of_Keys (1 << Total_Number_Of_Keys_Log2)
-
-#define Bits_Per_Key_State_Log2 1
-#define Bits_Per_Key_State (1 << Bits_Per_Key_State_Log2)
-#define Bits_Per_Key_State_Mask ((1 << Bits_Per_Key_State) - 1)
-
-#define Bits_Per_Key_State_Chunk (sizeof(key_state_chunk) * 8)
-#define Key_State_Chunk_Count (Total_Number_Of_Keys / (Bits_Per_Key_State_Chunk / Bits_Per_Key_State))
-
-typedef enum
-{
-    key_Up,
-    key_Pressed,
-    key_Down,
-    key_Released,
-    key_state_Count,
-    key_state_Undefined,
-} key_state;
 
 typedef enum
 {
@@ -126,12 +96,6 @@ typedef enum
     conjugation_Futuro,
     conjugation_Count,
 } conjugation;
-
-typedef struct
-{
-    s16 Index;
-    s16 Shift;
-} key_location;
 
 typedef enum
 {
@@ -210,16 +174,8 @@ typedef struct
     f32 DeltaTime;
     f32 Time;
 
-    u32 KeyStateIndex;
-    key_state_chunk KeyStates[2][Key_State_Chunk_Count];
-#define Key_Press_Queue_Size 16
-    u32 KeyPressQueue[Key_Press_Queue_Size];
-
     b32 ShowAnswer;
     b32 CurrentQuizItemFailed;
-
-    b32 InputOccured;
-    key_code LastKeyPressed;
 
 #define Quiz_Item_Max 512
     quiz_item QuizItems[Quiz_Item_Max];
@@ -266,13 +222,6 @@ typedef struct
 
 #define Save_File_Magic_Number 0xe54d
 #define Save_File_Header_Version 0
-
-global_variable key_state KeyStateMap[key_state_Count][2] = {
-    [key_Up]       =  {key_Up      ,  key_Pressed},
-    [key_Pressed]  =  {key_Released,  key_Down},
-    [key_Down]     =  {key_Released,  key_Down},
-    [key_Released] =  {key_Up      ,  key_Pressed},
-};
 
 global_variable b32 PrintableKeys[Total_Number_Of_Keys] = {
     [KEY_SPACE] = 1,
@@ -613,27 +562,6 @@ internal void WriteSaveFileToDisk(state *State, u8 *FilePath)
     }
 }
 
-internal inline key_location GetKeyLocation(u32 KeyNumber)
-{
-     key_location Location;
-
-     Location.Index = Key_State_Chunk_Count_Mask & (KeyNumber >> (Key_State_Chunk_Size_Log2 - Bits_Per_Key_State_Log2));
-     Location.Shift = Key_State_Chunk_Size_Mask & (KeyNumber << Bits_Per_Key_State_Log2);
-
-    if (Location.Index >= (s32)Key_State_Chunk_Count)
-    {
-        Location.Index = -1;
-        Location.Shift = -1;
-    }
-
-    return Location;
-}
-
-internal inline b32 KeyLocationIsValid(key_location Location)
-{
-    return Location.Index >= 0 && Location.Shift >= 0;
-}
-
 internal void ClearAccentKey(text_element *TextElement)
 {
     switch (TextElement->CurrentAccent)
@@ -691,7 +619,7 @@ internal void HandleKey(ui *UI, text_element *TextElement, key_code Key)
                         }
                         else
                         {
-                            if (!UI->ModifierKeys.Shift)
+                            if (!Get_Flag(UI->ModifierFlags, modifier_key_Shift))
                             {
                                 SecondByte += 32;
                             }
@@ -705,7 +633,7 @@ internal void HandleKey(ui *UI, text_element *TextElement, key_code Key)
                     {
                         char SecondByte = 0x91;
 
-                        if (!UI->ModifierKeys.Shift)
+                        if (!Get_Flag(UI->ModifierFlags, modifier_key_Shift))
                         {
                             SecondByte += 32;
                         }
@@ -723,7 +651,7 @@ internal void HandleKey(ui *UI, text_element *TextElement, key_code Key)
                 TextElement->AccentMode = 0;
                 TextElement->CurrentAccent = 0;
             }
-            else if (UI->ModifierKeys.Alt)
+            else if (Get_Flag(UI->ModifierFlags, modifier_key_Alt))
             {
                 switch (Key)
                 {
@@ -752,7 +680,7 @@ internal void HandleKey(ui *UI, text_element *TextElement, key_code Key)
                 } break;
                 case KEY_SLASH:
                 {
-                    if (UI->ModifierKeys.Shift &&
+                    if (Get_Flag(UI->ModifierFlags, modifier_key_Shift) &&
                         TextElement->Index + 2 < TextElement->TextSize)
                     {
                         /* NOTE: Inverted question mark '¿' */
@@ -763,14 +691,14 @@ internal void HandleKey(ui *UI, text_element *TextElement, key_code Key)
                 } break;
                 }
             }
-            else if (UI->ModifierKeys.Shift && Key == KEY_SLASH)
+            else if (Get_Flag(UI->ModifierFlags, modifier_key_Shift) && Key == KEY_SLASH)
             {
                 TextElement->Text[TextElement->Index] = '?';
                 TextElement->Index = TextElement->Index + 1;
             }
             else
             {
-                if (!UI->ModifierKeys.Shift && IS_UPPER_CASE(Key))
+                if (!Get_Flag(UI->ModifierFlags, modifier_key_Shift) && IS_UPPER_CASE(Key))
                 {
                     Key += 32;
                 }
@@ -846,114 +774,19 @@ internal void HandleKey(ui *UI, text_element *TextElement, key_code Key)
 
 internal void HandleUserInput(state *State)
 {
-    u32 Key;
-    u32 QueueIndex = 0;
-    b32 KeysWerePressed = 0;
+    ui *Ui = &State->UI;
 
+    for (s32 I = 0; I < Ui->QueueIndex; ++I)
     {
-        State->UI.ModifierKeys.Shift = IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT);
-        State->UI.ModifierKeys.Control = IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL);
-        State->UI.ModifierKeys.Alt = IsKeyDown(KEY_LEFT_ALT) || IsKeyDown(KEY_RIGHT_ALT);
-        State->UI.ModifierKeys.Super = IsKeyDown(KEY_LEFT_SUPER) || IsKeyDown(KEY_RIGHT_SUPER);
-    }
+        s32 Key = Ui->KeyEventQueue[I].Key;
 
-    {
-        State->UI.MousePosition = GetMousePosition();
-    }
-
-    for (u32 I = 0; I < Key_Press_Queue_Size; ++I)
-    {
-        State->KeyPressQueue[I] = 0;
-    }
-
-    b32 IsTyping = State->QuizMode == quiz_mode_Typing;
-    /* NOTE: Loop through the queue of pressed keys, for operations that rely
-       on the order of keys pressed.
-    */
-    for (;;)
-    {
-        Key = GetKeyPressed();
-        b32 QueueNotEmpty = QueueIndex < Key_Press_Queue_Size;
-
-        if (!(IsTyping && Key && QueueNotEmpty))
-        {
-            /* TODO: Do we need to still consume all key-presses with GetKeyPressed?
-                     Right now we break if the queue is full, but maybe we really
-                     should not do the code below, but still loop through calling
-                     GetKeyPressed in order to flush all the key events?
-            */
-            break;
-        }
-
-        if (State->UI.ModifierKeys.Control && Key == KEY_H)
+        if (Get_Flag(Ui->ModifierFlags, modifier_key_Control) && Key == KEY_H)
         {
             State->ShowAnswer = 1;
-            KeysWerePressed = 1;
-            State->InputOccured = 1;
         }
         else
         {
-            State->KeyPressQueue[QueueIndex] = Key;
-            QueueIndex += 1;
-            KeysWerePressed = 1;
-            State->TextElement.KeyRepeatTime = 0.0f;
-            State->TextElement.KeyHasRepeated = 0;
-            State->LastKeyPressed = Key;
-
-            HandleKey(&State->UI, &State->TextElement, Key);
-            State->InputOccured = 1;
-        }
-    }
-
-    if (!KeysWerePressed && IsKeyDown(State->LastKeyPressed))
-    {
-        /* NOTE: Handle keyboard repeat */
-        State->TextElement.KeyRepeatTime += State->DeltaTime;
-
-        b32 InitialKeyRepeat = !State->TextElement.KeyHasRepeated && State->TextElement.KeyRepeatTime > 0.3f;
-        /* NOTE: If the key repeat time is short enough, we may need to handle multiple repeats in a single frame. */
-        b32 TheOtherKeyRepeats = State->TextElement.KeyHasRepeated && State->TextElement.KeyRepeatTime > 0.04f;
-
-        if (InitialKeyRepeat || TheOtherKeyRepeats)
-        {
-            State->TextElement.KeyRepeatTime = 0.0f;
-            State->TextElement.KeyHasRepeated = 1;
-
-            HandleKey(&State->UI, &State->TextElement, State->LastKeyPressed);
-            State->InputOccured = 1;
-        }
-    }
-
-    for (u32 Key = 0; Key < Total_Number_Of_Keys; ++Key)
-    {
-        /* NOTE: Update state for each key */
-        u32 NextKeyStateIndex = !State->KeyStateIndex;
-        b32 IsDown = IsKeyDown(Key);
-        key_location Location = GetKeyLocation(Key);
-        key_state CurrentState = key_state_Undefined;
-
-        if (KeyLocationIsValid(Location))
-        {
-            u32 KeyStateChunk = State->KeyStates[State->KeyStateIndex][Location.Index];
-            key_state NextState = KeyStateMap[CurrentState][IsDown]; /* TODO: What is NextState used for? */
-            CurrentState = (KeyStateChunk >> Location.Shift) & Bits_Per_Key_State_Mask;
-
-            Assert(NextState < key_state_Count);
-
-            if (CurrentState != key_Up || NextState != key_Up)
-            {
-                /* TODO: do we really want to set InputOccured to 1 here??? */
-                State->InputOccured = 1;
-            }
-
-            u32 UnsetMask = ~(Bits_Per_Key_State_Mask << Location.Shift);
-            u32 NewChunk = (KeyStateChunk & UnsetMask) | (NextState << Location.Shift);
-
-            State->KeyStates[NextKeyStateIndex][Location.Index] = NewChunk;
-        }
-        else
-        {
-            /* NOTE: Error */
+            HandleKey(Ui, &State->TextElement, Key);
         }
     }
 }
@@ -1223,7 +1056,7 @@ internal void DrawQuizItem(state *State, u32 LetterSpacing)
         DrawTextEx(State->UI.Font, Buff, V2(BorderPadding, BorderPadding), State->UI.FontSize, LetterSpacing, FONT_COLOR);
     }
 
-    f32 MaxPromptWidth = MinF32(500.0f, SCREEN_WIDTH - 2.0f * BorderPadding);
+    f32 MaxPromptWidth = MinF32(500.0f, Screen_Width - 2.0f * BorderPadding);
 
     f32 AnswerY = SCREEN_HALF_HEIGHT + (1 * LineHeight);
 
@@ -1304,25 +1137,25 @@ internal void DrawQuizItem(state *State, u32 LetterSpacing)
         }
 
         Vector2 TextSize = MeasureTextEx(State->UI.Font, ConjugationText, State->UI.FontSize, LetterSpacing);
-        Vector2 TextPosition = V2((SCREEN_WIDTH / 2) - (TextSize.x / 2), (SCREEN_HEIGHT / 2) - (LineHeight));
+        Vector2 TextPosition = V2((Screen_Width / 2) - (TextSize.x / 2), (Screen_Height / 2) - (LineHeight));
         DrawTextEx(State->UI.Font, ConjugationText, TextPosition, State->UI.FontSize, LetterSpacing, CONJUGATION_TYPE_COLOR);
     }
 
-    if (State->InputOccured)
+    if (State->UI.InputOccured)
     {
         State->UI.CursorBlinkTime = 0.0f;
     }
 
-    DoText(&State->UI, &State->TextElement, State->DeltaTime);
+    DrawTextElement(&State->UI, &State->TextElement);
 
-    Vector2 NextButtonPosition = V2(SCREEN_WIDTH - BorderPadding, SCREEN_HEIGHT - BorderPadding);
+    Vector2 NextButtonPosition = V2(Screen_Width - BorderPadding, Screen_Height - BorderPadding);
     b32 NextPressed = DoButtonWith(&State->UI, ui_Next, (u8 *)"Next", NextButtonPosition, alignment_BottomRight);
     if (NextPressed)
     {
         GetNextRandomQuizItem(State);
     }
 
-    Vector2 PreviousButtonPosition = V2(BorderPadding, SCREEN_HEIGHT - BorderPadding);
+    Vector2 PreviousButtonPosition = V2(BorderPadding, Screen_Height - BorderPadding);
     b32 PreviousPressed = DoButtonWith(&State->UI, ui_Previous, (u8 *)"Previous", PreviousButtonPosition, alignment_BottomLeft);
     if (PreviousPressed)
     {
@@ -1592,7 +1425,7 @@ internal void DrawWinMessage(state *State, u32 LetterSpacing)
     {
         char *WinMessage = "Tú ganas!";
         Vector2 TextSize = MeasureTextEx(State->UI.Font, WinMessage, State->UI.FontSize, LetterSpacing);
-        Vector2 TextPosition = V2((SCREEN_WIDTH / 2) - (TextSize.x / 2), SCREEN_HEIGHT / 2);
+        Vector2 TextPosition = V2((Screen_Width / 2) - (TextSize.x / 2), Screen_Height / 2);
         DrawTextEx(State->UI.Font, WinMessage, TextPosition, State->UI.FontSize, LetterSpacing, FONT_COLOR);
 
         if (IsKeyPressed(KEY_ENTER))
@@ -1615,7 +1448,7 @@ internal void DrawUnknownQuizItem(state *State)
 {
     DrawText("Unknown quiz type\n", 20, 20, 22, (Color){220,100,180,255});
 
-    Vector2 NextButtonPosition = V2(SCREEN_WIDTH - State->UI.FontSize, SCREEN_HEIGHT - State->UI.FontSize);
+    Vector2 NextButtonPosition = V2(Screen_Width - State->UI.FontSize, Screen_Height - State->UI.FontSize);
     b32 NextPressed = DoButtonWith(&State->UI, ui_Next, (u8 *)"Next", NextButtonPosition, alignment_BottomRight);
 
     if (NextPressed)
@@ -1712,22 +1545,23 @@ internal void HandleQuizItem(state *State, quiz_item *QuizItem)
 
 internal void UpdateAndRender(state *State, b32 ForceDraw)
 {
-    State->InputOccured = ForceDraw;
+    State->UI.InputOccured = ForceDraw;
 
+    UpdateUserInputForUi(&State->UI);
     HandleUserInput(State);
 
-    if (State->InputOccured)
+    if (State->UI.InputOccured)
     {
         FrameIndex += 1;
     }
 
-    State->KeyStateIndex = !State->KeyStateIndex;
+    State->UI.KeyStateIndex = !State->UI.KeyStateIndex;
 
     quiz_item *QuizItem = GetActiveQuizItem(State);
 
     BeginDrawing();
 
-    if (/* TODO: Fix and reintroduce lazy-drawing */1 || ForceDraw || State->InputOccured)
+    if (/* TODO: Fix and reintroduce lazy-drawing */1 || ForceDraw || State->UI.InputOccured)
     {
         ClearBackground(BACKGROUND_COLOR);
 
@@ -1749,7 +1583,7 @@ internal void UpdateAndRender(state *State, b32 ForceDraw)
 #ifndef PLATFORM_WEB
         { /* NOTE: Overlay graphics on top of all view types. */
             f32 Spacing = State->UI.FontSize;
-            Vector2 ButtonPosition = V2(SCREEN_WIDTH - Spacing, Spacing);
+            Vector2 ButtonPosition = V2(Screen_Width - Spacing, Spacing);
             b32 SavePressed = DoButtonWith(&State->UI, ui_Save, (u8 *)"Save", ButtonPosition, alignment_TopRight);
 
             if (SavePressed)
@@ -1775,7 +1609,7 @@ int main(void)
     u8 TextBuffer[1024] = {0};
     State.TextElement.TextSize = 1024;
     State.TextElement.Text = TextBuffer;
-    State.TextElement.Position = V2(SCREEN_WIDTH / 2.0f, SCREEN_HEIGHT / 2.0f);
+    State.TextElement.Position = V2(Screen_Width / 2.0f, Screen_Height / 2.0f);
     State.TextElement.Color = (Color){255, 255, 255, 255};
 
 #if !PLATFORM_WEB
@@ -1822,7 +1656,7 @@ int main(void)
     /* TODO: Check if any anti-aliasing flags (like FLAG_MSAA_4X_HINT) affect the web-platform text quality. */
     /* SetConfigFlags(FLAG_MSAA_4X_HINT); */
 
-    InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Estudioso");
+    InitWindow(Screen_Width, Screen_Height, "Estudioso");
 #if !defined(PLATFORM_WEB)
     SetWindowPosition(0, 0);
 #endif
@@ -1877,6 +1711,7 @@ int main(void)
         { /* time calculation */
             f32 CurrentTime = GetTime();
             State.DeltaTime = CurrentTime - State.Time;
+            State.UI.DeltaTime = CurrentTime - State.Time; /* I guess it's ok that we assign delta time to two places, since the ui is becoming library-fied? */
             State.Time = CurrentTime;
         }
 

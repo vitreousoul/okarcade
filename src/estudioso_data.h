@@ -435,7 +435,9 @@ internal void InitializeDefaultQuizItems(state *State)
     AddQuizText("algunos", "some"); /* ALSO: few */
 #endif
 
+#if 1
     DefAns("almorzar", A("to have lunch", "to eat lunch"), 2);
+#endif
 }
 
 

@@ -8,7 +8,60 @@
 #define Is_Utf8_Header_Byte4(b) (((b) & 0xF8) == 0xF0)
 #define Is_Utf8_Tail_Byte(b)    (((b) & 0xC0) == 0x80)
 
+
+#define Total_Number_Of_Keys_Log2 9
+#define Total_Number_Of_Keys (1 << Total_Number_Of_Keys_Log2)
+
+#define Key_State_Chunk_Size_Log2 5
+#define Key_State_Chunk_Size (1 << Key_State_Chunk_Size_Log2)
+#define Key_State_Chunk_Size_Mask (Key_State_Chunk_Size - 1)
+
+#define Key_State_Chunk_Count_Log2 5
+#define Key_State_Chunk_Count_Mask ((1 << Key_State_Chunk_Count_Log2) - 1)
+
+#define Bits_Per_Key_State_Log2 1
+#define Bits_Per_Key_State (1 << Bits_Per_Key_State_Log2)
+#define Bits_Per_Key_State_Mask ((1 << Bits_Per_Key_State) - 1)
+
+#define Bits_Per_Key_State_Chunk (sizeof(key_state_chunk) * 8)
+#define Key_State_Chunk_Count (Total_Number_Of_Keys / (Bits_Per_Key_State_Chunk / Bits_Per_Key_State))
+
+#define Get_Flag(  flags, flag) (((flags) &  (flag)) != 0)
+#define Set_Flag(  flags, flag)  ((flags) = (flags) | flag)
+#define Unset_Flag(flags, flag)  ((flags) = (flags) & ~(flag))
+
+#define Assign_Flag(flags, flag, value)\
+    ((value) ? Set_Flag(flags, flag) : Unset_Flag(flags, flag))
+
+#define Toggle_Flag(flags, flag)\
+    (Get_Flag((flags), (flag)) ? Unset_Flag((flags), (flag)) : Set_Flag((flags), (flag)))
+
+typedef enum
+{
+    key_Up,
+    key_Pressed,
+    key_Down,
+    key_Released,
+    key_state_Count,
+    key_state_Undefined,
+} key_state;
+
+global_variable key_state KeyStateMap[key_state_Count][2] = {
+    [key_Up]       =  {key_Up      ,  key_Pressed},
+    [key_Pressed]  =  {key_Released,  key_Down},
+    [key_Down]     =  {key_Released,  key_Down},
+    [key_Released] =  {key_Up      ,  key_Pressed},
+};
+
+
 typedef s32 ui_id;
+typedef u32 key_code;
+
+typedef struct
+{
+    s16 Index;
+    s16 Shift;
+} key_location;
 
 typedef enum
 {
@@ -33,13 +86,15 @@ typedef enum
    alignment_CenterCenter,
 } alignment;
 
-typedef struct
+typedef enum
 {
-    b32 Shift;
-    b32 Control;
-    b32 Alt;
-    b32 Super;
-} modifier_keys;
+    modifier_key_Shift    = 0x1,
+    modifier_key_Control  = 0x2,
+    modifier_key_Alt      = 0x4,
+    modifier_key_Super    = 0x8,
+} modifier_key_type;
+
+typedef u32 modifier_flags;
 
 typedef enum
 {
@@ -83,17 +138,16 @@ typedef struct
 {
     ui_id Id;
 
-    u8 *Text;
+    u8 *Text; /* TODO: Use a string type. */
     s32 TextSize;
+
     /* TODO: Turn booleans into flags. */
     b32 AccentMode;
-    b32 KeyHasRepeated;
 
     Vector2 Position;
     Vector2 Size;
 
     s32 Index;
-    f32 KeyRepeatTime;
 
     accent CurrentAccent;
 
@@ -111,6 +165,14 @@ typedef struct
     };
 } ui_element;
 
+typedef u32 key_state_chunk;
+
+typedef struct
+{
+    key_code Key;
+    u32 Repeat;
+} key_event;
+
 typedef struct
 {
     ui_id Active;
@@ -123,13 +185,23 @@ typedef struct
     b32 MouseButtonReleased;
     Vector2 MousePosition;
 
-    modifier_keys ModifierKeys;
+    #define Key_Press_Queue_Size 32
+    key_event KeyEventQueue[Key_Press_Queue_Size];
+    s32 QueueIndex;
+    modifier_flags ModifierFlags;
     b32 EnterPressed;
+    f32 KeyRepeatTime;
+    b32 KeyHasRepeated;
+    key_code LastKeyPressed;
+    b32 InputOccured;
+    u32 KeyStateIndex;
+    key_state_chunk KeyStates[2][Key_State_Chunk_Count];
 
     Vector2 ActivationPosition;
 
     f32 CursorBlinkRate;
     f32 CursorBlinkTime;
+    f32 DeltaTime;
 
     /* TODO: Dynamically allocate the line buffer. */
 #define Max_Line_Count 6
@@ -141,6 +213,7 @@ typedef struct
 ui_id GetElementId(ui_element Element);
 
 button_element CreateButton(Vector2 Position, u8 *Text, s32 Id);
+text_element CreateText(Vector2 Position, s32 Id, u8 *Text);
 
 void DrawWrappedText(ui *Ui, u8 *Text, f32 MaxWidth, f32 X, f32 Y, f32 LineHeight, f32 LetterSpacing, Color FontColor, alignment Alignment);
 
@@ -180,13 +253,25 @@ ui_id GetElementId(ui_element Element)
 
 button_element CreateButton(Vector2 Position, u8 *Text, s32 Id)
 {
-    button_element Button;
+    button_element Element;
 
-    Button.Position = Position;
-    Button.Text = Text;
-    Button.Id = Id;
+    Element.Position = Position;
+    Element.Text = Text;
+    Element.Id = Id;
 
-    return Button;
+    return Element;
+}
+
+text_element CreateText(Vector2 Position, s32 Id, u8 *Text)
+{
+    text_element Element;
+
+    Element.Id = Id;
+    Element.Text = Text;
+    Element.Position = Position;
+    Element.Color = (Color){255, 255, 255, 255};
+
+    return Element;
 }
 
 internal b32 PositionIsInsideRect(Vector2 Position, Rectangle Rect)
@@ -565,11 +650,8 @@ b32 DoTablet(ui *UI, tablet_element *Tablet)
     return Changed;
 }
 
-/* TODO: Probably don't pass DeltaTime in, but have it live as a member of some arguemnt struct.
-   Or handle cursor blink timing outside of DoText? */
-u8 *DoText(ui *UI, text_element *TextElement, f32 DeltaTime)
+void DrawTextElement(ui *UI, text_element *TextElement)
 {
-    u8 *Result = (u8 *)"";
     char *Text = (char *)TextElement->Text;
     int LetterSpacing = 1;
 
@@ -590,7 +672,7 @@ u8 *DoText(ui *UI, text_element *TextElement, f32 DeltaTime)
 
         if (BlinkRate > 0.0f)
         {
-            BlinkTime = BlinkTime + DeltaTime;
+            BlinkTime = BlinkTime + UI->DeltaTime;
             while (BlinkTime > BlinkRate)
             {
                 BlinkTime -= BlinkRate;
@@ -605,8 +687,6 @@ u8 *DoText(ui *UI, text_element *TextElement, f32 DeltaTime)
             }
         }
     }
-
-    return Result;
 }
 
 b32 DoUiElement(ui *UI, ui_element *UiElement)
@@ -628,4 +708,126 @@ b32 DoUiElement(ui *UI, ui_element *UiElement)
     }
 
     return Changed;
+}
+
+
+internal inline key_location GetKeyLocation(u32 KeyNumber)
+{
+     key_location Location;
+
+     Location.Index = Key_State_Chunk_Count_Mask & (KeyNumber >> (Key_State_Chunk_Size_Log2 - Bits_Per_Key_State_Log2));
+     Location.Shift = Key_State_Chunk_Size_Mask & (KeyNumber << Bits_Per_Key_State_Log2);
+
+    if (Location.Index >= (s32)Key_State_Chunk_Count)
+    {
+        Location.Index = -1;
+        Location.Shift = -1;
+    }
+
+    return Location;
+}
+
+internal inline b32 KeyLocationIsValid(key_location Location)
+{
+    return Location.Index >= 0 && Location.Shift >= 0;
+}
+
+void UpdateUserInputForUi(ui *Ui)
+{
+    u32 Key;
+    Ui->QueueIndex = 0;
+    b32 KeysWerePressed = 0;
+
+    {
+        b32 ShiftDown = IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT);
+        b32 ControlDown = IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL);
+        b32 AltDown = IsKeyDown(KEY_LEFT_ALT) || IsKeyDown(KEY_RIGHT_ALT);
+        b32 SuperDown = IsKeyDown(KEY_LEFT_SUPER) || IsKeyDown(KEY_RIGHT_SUPER);
+
+        Assign_Flag(Ui->ModifierFlags, modifier_key_Shift, ShiftDown);
+        Assign_Flag(Ui->ModifierFlags, modifier_key_Control, ControlDown);
+        Assign_Flag(Ui->ModifierFlags, modifier_key_Alt, AltDown);
+        Assign_Flag(Ui->ModifierFlags, modifier_key_Super, SuperDown);
+    }
+
+    Ui->MousePosition = GetMousePosition();
+
+    for (u32 I = 0; I < Key_Press_Queue_Size; ++I)
+    {
+        Ui->KeyEventQueue[I] = (key_event){};
+    }
+
+    for (;;)
+    {
+        Key = GetKeyPressed();
+        b32 QueueHasRoom = Ui->QueueIndex < Key_Press_Queue_Size;
+
+        if (!(Key && QueueHasRoom))
+        {
+            break;
+        }
+
+        Ui->KeyEventQueue[Ui->QueueIndex].Key = Key;
+        Ui->QueueIndex += 1;
+        KeysWerePressed = 1;
+        Ui->KeyRepeatTime = 0.0f;
+        Ui->KeyHasRepeated = 0;
+        Ui->LastKeyPressed = Key;
+
+        Ui->InputOccured = 1;
+    }
+
+    if (!KeysWerePressed && IsKeyDown(Ui->LastKeyPressed))
+    {
+        Ui->KeyRepeatTime += Ui->DeltaTime;
+
+        b32 InitialKeyRepeat = !Ui->KeyHasRepeated && Ui->KeyRepeatTime > 0.3f;
+        /* NOTE: If the key repeat time is short enough, we may need to handle multiple repeats in a single frame. */
+        b32 TheOtherKeyRepeats = Ui->KeyHasRepeated && Ui->KeyRepeatTime > 0.04f;
+
+        if (InitialKeyRepeat || TheOtherKeyRepeats)
+        {
+            Ui->KeyRepeatTime = 0.0f;
+            Ui->KeyHasRepeated = 1;
+            Ui->InputOccured = 1;
+
+            if (Ui->QueueIndex < Key_Press_Queue_Size)
+            {
+                Ui->KeyEventQueue[Ui->QueueIndex].Key = Ui->LastKeyPressed;
+                Ui->QueueIndex += 1;
+            }
+        }
+    }
+
+    for (u32 Key = 0; Key < Total_Number_Of_Keys; ++Key)
+    {
+        /* NOTE: Update state for each key */
+        u32 NextKeyStateIndex = !Ui->KeyStateIndex;
+        b32 IsDown = IsKeyDown(Key);
+        key_location Location = GetKeyLocation(Key);
+
+        if (KeyLocationIsValid(Location))
+        {
+            u32 KeyStateChunk = Ui->KeyStates[Ui->KeyStateIndex][Location.Index];
+            key_state CurrentState = (KeyStateChunk >> Location.Shift) & Bits_Per_Key_State_Mask;
+            key_state NextState = KeyStateMap[CurrentState][IsDown]; /* TODO: What is NextState used for? */
+
+            Assert(NextState < key_state_Count);
+
+            if (CurrentState != key_Up || NextState != key_Up)
+            {
+                /* TODO: do we really want to set InputOccured to 1 here??? */
+                Ui->InputOccured = 1;
+            }
+
+            u32 UnsetMask = ~(Bits_Per_Key_State_Mask << Location.Shift);
+            u32 NewChunk = (KeyStateChunk & UnsetMask) | (NextState << Location.Shift);
+
+            Ui->KeyStates[NextKeyStateIndex][Location.Index] = NewChunk;
+        }
+        else
+        {
+            /* NOTE: Error */
+        }
+    }
 }

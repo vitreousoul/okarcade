@@ -263,6 +263,13 @@ typedef struct
     ryn_memory_arena FrameArena;
 } game;
 
+typedef enum
+{
+    ui_element__Null,
+    ui_element_CommandLine,
+    ui_element__Count,
+} ui_element_name;
+
 internal ryn_string GetWord(word_id Id)
 {
     ryn_string String = WordTable[Id];
@@ -707,7 +714,6 @@ int main(void)
     u64 MaxArenaSize = 1*Megabyte;
     Assert(sizeof(game) < MaxArenaSize);
 
-
     ryn_memory_arena Arena = ryn_memory_CreateArena(sizeof(game));
 
     game *Game = ryn_memory_PushStruct(&Arena, game);
@@ -721,9 +727,10 @@ int main(void)
     InitializeWordTable(World);
 
 
-    { /* NOTE: Initialize world. */
+    { /* NOTE: Initialize Ui. */
         Game->Ui.Font = GetFontDefault();
         Game->Ui.FontSize = 16.0f;
+        Game->Ui.CursorBlinkRate = 0.5f;
     }
 
     sentence Sentence = {0};
@@ -740,6 +747,8 @@ int main(void)
         Sentence.FirstPartOfSpeech.Next = &SecondPartOfSpeech;
     }
 
+    text_element DebugTextElement = CreateText(V2(40.0f, 20.0f), ui_element_CommandLine, (u8 *)"");
+
     while (!WindowShouldClose())
     {
         HandleUserInput(World, &Game->UserInput);
@@ -747,7 +756,8 @@ int main(void)
 
         BeginDrawing();
         ClearBackground((Color){40,0,50,255});
-        DrawWorld(Game);
+        DrawTextElement(&Game->Ui, &DebugTextElement);
+        /* DrawWorld(Game); */
         Game->FrameArena.Offset = 0;
         EndDrawing();
     }
