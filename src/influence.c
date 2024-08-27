@@ -669,8 +669,11 @@ internal void TestUpdatePlayer(world *World, user_input *UserInput)
     }
 }
 
-internal void HandleUserInput(world *World, user_input *UserInput)
+internal void HandleUserInput(game *Game, text_element *TextElement)
 {
+    ui *Ui = &Game->Ui;
+    user_input *UserInput = &Game->UserInput;
+
     UserInput->Direction = (v2s32){0,0};
     UserInput->ConversationDirection = (v2s32){0,0};
 
@@ -707,7 +710,16 @@ internal void HandleUserInput(world *World, user_input *UserInput)
     {
         UserInput->ConversationDirection.x -= 1;
     }
+
+    for (s32 I = 0; I < Ui->QueueIndex; ++I)
+    {
+        s32 Key = Ui->KeyEventQueue[I].Key;
+        HandleKey(Ui, TextElement, Key);
+    }
 }
+
+#define Debug_Text_Size 32
+global_variable u8 DebugText[Debug_Text_Size];
 
 int main(void)
 {
@@ -747,16 +759,17 @@ int main(void)
         Sentence.FirstPartOfSpeech.Next = &SecondPartOfSpeech;
     }
 
-    text_element DebugTextElement = CreateText(V2(40.0f, 20.0f), ui_element_CommandLine, (u8 *)"");
+    text_element DebugTextElement = CreateText(V2(40.0f, 20.0f), ui_element_CommandLine, DebugText, Debug_Text_Size);
 
     while (!WindowShouldClose())
     {
-        HandleUserInput(World, &Game->UserInput);
+        UpdateUserInputForUi(&Game->Ui);
+        HandleUserInput(Game, &DebugTextElement);
         TestUpdatePlayer(World, &Game->UserInput);
 
         BeginDrawing();
         ClearBackground((Color){40,0,50,255});
-        DrawTextElement(&Game->Ui, &DebugTextElement);
+        DoTextElement(&Game->Ui, &DebugTextElement);
         /* DrawWorld(Game); */
         Game->FrameArena.Offset = 0;
         EndDrawing();

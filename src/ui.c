@@ -1,6 +1,7 @@
 #define BUTTON_PADDING 8
 
 #define IS_SPACE(c) ((c) == ' ' || (c) == '\t' || (c) == '\n' || (c) == '\r')
+#define IS_UPPER_CASE(c) ((c) >= 65 && (c) <= 90)
 
 #define Is_Utf8_Header_Byte1(b) (((b) & 0x80) == 0x00)
 #define Is_Utf8_Header_Byte2(b) (((b) & 0xE0) == 0xC0)
@@ -35,6 +36,57 @@
 
 #define Toggle_Flag(flags, flag)\
     (Get_Flag((flags), (flag)) ? Unset_Flag((flags), (flag)) : Set_Flag((flags), (flag)))
+
+global_variable b32 PrintableKeys[Total_Number_Of_Keys] = {
+    [KEY_SPACE] = 1,
+    [KEY_APOSTROPHE] = 1,
+    [KEY_COMMA] = 1,
+    [KEY_MINUS] = 1,
+    [KEY_PERIOD] = 1,
+    [KEY_SLASH] = 1,
+    [KEY_ZERO] = 1,
+    [KEY_ONE] = 1,
+    [KEY_TWO] = 1,
+    [KEY_THREE] = 1,
+    [KEY_FOUR] = 1,
+    [KEY_FIVE] = 1,
+    [KEY_SIX] = 1,
+    [KEY_SEVEN] = 1,
+    [KEY_EIGHT] = 1,
+    [KEY_NINE] = 1,
+    [KEY_SEMICOLON] = 1,
+    [KEY_EQUAL] = 1,
+    [KEY_A] = 1,
+    [KEY_B] = 1,
+    [KEY_C] = 1,
+    [KEY_D] = 1,
+    [KEY_E] = 1,
+    [KEY_F] = 1,
+    [KEY_G] = 1,
+    [KEY_H] = 1,
+    [KEY_I] = 1,
+    [KEY_J] = 1,
+    [KEY_K] = 1,
+    [KEY_L] = 1,
+    [KEY_M] = 1,
+    [KEY_N] = 1,
+    [KEY_O] = 1,
+    [KEY_P] = 1,
+    [KEY_Q] = 1,
+    [KEY_R] = 1,
+    [KEY_S] = 1,
+    [KEY_T] = 1,
+    [KEY_U] = 1,
+    [KEY_V] = 1,
+    [KEY_W] = 1,
+    [KEY_X] = 1,
+    [KEY_Y] = 1,
+    [KEY_Z] = 1,
+    [KEY_LEFT_BRACKET] = 1,
+    [KEY_BACKSLASH] = 1,
+    [KEY_RIGHT_BRACKET] = 1,
+    [KEY_GRAVE] = 1,
+};
 
 typedef enum
 {
@@ -213,7 +265,7 @@ typedef struct
 ui_id GetElementId(ui_element Element);
 
 button_element CreateButton(Vector2 Position, u8 *Text, s32 Id);
-text_element CreateText(Vector2 Position, s32 Id, u8 *Text);
+text_element CreateText(Vector2 Position, s32 Id, u8 *Text, s32 TextSize);
 
 void DrawWrappedText(ui *Ui, u8 *Text, f32 MaxWidth, f32 X, f32 Y, f32 LineHeight, f32 LetterSpacing, Color FontColor, alignment Alignment);
 
@@ -262,12 +314,13 @@ button_element CreateButton(Vector2 Position, u8 *Text, s32 Id)
     return Element;
 }
 
-text_element CreateText(Vector2 Position, s32 Id, u8 *Text)
+text_element CreateText(Vector2 Position, s32 Id, u8 *Text, s32 TextSize)
 {
-    text_element Element;
+    text_element Element = {};
 
     Element.Id = Id;
     Element.Text = Text;
+    Element.TextSize = TextSize;
     Element.Position = Position;
     Element.Color = (Color){255, 255, 255, 255};
 
@@ -650,8 +703,9 @@ b32 DoTablet(ui *UI, tablet_element *Tablet)
     return Changed;
 }
 
-void DrawTextElement(ui *UI, text_element *TextElement)
+void DoTextElement(ui *UI, text_element *TextElement)
 {
+    /* TODO: Handle alignment for text-element. */
     char *Text = (char *)TextElement->Text;
     int LetterSpacing = 1;
 
@@ -662,10 +716,12 @@ void DrawTextElement(ui *UI, text_element *TextElement)
         b32 ShowCursor = BlinkTime < 0.6f * BlinkRate;
         Vector2 TextSize = MeasureTextEx(UI->Font, Text, UI->FontSize, 1);
 
-        f32 InputX = TextElement->Position.x - (TextSize.x / 2.0f);
+        f32 HalfTextWidth = TextSize.x / 2.0f;
+
+        f32 InputX = TextElement->Position.x - HalfTextWidth;
         f32 InputY = TextElement->Position.y;
 
-        f32 CursorX = (Screen_Width + TextSize.x) / 2.0f;
+        f32 CursorX = TextElement->Position.x + HalfTextWidth;
         f32 CursorY = InputY;
 
         DrawTextEx(UI->Font, Text, V2(InputX, InputY), UI->FontSize, LetterSpacing, TextElement->Color);
@@ -730,6 +786,216 @@ internal inline key_location GetKeyLocation(u32 KeyNumber)
 internal inline b32 KeyLocationIsValid(key_location Location)
 {
     return Location.Index >= 0 && Location.Shift >= 0;
+}
+
+internal void ClearAccentKey(text_element *TextElement)
+{
+    switch (TextElement->CurrentAccent)
+    {
+    case accent_Acute:
+    case accent_Tilde:
+    {
+        if (TextElement->Text)
+        {
+            TextElement->Text[TextElement->Index] = 0;
+            if (TextElement->Index + 1 < TextElement->TextSize)
+            {
+                TextElement->Text[TextElement->Index+1] = 0;
+            }
+            TextElement->AccentMode = 0;
+            TextElement->CurrentAccent = 0;
+        }
+    } break;
+    default:
+    {
+        Assert(!"Not Implemented.");
+    }
+    }
+}
+
+void HandleKey(ui *UI, text_element *TextElement, key_code Key)
+{
+    if (PrintableKeys[Key])
+    {
+        if (TextElement->Index + 1 < TextElement->TextSize)
+        {
+            if (TextElement->AccentMode)
+            {
+                unsigned char SecondByte = 0;
+
+                if (TextElement->Index + 2 < TextElement->TextSize)
+                {
+                    if (TextElement->CurrentAccent == accent_Acute)
+                    {
+                        b32 DoNotUpdate = 0;
+
+                        switch (Key)
+                        {
+                        case KEY_A: SecondByte = 0x81; break;
+                        case KEY_E: SecondByte = 0x89; break;
+                        case KEY_I: SecondByte = 0x8d; break;
+                        case KEY_O: SecondByte = 0x93; break;
+                        case KEY_U: SecondByte = 0x9a; break;
+                        default: DoNotUpdate = 1; break;
+                        }
+
+                        if (DoNotUpdate)
+                        {
+                            ClearAccentKey(TextElement);
+                        }
+                        else
+                        {
+                            if (!Get_Flag(UI->ModifierFlags, modifier_key_Shift))
+                            {
+                                SecondByte += 32;
+                            }
+
+                            TextElement->Text[TextElement->Index] = 0xC3;
+                            TextElement->Text[TextElement->Index+1] = SecondByte;
+                            TextElement->Index += 2;
+                        }
+                    }
+                    else if (TextElement->CurrentAccent == accent_Tilde && Key == KEY_N)
+                    {
+                        char SecondByte = 0x91;
+
+                        if (!Get_Flag(UI->ModifierFlags, modifier_key_Shift))
+                        {
+                            SecondByte += 32;
+                        }
+
+                        TextElement->Text[TextElement->Index] = 0xC3;
+                        TextElement->Text[TextElement->Index+1] = SecondByte;
+                        TextElement->Index += 2;
+                    }
+                    else
+                    {
+                        ClearAccentKey(TextElement);
+                    }
+                }
+
+                TextElement->AccentMode = 0;
+                TextElement->CurrentAccent = 0;
+            }
+            else if (Get_Flag(UI->ModifierFlags, modifier_key_Alt))
+            {
+                switch (Key)
+                {
+                case KEY_E:
+                {
+                    if (TextElement->Index + 2 < TextElement->TextSize)
+                    {
+                        /* NOTE: Acute accent '´' */
+                        TextElement->Text[TextElement->Index] = 0xC2;
+                        TextElement->Text[TextElement->Index+1] = 0xB4;
+                        TextElement->AccentMode = 1;
+                        TextElement->CurrentAccent = accent_Acute;
+                    }
+                } break;
+                case KEY_N:
+                {
+                    if (TextElement->Index + 2 < TextElement->TextSize)
+                    {
+                        /* NOTE: Tilde '˜' */
+                        /* TextElement->Text[TextElement->Index] = '~'; */
+                        TextElement->Text[TextElement->Index] = 0xCB;
+                        TextElement->Text[TextElement->Index+1] = 0x9C;
+                        TextElement->AccentMode = 1;
+                        TextElement->CurrentAccent = accent_Tilde;
+                    }
+                } break;
+                case KEY_SLASH:
+                {
+                    if (Get_Flag(UI->ModifierFlags, modifier_key_Shift) &&
+                        TextElement->Index + 2 < TextElement->TextSize)
+                    {
+                        /* NOTE: Inverted question mark '¿' */
+                        TextElement->Text[TextElement->Index] = 0xC2;
+                        TextElement->Text[TextElement->Index+1] = 0xBF;
+                        TextElement->Index = TextElement->Index + 2;
+                    }
+                } break;
+                }
+            }
+            else if (Get_Flag(UI->ModifierFlags, modifier_key_Shift) && Key == KEY_SLASH)
+            {
+                TextElement->Text[TextElement->Index] = '?';
+                TextElement->Index = TextElement->Index + 1;
+            }
+            else
+            {
+                if (!Get_Flag(UI->ModifierFlags, modifier_key_Shift) && IS_UPPER_CASE(Key))
+                {
+                    Key += 32;
+                }
+
+                TextElement->Text[TextElement->Index] = Key;
+                TextElement->Index = TextElement->Index + 1;
+            }
+        }
+    }
+    else
+    {
+        switch (Key)
+        {
+        case KEY_BACKSPACE:
+        {
+            if (TextElement->AccentMode)
+            {
+                ClearAccentKey(TextElement);
+            }
+            else
+            {
+                int TailBytesSkipped = 0;
+
+                for (;;)
+                {
+                    if (TextElement->Index > 0)
+                    {
+                        TextElement->Index = TextElement->Index - 1;
+                    }
+
+                    if (TextElement->Index < 0)
+                    {
+                        break;
+                    }
+
+                    char Char = TextElement->Text[TextElement->Index];
+
+                    if (Is_Utf8_Tail_Byte(Char))
+                    {
+                        TextElement->Text[TextElement->Index] = 0;
+                        TailBytesSkipped += 1;
+                    }
+                    else if (TailBytesSkipped == 1 && Is_Utf8_Header_Byte2(Char))
+                    {
+                        if (TextElement->Index < 0) break;
+                        TextElement->Text[TextElement->Index] = 0;
+                        break;
+                    }
+                    else if (TailBytesSkipped == 2 && Is_Utf8_Header_Byte3(Char))
+                    {
+                        if (TextElement->Index < 0) break;
+                        TextElement->Text[TextElement->Index] = 0;
+                        break;
+                    }
+                    else if (TailBytesSkipped == 3 && Is_Utf8_Header_Byte4(Char))
+                    {
+                        if (TextElement->Index < 0) break;
+                        TextElement->Text[TextElement->Index] = 0;
+                        break;
+                    }
+                    else
+                    {
+                        /* NOTE: Delete an ASCII character. */
+                        TextElement->Text[TextElement->Index] = 0;
+                        break;
+                    }
+                }
+            }
+        } break;
+        }
+    }
 }
 
 void UpdateUserInputForUi(ui *Ui)
