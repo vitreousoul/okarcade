@@ -703,25 +703,24 @@ b32 DoTablet(ui *UI, tablet_element *Tablet)
     return Changed;
 }
 
-void DoTextElement(ui *UI, text_element *TextElement)
+void DoTextElement(ui *UI, text_element *TextElement, alignment Alignment)
 {
     /* TODO: Handle alignment for text-element. */
     char *Text = (char *)TextElement->Text;
-    int LetterSpacing = 1;
+    float LetterSpacing = 1.7f;
 
     if (Text)
     {
         f32 BlinkTime = UI->CursorBlinkTime;
         f32 BlinkRate = UI->CursorBlinkRate;
         b32 ShowCursor = BlinkTime < 0.6f * BlinkRate;
-        Vector2 TextSize = MeasureTextEx(UI->Font, Text, UI->FontSize, 1);
+        Vector2 TextSize = MeasureTextEx(UI->Font, Text, UI->FontSize, LetterSpacing);
+        Rectangle AlignedRectangle = GetAlignedRectangle(TextElement->Position, TextSize, Alignment);
 
-        f32 HalfTextWidth = TextSize.x / 2.0f;
-
-        f32 InputX = TextElement->Position.x - HalfTextWidth;
+        f32 InputX = AlignedRectangle.x;
         f32 InputY = TextElement->Position.y;
 
-        f32 CursorX = TextElement->Position.x + HalfTextWidth;
+        f32 CursorX = AlignedRectangle.x + TextSize.x;
         f32 CursorY = InputY;
 
         DrawTextEx(UI->Font, Text, V2(InputX, InputY), UI->FontSize, LetterSpacing, TextElement->Color);

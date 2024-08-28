@@ -741,8 +741,8 @@ int main(void)
 
     { /* NOTE: Initialize Ui. */
         Game->Ui.Font = GetFontDefault();
-        Game->Ui.FontSize = 16.0f;
-        Game->Ui.CursorBlinkRate = 0.5f;
+        Game->Ui.FontSize = 18.0f;
+        Game->Ui.CursorBlinkRate = 1.1f;
     }
 
     sentence Sentence = {0};
@@ -759,17 +759,25 @@ int main(void)
         Sentence.FirstPartOfSpeech.Next = &SecondPartOfSpeech;
     }
 
-    text_element DebugTextElement = CreateText(V2(40.0f, 20.0f), ui_element_CommandLine, DebugText, Debug_Text_Size);
+    text_element DebugTextElement = CreateText(V2(20.0f, 20.0f), ui_element_CommandLine, DebugText, Debug_Text_Size);
+
+    f32 Time = GetTime();
 
     while (!WindowShouldClose())
     {
+        {
+            f32 CurrentTime = GetTime();
+            Game->Ui.DeltaTime = CurrentTime - Time;
+            Time = CurrentTime;
+        }
+
         UpdateUserInputForUi(&Game->Ui);
         HandleUserInput(Game, &DebugTextElement);
         TestUpdatePlayer(World, &Game->UserInput);
 
         BeginDrawing();
         ClearBackground((Color){40,0,50,255});
-        DoTextElement(&Game->Ui, &DebugTextElement);
+        DoTextElement(&Game->Ui, &DebugTextElement, alignment_TopLeft);
         /* DrawWorld(Game); */
         Game->FrameArena.Offset = 0;
         EndDrawing();

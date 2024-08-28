@@ -883,7 +883,7 @@ internal void DrawQuizItem(state *State, u32 LetterSpacing)
         State->UI.CursorBlinkTime = 0.0f;
     }
 
-    DoTextElement(&State->UI, &State->TextElement);
+    DoTextElement(&State->UI, &State->TextElement, alignment_TopCenter);
 
     Vector2 NextButtonPosition = V2(Screen_Width - BorderPadding, Screen_Height - BorderPadding);
     b32 NextPressed = DoButtonWith(&State->UI, ui_Next, (u8 *)"Next", NextButtonPosition, alignment_BottomRight);
