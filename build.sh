@@ -31,10 +31,10 @@ else
 fi
 
 if [ $DEBUG -eq 0 ]; then
-    echo "Optimized build";
+    echo "Optimized build : $TARGET_NAME";
     TARGET="-O2 -o dist/$TARGET_NAME.exe"
 elif [ $DEBUG -eq 1 ]; then
-    echo "Debug build";
+    echo "Debug build : $TARGET_NAME";
     TARGET="-g3 -O0 -o dist/$TARGET_NAME.out"
 fi
 

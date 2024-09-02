@@ -190,7 +190,7 @@ typedef struct
     quiz_mode QuizMode;
 
     ui UI;
-    text_element TextElement;
+    ui_element TextElement;
 
     Sound Correct;
     Sound Wrong;
@@ -553,7 +553,7 @@ internal b32 StringsMatch(char *A, char *B)
     }
 }
 
-internal void ClearTextElement(text_element *TextElement)
+internal void ClearTextElement(ui_element *TextElement)
 {
     for (s32 I = 0; I <= TextElement->TextSize; ++I)
     {

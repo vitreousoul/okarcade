@@ -118,11 +118,13 @@ typedef struct
 typedef enum
 {
     ui_element_type_UNDEFINED,
+
     ui_element_type_Button,
     ui_element_type_Slider,
     ui_element_type_Tablet,
-    ui_element_type_Count,
     ui_element_type_Text,
+
+    ui_element_type__Count,
 } ui_element_type;
 
 typedef enum
@@ -157,64 +159,20 @@ typedef enum
 
 typedef struct
 {
+    ui_element_type Type;
     ui_id Id;
-
     Vector2 Position;
     alignment Alignment;
-
     Vector2 Size;
-    u8 *Text;
-} button_element;
-
-typedef struct
-{
-    ui_id Id;
-
-    Vector2 Position;
-    Vector2 Size;
-    f32 Value;
-} slider_element;
-
-typedef struct
-{
-    ui_id Id;
-
-    Vector2 Position;
-    Vector2 Size;
-    Vector2 Offset;
-
-    b32 MouseReleased;
-} tablet_element;
-
-typedef struct
-{
-    ui_id Id;
-
     u8 *Text; /* TODO: Use a string type. */
     s32 TextSize;
-
-    /* TODO: Turn booleans into flags. */
-    b32 AccentMode;
-
-    Vector2 Position;
-    Vector2 Size;
-
+    f32 Value;
+    Vector2 Offset;
+    b32 MouseReleased;
+    b32 AccentMode; /* TODO: Turn this into a flag. */
     s32 Index;
-
     accent CurrentAccent;
-
     Color Color;
-} text_element;
-
-typedef struct
-{
-    ui_element_type Type;
-    union
-    {
-        button_element Button;
-        slider_element Slider;
-        tablet_element Tablet;
-    };
 } ui_element;
 
 typedef u32 key_state_chunk;
@@ -262,20 +220,6 @@ typedef struct
     s32 LineBufferIndex;
 } ui;
 
-ui_id GetElementId(ui_element Element);
-
-button_element CreateButton(Vector2 Position, u8 *Text, s32 Id);
-text_element CreateText(Vector2 Position, s32 Id, u8 *Text, s32 TextSize);
-
-void DrawWrappedText(ui *Ui, u8 *Text, f32 MaxWidth, f32 X, f32 Y, f32 LineHeight, f32 LetterSpacing, Color FontColor, alignment Alignment);
-
-b32 DoButton(ui *UI, button_element *Button);
-b32 DoButtonWith(ui *UI, s32 Id, u8 *Text, Vector2 Position, alignment Alignment);
-b32 DoSlider(ui *UI, slider_element *Slider);
-b32 DoTablet(ui *UI, tablet_element *Tablet);
-b32 DoUiElement(ui *UI, ui_element *UiElement);
-
-
 ui_id GetElementId(ui_element Element)
 {
     ui_id Result;
@@ -283,16 +227,10 @@ ui_id GetElementId(ui_element Element)
     switch (Element.Type)
     {
     case ui_element_type_Button:
-    {
-        Result = Element.Button.Id;
-    } break;
     case ui_element_type_Slider:
-    {
-        Result = Element.Slider.Id;
-    } break;
     case ui_element_type_Tablet:
     {
-        Result = Element.Tablet.Id;
+        Result = Element.Id;
     } break;
     default:
     {
@@ -303,20 +241,21 @@ ui_id GetElementId(ui_element Element)
     return Result;
 }
 
-button_element CreateButton(Vector2 Position, u8 *Text, s32 Id)
+ui_element CreateButton(s32 Id, u8 *Text, Vector2 Position, alignment Alignment)
 {
-    button_element Element;
+    ui_element Element = {};
 
     Element.Position = Position;
     Element.Text = Text;
     Element.Id = Id;
+    Element.Alignment = Alignment;
 
     return Element;
 }
 
-text_element CreateText(Vector2 Position, s32 Id, u8 *Text, s32 TextSize)
+ui_element CreateText(Vector2 Position, s32 Id, u8 *Text, s32 TextSize)
 {
-    text_element Element = {};
+    ui_element Element = {};
 
     Element.Id = Id;
     Element.Text = Text;
@@ -340,7 +279,7 @@ internal b32 PositionIsInsideRect(Vector2 Position, Rectangle Rect)
             (Position.y <= y1));
 }
 
-internal b32 PositionIsInsideSliderHandle(Vector2 Position, slider_element *Slider)
+internal b32 PositionIsInsideSliderHandle(Vector2 Position, ui_element *Slider)
 {
     f32 X0 = Slider->Position.x;
     f32 Y0 = Slider->Position.y;
@@ -353,7 +292,7 @@ internal b32 PositionIsInsideSliderHandle(Vector2 Position, slider_element *Slid
             (Position.y <= Y1));
 }
 
-internal b32 PositionIsInsideTablet(Vector2 Position, tablet_element *Tablet)
+internal b32 PositionIsInsideTablet(Vector2 Position, ui_element *Tablet)
 {
     f32 X0 = Tablet->Position.x;
     f32 Y0 = Tablet->Position.y;
@@ -391,10 +330,11 @@ internal Rectangle GetAlignedRectangle(Vector2 Position, Vector2 Size, alignment
     return Result;
 }
 
+/* TODO: GetCenteredTextX relies on the Screen_Width, which doesn't feel good, we should remove this function and have calling code offset the element's x to the center and use a center-x alignment. */
 internal f32 GetCenteredTextX(ui *Ui, u8 *Text, s32 LetterSpacing)
 {
     Vector2 TextSize = MeasureTextEx(Ui->Font, (char *)Text, Ui->FontSize, LetterSpacing);
-    f32 X = (Screen_Width - TextSize.x) / 2.0f;
+    f32 X = (Screen_Width - TextSize.x) / 2.0f; /* TODO: Don't rely on Screen_Width being defined! Find some other way to get the screen-width to this function. */
 
     return X;
 }
@@ -509,91 +449,243 @@ void DrawWrappedText(ui *Ui, u8 *Text, f32 MaxWidth, f32 X, f32 Y, f32 LineHeigh
     }
 }
 
-b32 DoButton(ui *UI, button_element *Button)
+b32 DoUiElement(ui *Ui, ui_element *UiElement)
 {
-    b32 ButtonPressed = 0;
-    Color UnderColor = (Color){20,20,20,225};
-    Color InactiveColor = (Color){20,180,180,255};
-    Color HotColor = (Color){40,120,120,255};
-    Color ActiveColor = (Color){40,120,120,255};
-    Color TextColor = (Color){0,0,0,255};
+    b32 Changed = 0;
 
-    f32 FontSpacing = 0;
-    Vector2 TextSize = MeasureTextEx(UI->Font, (char *)Button->Text, UI->FontSize, FontSpacing);
-
-    f32 TwicePadding = 2 * BUTTON_PADDING;
-    Button->Size = V2(TextSize.x + TwicePadding, UI->FontSize + TwicePadding);
-
-    Rectangle AlignedRect = GetAlignedRectangle(Button->Position, Button->Size, Button->Alignment);
-
-    b32 IsMouseOver = PositionIsInsideRect(UI->MousePosition, AlignedRect);
-    b32 IsHot = UI->Hot == Button->Id;
-    b32 IsActive = UI->Active == Button->Id;
-
-    if (IsMouseOver)
+    switch (UiElement->Type)
     {
-        UI->Hot = Button->Id;
-    }
-    else if (UI->Hot == Button->Id)
+    case ui_element_type_Button:
     {
-        UI->Hot = 0;
-    }
+        b32 ButtonPressed = 0;
+        Color UnderColor = (Color){20,20,20,225};
+        Color InactiveColor = (Color){20,180,180,255};
+        Color HotColor = (Color){40,120,120,255};
+        Color ActiveColor = (Color){40,120,120,255};
+        Color TextColor = (Color){0,0,0,255};
 
-    if (UI->MouseButtonPressed)
-    {
-        if (IsHot)
+        f32 FontSpacing = 0;
+        Vector2 TextSize = MeasureTextEx(Ui->Font, (char *)UiElement->Text, Ui->FontSize, FontSpacing);
+
+        f32 TwicePadding = 2 * BUTTON_PADDING;
+        UiElement->Size = V2(TextSize.x + TwicePadding, Ui->FontSize + TwicePadding);
+
+        Rectangle AlignedRect = GetAlignedRectangle(UiElement->Position, UiElement->Size, UiElement->Alignment);
+
+        b32 IsMouseOver = PositionIsInsideRect(Ui->MousePosition, AlignedRect);
+        b32 IsHot = Ui->Hot == UiElement->Id;
+        b32 IsActive = Ui->Active == UiElement->Id;
+
+        if (IsMouseOver)
         {
-            if (!UI->Active)
+            Ui->Hot = UiElement->Id;
+        }
+        else if (Ui->Hot == UiElement->Id)
+        {
+            Ui->Hot = 0;
+        }
+
+        if (Ui->MouseButtonPressed)
+        {
+            if (IsHot)
             {
-                UI->Active = Button->Id;
+                if (!Ui->Active)
+                {
+                    Ui->Active = UiElement->Id;
+                }
             }
         }
-    }
-    else if (UI->MouseButtonReleased)
-    {
-        if (IsHot && IsActive)
+        else if (Ui->MouseButtonReleased)
         {
-            ButtonPressed = 1;
+            if (IsHot && IsActive)
+            {
+                ButtonPressed = 1;
+            }
+
+            if (IsActive)
+            {
+                Ui->Active = 0;
+            }
+        }
+        else if (Ui->EnterPressed)
+        {
+            if (IsHot)
+            {
+                ButtonPressed = 1;
+            }
+        }
+
+        Rectangle Rect = (Rectangle){AlignedRect.x, AlignedRect.y,
+                                     AlignedRect.width, AlignedRect.height};
+        Rectangle UnderRect = (Rectangle){AlignedRect.x + 2.0f, AlignedRect.y + 2.0f,
+                                          AlignedRect.width, AlignedRect.height};
+
+        Color ButtonColor = IsActive ? ActiveColor : InactiveColor;
+
+        DrawRectangleLinesEx(UnderRect, 2.0f, UnderColor);
+        DrawRectangle(Rect.x, Rect.y, Rect.width, Rect.height, ButtonColor);
+
+        if (IsHot && (IsActive || !Ui->Active))
+        {
+            DrawRectangleLinesEx(Rect, 2.0f, HotColor);
+        }
+
+        Vector2 TextPosition = V2(AlignedRect.x + BUTTON_PADDING, AlignedRect.y + BUTTON_PADDING);
+
+        DrawTextEx(Ui->Font, (char *)UiElement->Text, TextPosition, Ui->FontSize, FontSpacing, TextColor);
+
+        return ButtonPressed;
+    } break;
+    case ui_element_type_Slider:
+    {
+        b32 Changed = 0;
+
+        Vector2 Position = UiElement->Position;
+        Vector2 Size = UiElement->Size;
+        f32 CenterY = Position.y + (Size.y / 2.0f);
+
+        Color SliderColor = (Color){50,50,50,255};
+        Color HandleColor = (Color){230,210,150,255};
+
+        f32 TrackWidthPercent = 0.1f;
+        f32 TrackHeight = Size.y * TrackWidthPercent;
+        f32 TrackOffset = TrackHeight / 2.0f;
+
+        f32 HandleWidth = 16.0f;
+
+        b32 IsHot = PositionIsInsideSliderHandle(Ui->MousePosition, UiElement);
+        b32 IsActive = Ui->Active == UiElement->Id;
+
+        if (Ui->MouseButtonPressed)
+        {
+            if (IsHot)
+            {
+                if (!Ui->Active)
+                {
+                    Ui->Active = UiElement->Id;
+                }
+            }
+        }
+        else if (Ui->MouseButtonReleased)
+        {
+            if (IsActive)
+            {
+                Ui->Active = 0;
+            }
         }
 
         if (IsActive)
         {
-            UI->Active = 0;
+            UiElement->Value = (Ui->MousePosition.x - UiElement->Position.x) / UiElement->Size.x;
+            UiElement->Value = ClampF32(UiElement->Value, 0.0f, 1.0f);
+            Changed = 1;
         }
-    }
-    else if (UI->EnterPressed)
+
+        f32 HandleX = (UiElement->Value * UiElement->Size.x) + UiElement->Position.x - (HandleWidth / 2.0f);
+
+        DrawRectangle(Position.x, CenterY - TrackOffset, Size.x, TrackHeight, SliderColor);
+        DrawRectangle(HandleX, Position.y, HandleWidth, Size.y, HandleColor);
+
+        return Changed;
+    } break;
+    case ui_element_type_Tablet:
     {
+        b32 Changed = 0;
+
+        b32 IsHot = PositionIsInsideTablet(Ui->MousePosition, UiElement);
+        b32 NoActive = !Ui->Active;
+        b32 IsActive = Ui->Active == UiElement->Id;
+
+        UiElement->MouseReleased = 0;
+
         if (IsHot)
         {
-            ButtonPressed = 1;
+            if (Ui->MouseButtonPressed && NoActive)
+            {
+                Ui->Active = UiElement->Id;
+                Ui->ActivationPosition = Ui->MousePosition;
+            }
+
+            if (IsActive)
+            {
+                Changed = 1;
+
+                UiElement->Offset.x = Ui->MousePosition.x - Ui->ActivationPosition.x;
+                UiElement->Offset.y = Ui->MousePosition.y - Ui->ActivationPosition.y;
+            }
         }
-    }
 
-    Rectangle Rect = (Rectangle){AlignedRect.x, AlignedRect.y,
-                                 AlignedRect.width, AlignedRect.height};
-    Rectangle UnderRect = (Rectangle){AlignedRect.x + 2.0f, AlignedRect.y + 2.0f,
-                                      AlignedRect.width, AlignedRect.height};
+        if (Ui->MouseButtonReleased)
+        {
+            if (IsActive)
+            {
+                IsActive = 0;
+                Ui->Active = 0;
+                Changed = 1;
 
-    Color ButtonColor = IsActive ? ActiveColor : InactiveColor;
+                UiElement->MouseReleased = 1;
+                /* UiElement->Offset.x = Ui->ActivationPosition.x + UiElement->Offset.x; */
+                /* UiElement->Offset.y = Ui->ActivationPosition.y + UiElement->Offset.y; */
+            }
+        }
 
-    DrawRectangleLinesEx(UnderRect, 2.0f, UnderColor);
-    DrawRectangle(Rect.x, Rect.y, Rect.width, Rect.height, ButtonColor);
-
-    if (IsHot && (IsActive || !UI->Active))
+        return Changed;
+    } break;
+    case ui_element_type_Text:
     {
-        DrawRectangleLinesEx(Rect, 2.0f, HotColor);
+        /* TODO: Handle alignment for text-element. */
+        char *Text = (char *)UiElement->Text;
+        float LetterSpacing = 1.7f;
+
+        if (Text)
+        {
+            f32 BlinkTime = Ui->CursorBlinkTime;
+            f32 BlinkRate = Ui->CursorBlinkRate;
+            b32 ShowCursor = BlinkTime < 0.6f * BlinkRate;
+            Vector2 TextSize = MeasureTextEx(Ui->Font, Text, Ui->FontSize, LetterSpacing);
+            Rectangle AlignedRectangle = GetAlignedRectangle(UiElement->Position, TextSize, UiElement->Alignment);
+
+            f32 InputX = AlignedRectangle.x;
+            f32 InputY = UiElement->Position.y;
+
+            f32 CursorX = AlignedRectangle.x + TextSize.x;
+            f32 CursorY = InputY;
+
+            DrawTextEx(Ui->Font, Text, V2(InputX, InputY), Ui->FontSize, LetterSpacing, UiElement->Color);
+
+            if (BlinkRate > 0.0f)
+            {
+                BlinkTime = BlinkTime + Ui->DeltaTime;
+                while (BlinkTime > BlinkRate)
+                {
+                    BlinkTime -= BlinkRate;
+                }
+                Ui->CursorBlinkTime = BlinkTime;
+
+                if (ShowCursor)
+                {
+                    Color CursorColor = (Color){130,100,250,255};
+                    f32 Spacing = 3.0f;
+                    DrawRectangle(CursorX + Spacing, CursorY, 3, Ui->FontSize, CursorColor);
+                }
+            }
+        }
+    } break;
+    default: Assert(!"Unhandled ui element type."); break;
     }
 
-    Vector2 TextPosition = V2(AlignedRect.x + BUTTON_PADDING, AlignedRect.y + BUTTON_PADDING);
-
-    DrawTextEx(UI->Font, (char *)Button->Text, TextPosition, UI->FontSize, FontSpacing, TextColor);
-
-    return ButtonPressed;
+    return Changed;
 }
 
-b32 DoButtonWith(ui *UI, s32 Id, u8 *Text, Vector2 Position, alignment Alignment)
+b32 DoButton(ui *Ui, ui_element *Button)
 {
-    button_element Button;
+    Button->Type = ui_element_type_Button;
+    return DoUiElement(Ui, Button);
+}
+
+b32 DoButtonWith(ui *Ui, s32 Id, u8 *Text, Vector2 Position, alignment Alignment)
+{
+    ui_element Button;
 
     Button.Id = Id;
     Button.Position = Position;
@@ -601,170 +693,29 @@ b32 DoButtonWith(ui *UI, s32 Id, u8 *Text, Vector2 Position, alignment Alignment
     Button.Size = V2(0.0f, 0.0f);
     Button.Text = Text;
 
-    b32 Pressed = DoButton(UI, &Button);
+    b32 Pressed = DoButton(Ui, &Button);
 
     return Pressed;
 }
 
-b32 DoSlider(ui *UI, slider_element *Slider)
+b32 DoSlider(ui *Ui, ui_element *Slider)
 {
-    b32 Changed = 0;
-
-    Vector2 Position = Slider->Position;
-    Vector2 Size = Slider->Size;
-    f32 CenterY = Position.y + (Size.y / 2.0f);
-
-    Color SliderColor = (Color){50,50,50,255};
-    Color HandleColor = (Color){230,210,150,255};
-
-    f32 TrackWidthPercent = 0.1f;
-    f32 TrackHeight = Size.y * TrackWidthPercent;
-    f32 TrackOffset = TrackHeight / 2.0f;
-
-    f32 HandleWidth = 16.0f;
-
-    b32 IsHot = PositionIsInsideSliderHandle(UI->MousePosition, Slider);
-    b32 IsActive = UI->Active == Slider->Id;
-
-    if (UI->MouseButtonPressed)
-    {
-        if (IsHot)
-        {
-            if (!UI->Active)
-            {
-                UI->Active = Slider->Id;
-            }
-        }
-    }
-    else if (UI->MouseButtonReleased)
-    {
-        if (IsActive)
-        {
-            UI->Active = 0;
-        }
-    }
-
-    if (IsActive)
-    {
-        Slider->Value = (UI->MousePosition.x - Slider->Position.x) / Slider->Size.x;
-        Slider->Value = ClampF32(Slider->Value, 0.0f, 1.0f);
-        Changed = 1;
-    }
-
-    f32 HandleX = (Slider->Value * Slider->Size.x) + Slider->Position.x - (HandleWidth / 2.0f);
-
-    DrawRectangle(Position.x, CenterY - TrackOffset, Size.x, TrackHeight, SliderColor);
-    DrawRectangle(HandleX, Position.y, HandleWidth, Size.y, HandleColor);
-
-    return Changed;
+    Slider->Type = ui_element_type_Slider;
+    return DoUiElement(Ui, Slider);
 }
 
-b32 DoTablet(ui *UI, tablet_element *Tablet)
+b32 DoTablet(ui *Ui, ui_element *Tablet)
 {
-    b32 Changed = 0;
-
-    b32 IsHot = PositionIsInsideTablet(UI->MousePosition, Tablet);
-    b32 NoActive = !UI->Active;
-    b32 IsActive = UI->Active == Tablet->Id;
-
-    Tablet->MouseReleased = 0;
-
-    if (IsHot)
-    {
-        if (UI->MouseButtonPressed && NoActive)
-        {
-            UI->Active = Tablet->Id;
-            UI->ActivationPosition = UI->MousePosition;
-        }
-
-        if (IsActive)
-        {
-            Changed = 1;
-
-            Tablet->Offset.x = UI->MousePosition.x - UI->ActivationPosition.x;
-            Tablet->Offset.y = UI->MousePosition.y - UI->ActivationPosition.y;
-        }
-    }
-
-    if (UI->MouseButtonReleased)
-    {
-        if (IsActive)
-        {
-            IsActive = 0;
-            UI->Active = 0;
-            Changed = 1;
-
-            Tablet->MouseReleased = 1;
-            /* Tablet->Offset.x = UI->ActivationPosition.x + Tablet->Offset.x; */
-            /* Tablet->Offset.y = UI->ActivationPosition.y + Tablet->Offset.y; */
-        }
-    }
-
-    return Changed;
+    Tablet->Type = ui_element_type_Tablet;
+    return DoUiElement(Ui, Tablet);
 }
 
-void DoTextElement(ui *UI, text_element *TextElement, alignment Alignment)
+void DoTextElement(ui *Ui, ui_element *TextElement, alignment Alignment)
 {
-    /* TODO: Handle alignment for text-element. */
-    char *Text = (char *)TextElement->Text;
-    float LetterSpacing = 1.7f;
-
-    if (Text)
-    {
-        f32 BlinkTime = UI->CursorBlinkTime;
-        f32 BlinkRate = UI->CursorBlinkRate;
-        b32 ShowCursor = BlinkTime < 0.6f * BlinkRate;
-        Vector2 TextSize = MeasureTextEx(UI->Font, Text, UI->FontSize, LetterSpacing);
-        Rectangle AlignedRectangle = GetAlignedRectangle(TextElement->Position, TextSize, Alignment);
-
-        f32 InputX = AlignedRectangle.x;
-        f32 InputY = TextElement->Position.y;
-
-        f32 CursorX = AlignedRectangle.x + TextSize.x;
-        f32 CursorY = InputY;
-
-        DrawTextEx(UI->Font, Text, V2(InputX, InputY), UI->FontSize, LetterSpacing, TextElement->Color);
-
-        if (BlinkRate > 0.0f)
-        {
-            BlinkTime = BlinkTime + UI->DeltaTime;
-            while (BlinkTime > BlinkRate)
-            {
-                BlinkTime -= BlinkRate;
-            }
-            UI->CursorBlinkTime = BlinkTime;
-
-            if (ShowCursor)
-            {
-                Color CursorColor = (Color){130,100,250,255};
-                f32 Spacing = 3.0f;
-                DrawRectangle(CursorX + Spacing, CursorY, 3, UI->FontSize, CursorColor);
-            }
-        }
-    }
+    TextElement->Type = ui_element_type_Text;
+    TextElement->Alignment = Alignment;
+    DoUiElement(Ui, TextElement);
 }
-
-b32 DoUiElement(ui *UI, ui_element *UiElement)
-{
-    b32 Changed = 0;
-
-    switch (UiElement->Type)
-    {
-    case ui_element_type_Button:
-        Changed = DoButton(UI, &UiElement->Button);
-        break;
-    case ui_element_type_Slider:
-        Changed = DoSlider(UI, &UiElement->Slider);
-        break;
-    case ui_element_type_Tablet:
-        Changed = DoTablet(UI, &UiElement->Tablet);
-        break;
-    default: break;
-    }
-
-    return Changed;
-}
-
 
 internal inline key_location GetKeyLocation(u32 KeyNumber)
 {
@@ -787,7 +738,7 @@ internal inline b32 KeyLocationIsValid(key_location Location)
     return Location.Index >= 0 && Location.Shift >= 0;
 }
 
-internal void ClearAccentKey(text_element *TextElement)
+internal void ClearAccentKey(ui_element *TextElement)
 {
     switch (TextElement->CurrentAccent)
     {
@@ -812,7 +763,7 @@ internal void ClearAccentKey(text_element *TextElement)
     }
 }
 
-void HandleKey(ui *UI, text_element *TextElement, key_code Key)
+void HandleKey(ui *Ui, ui_element *TextElement, key_code Key)
 {
     if (PrintableKeys[Key])
     {
@@ -844,7 +795,7 @@ void HandleKey(ui *UI, text_element *TextElement, key_code Key)
                         }
                         else
                         {
-                            if (!Get_Flag(UI->ModifierFlags, modifier_key_Shift))
+                            if (!Get_Flag(Ui->ModifierFlags, modifier_key_Shift))
                             {
                                 SecondByte += 32;
                             }
@@ -858,7 +809,7 @@ void HandleKey(ui *UI, text_element *TextElement, key_code Key)
                     {
                         char SecondByte = 0x91;
 
-                        if (!Get_Flag(UI->ModifierFlags, modifier_key_Shift))
+                        if (!Get_Flag(Ui->ModifierFlags, modifier_key_Shift))
                         {
                             SecondByte += 32;
                         }
@@ -876,7 +827,7 @@ void HandleKey(ui *UI, text_element *TextElement, key_code Key)
                 TextElement->AccentMode = 0;
                 TextElement->CurrentAccent = 0;
             }
-            else if (Get_Flag(UI->ModifierFlags, modifier_key_Alt))
+            else if (Get_Flag(Ui->ModifierFlags, modifier_key_Alt))
             {
                 switch (Key)
                 {
@@ -905,7 +856,7 @@ void HandleKey(ui *UI, text_element *TextElement, key_code Key)
                 } break;
                 case KEY_SLASH:
                 {
-                    if (Get_Flag(UI->ModifierFlags, modifier_key_Shift) &&
+                    if (Get_Flag(Ui->ModifierFlags, modifier_key_Shift) &&
                         TextElement->Index + 2 < TextElement->TextSize)
                     {
                         /* NOTE: Inverted question mark '¿' */
@@ -916,14 +867,14 @@ void HandleKey(ui *UI, text_element *TextElement, key_code Key)
                 } break;
                 }
             }
-            else if (Get_Flag(UI->ModifierFlags, modifier_key_Shift) && Key == KEY_SLASH)
+            else if (Get_Flag(Ui->ModifierFlags, modifier_key_Shift) && Key == KEY_SLASH)
             {
                 TextElement->Text[TextElement->Index] = '?';
                 TextElement->Index = TextElement->Index + 1;
             }
             else
             {
-                if (!Get_Flag(UI->ModifierFlags, modifier_key_Shift) && IS_UPPER_CASE(Key))
+                if (!Get_Flag(Ui->ModifierFlags, modifier_key_Shift) && IS_UPPER_CASE(Key))
                 {
                     Key += 32;
                 }

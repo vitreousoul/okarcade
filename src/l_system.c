@@ -20,8 +20,8 @@
 
 #include "types.h"
 
-int SCREEN_WIDTH = 1024;
-int SCREEN_HEIGHT = 600;
+int Screen_Width = 1024;
+int Screen_Height = 600;
 #define TARGET_FPS 30
 
 #include "core.c"
@@ -108,9 +108,9 @@ typedef struct
     Texture2D FrameBuffer;
 
     ui UI;
-    button_element Buttons[button_kind_Count];
-    slider_element AngleSlider;
-    slider_element LengthSlider;
+    ui_element Buttons[button_kind_Count];
+    ui_element AngleSlider;
+    ui_element LengthSlider;
     ui_element Tablet;
 
     expansion Expansion;
@@ -342,7 +342,7 @@ internal void InitTurtleState(state *State, f32 OffsetX, f32 OffsetY)
     PushExpansionItem(&State->Expansion, RootItem);
 }
 
-internal b32 UpdateSlider(state *State, slider_element *Slider)
+internal b32 UpdateSlider(state *State, ui_element *Slider)
 {
     ui *UI = &State->UI;
     b32 SliderUpdated = DoSlider(UI, Slider);
@@ -452,7 +452,7 @@ internal void UpdateAndRender(void *VoidAppState)
         }
         else
         {
-            tablet_element *Tablet = &State->Tablet.Tablet;
+            ui_element *Tablet = &State->Tablet;
             Vector2 OldOffset = Tablet->Offset;
             b32 TabletChanged = DoUiElement(UI, &State->Tablet);
             Vector2 DeltaOffset = AbsV2(SubtractV2(OldOffset, Tablet->Offset));
@@ -560,17 +560,17 @@ internal void InitUi(state *State)
     }
 
     { /* init tablet */
-        State->Tablet.Tablet.Id = I;
+        State->Tablet.Id = I;
         State->Tablet.Type = ui_element_type_Tablet;
 
-        State->Tablet.Tablet.Position.x = 0.0f;
-        State->Tablet.Tablet.Position.y = 0.0f;
+        State->Tablet.Position.x = 0.0f;
+        State->Tablet.Position.y = 0.0f;
 
-        State->Tablet.Tablet.Size.x = SCREEN_WIDTH;
-        State->Tablet.Tablet.Size.y = SCREEN_HEIGHT;
+        State->Tablet.Size.x = Screen_Width;
+        State->Tablet.Size.y = Screen_Height;
 
-        State->Tablet.Tablet.Offset.x = 0.0f;
-        State->Tablet.Tablet.Offset.y = 0.0f;
+        State->Tablet.Offset.x = 0.0f;
+        State->Tablet.Offset.y = 0.0f;
 
         I += 1;
     }
@@ -580,7 +580,7 @@ internal state InitAppState(void)
 {
     state State;
 
-    Vector2 TurtlePosition = V2(120.0f, SCREEN_HEIGHT / 2.0f);
+    Vector2 TurtlePosition = V2(120.0f, Screen_Height / 2.0f);
     Vector2 TurtleHeading = V2(1.0f, 0.0f);
 
     State.Turtle = (turtle){TurtlePosition, TurtleHeading};
@@ -588,7 +588,7 @@ internal state InitAppState(void)
     State.RotationAmount = 0.25f;
     State.LineDrawsPerFrame = 20000;
 
-    State.Canvas = GenImageColor(SCREEN_WIDTH, SCREEN_HEIGHT, BackgroundColor);
+    State.Canvas = GenImageColor(Screen_Width, Screen_Height, BackgroundColor);
     State.FrameBuffer = LoadTextureFromImage(State.Canvas);
     State.UI.FontSize = 22;
 
@@ -607,8 +607,8 @@ int main(void)
     InitRaylibCanvas();
 #endif
 
-    printf("InitWindow %d %d\n", SCREEN_WIDTH, SCREEN_HEIGHT);
-    InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Look at the l-systems");
+    printf("InitWindow %d %d\n", Screen_Width, Screen_Height);
+    InitWindow(Screen_Width, Screen_Height, "Look at the l-systems");
 
     state State = InitAppState();
 

@@ -669,7 +669,7 @@ internal void TestUpdatePlayer(world *World, user_input *UserInput)
     }
 }
 
-internal void HandleUserInput(game *Game, text_element *TextElement)
+internal void HandleUserInput(game *Game, ui_element *TextElement)
 {
     ui *Ui = &Game->Ui;
     user_input *UserInput = &Game->UserInput;
@@ -759,7 +759,7 @@ int main(void)
         Sentence.FirstPartOfSpeech.Next = &SecondPartOfSpeech;
     }
 
-    text_element DebugTextElement = CreateText(V2(20.0f, 20.0f), ui_element_CommandLine, DebugText, Debug_Text_Size);
+    ui_element DebugTextElement = CreateText(V2(20.0f, 20.0f), ui_element_CommandLine, DebugText, Debug_Text_Size);
 
     f32 Time = GetTime();
 

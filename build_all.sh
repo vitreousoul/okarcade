@@ -4,36 +4,24 @@ echo "================================"
 echo "Desktop builds"
 echo "================================"
 ./build.sh estudioso
+./build.sh influence
+./build.sh l_system
+./build.sh scuba
+echo ""
 
-if [ $? -eq 0 ]; then
-    ./build.sh scuba
+
+if [ "$1" == "noweb" ]; then
+    # skip doing web builds, because they take a long time
+    echo "Skipping web builds."
 else
-    exit 1
-fi
+    echo "================================"
+    echo "Web builds"
+    echo "================================"
 
-if [ $? -eq 0 ]; then
-    ./build.sh l_system
-else
-    exit 1
-fi
+    source init_emcc.sh
 
-
-echo "================================"
-echo "Web builds"
-echo "================================"
-
-source init_emcc.sh
-
-./build_web.sh estudioso
-
-if [ $? -eq 0 ]; then
-    ./build_web.sh scuba
-else
-    exit 1
-fi
-
-if [ $? -eq 0 ]; then
+    ./build_web.sh estudioso
+    ./build_web.sh influence
     ./build_web.sh l_system
-else
-    exit 1
+    ./build_web.sh scuba
 fi

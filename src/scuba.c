@@ -16,8 +16,8 @@
 
 #include "types.h"
 
-int SCREEN_WIDTH = 1200;
-int SCREEN_HEIGHT = 700;
+int Screen_Width = 1200;
+int Screen_Height = 700;
 
 #if defined(PLATFORM_WEB)
 #include <emscripten/emscripten.h>
@@ -385,13 +385,13 @@ internal Vector2 WorldToScreenPosition(game_state *GameState, Vector2 P)
     /* TODO: Get rid of control flow involving debug state, so that debug code can be compiled out. */
     if (DebugPause)
     {
-        Vector2 HalfScreen = MultiplyV2S(V2(SCREEN_WIDTH, SCREEN_HEIGHT), 0.5f);
+        Vector2 HalfScreen = MultiplyV2S(V2(Screen_Width, Screen_Height), 0.5f);
         HalfScreen = MultiplyV2S(HalfScreen, DebugCameraZoom);
         Result = AddV2(MultiplyV2S(SubtractV2(P, DebugCameraPosition), DebugCameraZoom), HalfScreen);
     }
     else
     {
-        Vector2 HalfScreen = MultiplyV2S(V2(SCREEN_WIDTH, SCREEN_HEIGHT), 0.5f);
+        Vector2 HalfScreen = MultiplyV2S(V2(Screen_Width, Screen_Height), 0.5f);
         Result = AddV2(SubtractV2(P, GameState->CameraPosition), HalfScreen);
     }
 
@@ -503,7 +503,7 @@ internal void DrawFrameRateHistory(void)
 
         s32 FrameRateItemHeight = (s32)(FrameRateScaled);
 
-        s32 FrameRateItemX = SCREEN_WIDTH - 24 - HistogramFullWidth + I * HistogramItemWidth;
+        s32 FrameRateItemX = Screen_Width - 24 - HistogramFullWidth + I * HistogramItemWidth;
         s32 FrameRateItemY = HistogramHeight + 24 - FrameRateItemHeight;
 
         DrawRectangle(FrameRateItemX, FrameRateItemY, 2, FrameRateItemHeight, RectangleColor);
@@ -1944,58 +1944,40 @@ internal void ResetGame(game_state *GameState)
     }
 
     { /* init ui */
-        GameState->StartElements[0] = (ui_element){
-            ui_element_type_Button, {{UiId++,
-            V2(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 30),
-            alignment_CenterCenter,
-            V2(0, 0),
-            (u8 *)"Play Game"
-        }}};
+        GameState->StartElements[0] = CreateButton(
+            UiId++, (u8 *)"Play Game",
+            V2(Screen_Width / 2, Screen_Height / 2 - 30),
+            alignment_CenterCenter);
 
 #if !PLATFORM_WEB
-        GameState->StartElements[1] = (ui_element){
-            ui_element_type_Button, {{UiId++,
-            V2(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 30),
-            alignment_CenterCenter,
-            V2(0, 0),
-            (u8 *)"Quit"
-        }}};
+        GameState->StartElements[1] = CreateButton(
+            UiId++, (u8 *)"Quit",
+            V2(Screen_Width / 2, Screen_Height / 2 + 30),
+            alignment_CenterCenter);
 #endif
 
-        GameState->GameOverElements[0] = (ui_element){
-            ui_element_type_Button, {{UiId++,
-            V2(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 30),
-            alignment_CenterCenter,
-            V2(0, 0),
-            (u8 *)"Play Again"
-        }}};
+        GameState->GameOverElements[0] = CreateButton(
+            UiId++, (u8 *)"Play Again",
+            V2(Screen_Width / 2, Screen_Height / 2 - 30),
+            alignment_CenterCenter);
 
 #if !PLATFORM_WEB
-        GameState->GameOverElements[1] = (ui_element){
-            ui_element_type_Button, {{UiId++,
-            V2(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 30),
-            alignment_CenterCenter,
-            V2(0, 0),
-            (u8 *)"Quit"
-        }}};
+        GameState->GameOverElements[1] = CreateButton(
+            UiId++, (u8 *)"Quit",
+            V2(Screen_Width / 2, Screen_Height / 2 + 30),
+            alignment_CenterCenter);
 #endif
 
-        GameState->WinElements[0] = (ui_element){
-            ui_element_type_Button, {{UiId++,
-            V2(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 30),
-            alignment_CenterCenter,
-            V2(0, 0),
-            (u8 *)"Play Again"
-        }}};
+        GameState->WinElements[0] = CreateButton(
+            UiId++, (u8 *)"Play Again",
+            V2(Screen_Width / 2, Screen_Height / 2 - 30),
+            alignment_CenterCenter);
 
 #if !PLATFORM_WEB
-        GameState->WinElements[1] = (ui_element){
-            ui_element_type_Button, {{UiId++,
-            V2(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 30),
-            alignment_CenterCenter,
-            V2(0, 0),
-            (u8 *)"Quit"
-        }}};
+        GameState->WinElements[1] = CreateButton(
+            UiId++, (u8 *)"Quit",
+            V2(Screen_Width / 2, Screen_Height / 2 + 30),
+            alignment_CenterCenter);
 #endif
     }
 
@@ -2204,7 +2186,7 @@ internal s32 DoElementArray(game_state *GameState, ui_element *Elements, u64 Cou
         {
         case ui_element_type_Button:
         {
-            b32 Pressed = DoButton(&GameState->UI, &Element.Button);
+            b32 Pressed = DoButton(&GameState->UI, &Element);
 
             if (Pressed)
             {
@@ -2277,7 +2259,7 @@ internal void UpdateAndRender(void *VoidGameState)
     } break;
     case game_mode_Win:
     {
-        f32 CenterX = SCREEN_WIDTH / 2.0;
+        f32 CenterX = Screen_Width / 2.0;
 
         ClearBackground(BackgroundColor);
 
@@ -2465,7 +2447,7 @@ int main(void)
     CPUFreq = ryn_EstimateCpuFrequency();
 #endif
 
-    InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "SCUBA");
+    InitWindow(Screen_Width, Screen_Height, "SCUBA");
 
     s32 FontSize = 32;
     s32 *Chars = 0;

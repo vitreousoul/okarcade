@@ -95,8 +95,8 @@ void InitRaylibCanvas(void)
 
     if (CanvasWidth > 0.0f && CanvasHeight > 0.0f)
     {
-        SCREEN_WIDTH = CanvasWidth;
-        SCREEN_HEIGHT = CanvasHeight;
+        Screen_Width = CanvasWidth;
+        Screen_Height = CanvasHeight;
     }
 }
 
