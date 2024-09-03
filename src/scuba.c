@@ -642,7 +642,6 @@ internal void HandleUserInput(game_state *GameState)
     GameState->UI.MousePosition = GetMousePosition();
     GameState->UI.MouseButtonPressed = IsMouseButtonPressed(0);
     GameState->UI.MouseButtonReleased = IsMouseButtonReleased(0);
-    GameState->UI.EnterPressed = IsKeyPressed(KEY_ENTER);
 
     StoreGameInput(KeyboardEnter, KEY_ENTER);
     StoreGameInput(KeyboardUp, KEY_UP);

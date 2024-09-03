@@ -318,14 +318,6 @@ internal void DrawLSystem(state *State, s32 Depth)
     }
 }
 
-internal void UpdateUI(state *State)
-{
-    State->UI.Hot = -1;
-    State->UI.MouseButtonPressed = IsMouseButtonPressed(0);
-    State->UI.MouseButtonReleased = IsMouseButtonReleased(0);
-    State->UI.MousePosition = GetMousePosition();
-}
-
 internal void InitTurtleState(state *State, f32 OffsetX, f32 OffsetY)
 {
     SetMemory((u8 *)&State->Expansion, 0, sizeof(expansion));
@@ -364,7 +356,7 @@ internal void UpdateAndRender(void *VoidAppState)
        https://github.com/raysan5/raylib/blob/master/examples/core/core_basic_window_web.c
     */
     state *State = (state *)VoidAppState;
-    UpdateUI(State);
+    UpdateUserInputForUi(&State->UI);
     b32 UiInteractionOccured = 0;
 
     BeginDrawing();
@@ -461,7 +453,7 @@ internal void UpdateAndRender(void *VoidAppState)
             {
                 ImageClearBackground(&State->Canvas, BackgroundColor);
 
-                if (Tablet->MouseReleased)
+                if (UI->MouseButtonReleased)
                 {
                     State->Turtle.Position.x += Tablet->Offset.x;
                     State->Turtle.Position.y += Tablet->Offset.y;
@@ -533,7 +525,6 @@ internal void InitUi(state *State)
 
     { /* init angle slider */
         State->AngleSlider.Id = I;
-
         State->AngleSlider.Position.x = 10.0f;
         State->AngleSlider.Position.y = Y;
 
@@ -563,6 +554,8 @@ internal void InitUi(state *State)
         State->Tablet.Id = I;
         State->Tablet.Type = ui_element_type_Tablet;
 
+        State->Tablet.Flags = ui_element_flag_Clickable | ui_element_flag_SlidableXY;
+
         State->Tablet.Position.x = 0.0f;
         State->Tablet.Position.y = 0.0f;
 
@@ -578,7 +571,7 @@ internal void InitUi(state *State)
 
 internal state InitAppState(void)
 {
-    state State;
+    state State = {};
 
     Vector2 TurtlePosition = V2(120.0f, Screen_Height / 2.0f);
     Vector2 TurtleHeading = V2(1.0f, 0.0f);
