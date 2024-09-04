@@ -761,6 +761,8 @@ int main(void)
     }
 
     ui_element DebugTextElement = CreateText(V2(20.0f, 20.0f), ui_element_CommandLine, DebugText, Debug_Text_Size);
+    Set_Flag(DebugTextElement.Flags, ui_element_flag_HasCursor);
+    DebugTextElement.Alignment = alignment_TopLeft;
     ui_element TestButtonElement = CreateButton(ui_element_TestButton, (u8 *)"Click Me", V2(Screen_Width, 0.0f), alignment_TopRight);
 
     f32 Time = GetTime();
@@ -779,7 +781,7 @@ int main(void)
 
         BeginDrawing();
         ClearBackground((Color){40,0,50,255});
-        DoTextElement(&Game->Ui, &DebugTextElement, alignment_TopLeft);
+        DoTextElement(&Game->Ui, &DebugTextElement, 0);
         b32 Clicked = DoButton(&Game->Ui, &TestButtonElement);
         if (Clicked)
         {

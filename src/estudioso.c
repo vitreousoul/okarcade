@@ -883,7 +883,7 @@ internal void DrawQuizItem(state *State, u32 LetterSpacing)
         State->UI.CursorBlinkTime = 0.0f;
     }
 
-    DoTextElement(&State->UI, &State->TextElement, alignment_TopCenter);
+    DoTextElement(&State->UI, &State->TextElement, ui_element_flag_HasCursor);
 
     Vector2 NextButtonPosition = V2(Screen_Width - BorderPadding, Screen_Height - BorderPadding);
     b32 NextPressed = DoButtonWith(&State->UI, ui_Next, (u8 *)"Next", NextButtonPosition, alignment_BottomRight);
@@ -1345,6 +1345,7 @@ int main(void)
 
     u8 TextBuffer[1024] = {0};
     State.TextElement.TextSize = 1024;
+    State.TextElement.Alignment = alignment_TopCenter;
     State.TextElement.Text = TextBuffer;
     State.TextElement.Position = V2(Screen_Width / 2.0f, Screen_Height / 2.0f);
     State.TextElement.Color = (Color){255, 255, 255, 255};

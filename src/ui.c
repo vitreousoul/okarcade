@@ -164,9 +164,10 @@ typedef enum
     ui_element_flag_SlidableY  = (1<<2),
     ui_element_flag_AccentMode = (1<<3),
     ui_element_flag_HasText    = (1<<4), /* TODO: Maybe we need two distinct flags for single-line and multi-line text. Or maybe single-line text is multi-line text with infinite width? */
-    ui_element_flag_Rectangle  = (1<<5),
-    ui_element_flag_Outline    = (1<<6),
-    ui_element_flag_Shadow     = (1<<7),
+    ui_element_flag_HasCursor  = (1<<5), /* TODO: Maybe we need two distinct flags for single-line and multi-line text. Or maybe single-line text is multi-line text with infinite width? */
+    ui_element_flag_Rectangle  = (1<<6),
+    ui_element_flag_Outline    = (1<<7),
+    ui_element_flag_Shadow     = (1<<8),
 
     ui_element_flag_SlidableXY = ui_element_flag_SlidableX | ui_element_flag_SlidableY,
 } ui_element_flag;
@@ -439,7 +440,6 @@ void DrawWrappedText(ui *Ui, u8 *Text, f32 MaxWidth, f32 X, f32 Y, f32 LineHeigh
 b32 DoUiElement(ui *Ui, ui_element *UiElement)
 {
     b32 Changed = 0;
-
     f32 LetterSpacing = 1.7f; /* TODO: Don't hardcode this. */
 
     if (Get_Flag(UiElement->Flags, ui_element_flag_HasText))
@@ -513,7 +513,6 @@ b32 DoUiElement(ui *Ui, ui_element *UiElement)
         Color ActiveColor = (Color){40,120,120,255};
         Color TextColor = (Color){0,0,0,255};
 
-
         Rectangle UnderRect = (Rectangle){AlignedRect.x + 2.0f, AlignedRect.y + 2.0f,
                                           AlignedRect.width, AlignedRect.height};
 
@@ -562,20 +561,27 @@ b32 DoUiElement(ui *Ui, ui_element *UiElement)
     } break;
     case ui_element_type_Text:
     {
-        if (UiElement->Text)
+    } break;
+    default: Assert(!"Unhandled ui element type."); break;
+    }
+
+    if (Get_Flag(UiElement->Flags, ui_element_flag_HasText) && UiElement->Text)
+    {
+        Rectangle AlignedRectangle = GetAlignedRectangle(UiElement->Position, UiElement->Size, UiElement->Alignment);
+
+        f32 InputX = AlignedRectangle.x;
+        f32 InputY = UiElement->Position.y;
+
+        f32 CursorX = AlignedRectangle.x + UiElement->Size.x;
+        f32 CursorY = InputY;
+
+        DrawTextEx(Ui->Font, (char *)UiElement->Text, V2(InputX, InputY), Ui->FontSize, LetterSpacing, UiElement->Color);
+
+        if (Get_Flag(UiElement->Flags, ui_element_flag_HasCursor))
         {
             f32 BlinkTime = Ui->CursorBlinkTime;
             f32 BlinkRate = Ui->CursorBlinkRate;
             b32 ShowCursor = BlinkTime < 0.6f * BlinkRate;
-            Rectangle AlignedRectangle = GetAlignedRectangle(UiElement->Position, UiElement->Size, UiElement->Alignment);
-
-            f32 InputX = AlignedRectangle.x;
-            f32 InputY = UiElement->Position.y;
-
-            f32 CursorX = AlignedRectangle.x + UiElement->Size.x;
-            f32 CursorY = InputY;
-
-            DrawTextEx(Ui->Font, (char *)UiElement->Text, V2(InputX, InputY), Ui->FontSize, LetterSpacing, UiElement->Color);
 
             if (BlinkRate > 0.0f)
             {
@@ -594,8 +600,6 @@ b32 DoUiElement(ui *Ui, ui_element *UiElement)
                 }
             }
         }
-    } break;
-    default: Assert(!"Unhandled ui element type."); break;
     }
 
     return Changed;
@@ -638,11 +642,10 @@ b32 DoTablet(ui *Ui, ui_element *Tablet)
     return DoUiElement(Ui, Tablet);
 }
 
-void DoTextElement(ui *Ui, ui_element *TextElement, alignment Alignment)
+void DoTextElement(ui *Ui, ui_element *TextElement, ui_element_flag AdditionalFlags)
 {
     TextElement->Type = ui_element_type_Text;
-    TextElement->Alignment = Alignment;
-    Set_Flag(TextElement->Flags, ui_element_flag_HasText);
+    Set_Flag(TextElement->Flags, ui_element_flag_HasText | AdditionalFlags);
     DoUiElement(Ui, TextElement);
 }
 
