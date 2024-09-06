@@ -641,7 +641,7 @@ b32 DoButton(ui *Ui, ui_element *Button)
 
 b32 DoButtonWith(ui *Ui, s32 Id, u8 *Text, Vector2 Position, alignment Alignment)
 {
-    ui_element Button;
+    ui_element Button = {0};
 
     Button.Id = Id;
     Button.Position = Position;

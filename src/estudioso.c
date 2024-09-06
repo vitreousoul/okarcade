@@ -1344,10 +1344,12 @@ int main(void)
     State.UI.CursorBlinkRate = 1.0f;
     State.UI.Arena = ryn_memory_CreateArena(Megabytes(1));
 
-    u8 TextBuffer[1024] = {0};
+#define Text_Element_Capacity 1024
+    u8 TextBuffer[Text_Element_Capacity] = {0};
     State.TextElement.TextSize = 1024;
     State.TextElement.Alignment = alignment_TopCenter;
     State.TextElement.Text = TextBuffer;
+    State.TextElement.TextCapacity = Text_Element_Capacity;
     State.TextElement.TextIndex = 0;
     State.TextElement.Position = V2(Screen_Width / 2.0f, Screen_Height / 2.0f);
     State.TextElement.Color = (Color){255, 255, 255, 255};
