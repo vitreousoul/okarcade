@@ -1,3 +1,5 @@
+#include <stddef.h>
+
 #define internal static
 #define global_variable static
 #define debug_variable static

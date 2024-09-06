@@ -559,7 +559,7 @@ internal void ClearTextElement(ui_element *TextElement)
     {
         TextElement->Text[I] = 0;
     }
-    TextElement->Index = 0;
+    TextElement->TextIndex = 0;
 }
 
 debug_variable b32 FrameIndex = 0;
@@ -674,7 +674,7 @@ internal void GetNextRandomQuizItem(state *State)
     State->ShowAnswer = 0;
 
     ClearTextElement(&State->TextElement);
-    State->TextElement.Index = 0;
+    State->TextElement.TextIndex = 0;
     State->CurrentQuizItemFailed = 0;
 
     { /* NOTE: Randomly pick index for variable-answer quiz-items. */
@@ -1342,11 +1342,13 @@ int main(void)
 
     state State = {0};
     State.UI.CursorBlinkRate = 1.0f;
+    State.UI.Arena = ryn_memory_CreateArena(Megabytes(1));
 
     u8 TextBuffer[1024] = {0};
     State.TextElement.TextSize = 1024;
     State.TextElement.Alignment = alignment_TopCenter;
     State.TextElement.Text = TextBuffer;
+    State.TextElement.TextIndex = 0;
     State.TextElement.Position = V2(Screen_Width / 2.0f, Screen_Height / 2.0f);
     State.TextElement.Color = (Color){255, 255, 255, 255};
 

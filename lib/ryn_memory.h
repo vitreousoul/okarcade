@@ -18,6 +18,7 @@
 #include <errno.h>
 #endif
 
+#include <stdio.h> /* TODO: Create a way to disable or replace printf. */
 
 #include <stdint.h>
 #define ryn_memory_u8 uint8_t
@@ -55,7 +56,7 @@ ryn_memory_u8 *ryn_memory_GetArenaWriteLocation(ryn_memory_arena *Arena);
 void ryn_memory_FreeArena(ryn_memory_arena Arena);
 
 #define ryn_memory_PushStruct(arena, type) \
-    (ryn_memory_PushSize((arena), sizeof(type)))
+    (type *)(ryn_memory_PushSize((arena), sizeof(type)))
 
 #define ryn_memory_PushZeroStruct(arena, type) \
     (ryn_memory_PushZeroArena((arena), sizeof(type)))

@@ -14,6 +14,8 @@
 
 #include "../lib/raylib.h"
 
+#include "../lib/ryn_memory.h"
+
 #if defined(PLATFORM_WEB)
     #include <emscripten/emscripten.h>
 #endif

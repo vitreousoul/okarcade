@@ -9,6 +9,8 @@
 
 #include "../lib/raylib.h"
 
+#include "../lib/ryn_memory.h"
+
 #if PLATFORM_WEB
 #define ryn_PROFILER 0
 #endif

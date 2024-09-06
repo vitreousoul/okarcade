@@ -164,7 +164,7 @@ typedef enum
     ui_element_flag_SlidableY  = (1<<2),
     ui_element_flag_AccentMode = (1<<3),
     ui_element_flag_HasText    = (1<<4), /* TODO: Maybe we need two distinct flags for single-line and multi-line text. Or maybe single-line text is multi-line text with infinite width? */
-    ui_element_flag_HasCursor  = (1<<5), /* TODO: Maybe we need two distinct flags for single-line and multi-line text. Or maybe single-line text is multi-line text with infinite width? */
+    ui_element_flag_HasCursor  = (1<<5), /* TODO: Does this really mean is-editable? */
     ui_element_flag_Rectangle  = (1<<6),
     ui_element_flag_Outline    = (1<<7),
     ui_element_flag_Shadow     = (1<<8),
@@ -180,11 +180,12 @@ typedef struct
     alignment Alignment;
     Vector2 Size;
     u8 *Text; /* TODO: Use a string type. */
+    s32 TextCapacity;
     s32 TextSize;
+    s32 TextIndex;
     f32 Value;
     Vector2 Offset;
     b32 AccentMode; /* TODO: Turn this into a flag. */
-    s32 Index;
     accent CurrentAccent;
     Color Color;
     ui_element_flag Flags;
@@ -200,6 +201,7 @@ typedef struct
 
 typedef struct
 {
+    ryn_memory_arena Arena; /* TODO: What kind of arena is this? Does it need a more specific name? */
     ui_id Active;
     ui_id Hot;
 
@@ -267,13 +269,13 @@ ui_element CreateButton(s32 Id, u8 *Text, Vector2 Position, alignment Alignment)
     return Element;
 }
 
-ui_element CreateText(Vector2 Position, s32 Id, u8 *Text, s32 TextSize)
+ui_element CreateText(Vector2 Position, s32 Id, u8 *Text, s32 TextCapacity)
 {
     ui_element Element = {};
 
     Element.Id = Id;
     Element.Text = Text;
-    Element.TextSize = TextSize;
+    Element.TextCapacity = TextCapacity;
     Element.Position = Position;
     Element.Color = (Color){255, 255, 255, 255};
 
@@ -437,14 +439,37 @@ void DrawWrappedText(ui *Ui, u8 *Text, f32 MaxWidth, f32 X, f32 Y, f32 LineHeigh
     }
 }
 
+void TrimCStringFromRight(u8 *NullTerminatedString, s32 FinalStringSize, u8 *Destination)
+{
+    s32 I = 0;
+
+    for (; I < FinalStringSize; ++I)
+    {
+        if (NullTerminatedString[I])
+        {
+            Destination[I] = NullTerminatedString[I];
+        }
+        else
+        {
+            break;
+        }
+    }
+
+    Destination[I] = 0;
+}
+
 b32 DoUiElement(ui *Ui, ui_element *UiElement)
 {
     b32 Changed = 0;
     f32 LetterSpacing = 1.7f; /* TODO: Don't hardcode this. */
 
+    u64 OldOffset = Ui->Arena.Offset;
+
     if (Get_Flag(UiElement->Flags, ui_element_flag_HasText))
     {
-        UiElement->Size = MeasureTextEx(Ui->Font, (char *)UiElement->Text, Ui->FontSize, LetterSpacing);
+        u8 *TextBeforeCursor = ryn_memory_PushSize(&Ui->Arena, UiElement->TextIndex + 1);
+        TrimCStringFromRight(UiElement->Text, UiElement->TextIndex, TextBeforeCursor);
+        UiElement->Size = MeasureTextEx(Ui->Font, (char *)TextBeforeCursor, Ui->FontSize, LetterSpacing);
     }
 
     if (UiElement->Type == ui_element_type_Button)
@@ -572,13 +597,13 @@ b32 DoUiElement(ui *Ui, ui_element *UiElement)
         f32 InputX = AlignedRectangle.x;
         f32 InputY = UiElement->Position.y;
 
-        f32 CursorX = AlignedRectangle.x + UiElement->Size.x;
-        f32 CursorY = InputY;
-
         DrawTextEx(Ui->Font, (char *)UiElement->Text, V2(InputX, InputY), Ui->FontSize, LetterSpacing, UiElement->Color);
 
         if (Get_Flag(UiElement->Flags, ui_element_flag_HasCursor))
         {
+            f32 CursorX = AlignedRectangle.x + UiElement->Size.x;
+            f32 CursorY = InputY;
+
             f32 BlinkTime = Ui->CursorBlinkTime;
             f32 BlinkRate = Ui->CursorBlinkRate;
             b32 ShowCursor = BlinkTime < 0.6f * BlinkRate;
@@ -601,6 +626,8 @@ b32 DoUiElement(ui *Ui, ui_element *UiElement)
             }
         }
     }
+
+    Ui->Arena.Offset = OldOffset;
 
     return Changed;
 }
@@ -679,10 +706,10 @@ internal void ClearAccentKey(ui_element *TextElement)
     {
         if (TextElement->Text)
         {
-            TextElement->Text[TextElement->Index] = 0;
-            if (TextElement->Index + 1 < TextElement->TextSize)
+            TextElement->Text[TextElement->TextIndex] = 0;
+            if (TextElement->TextIndex + 1 < TextElement->TextSize)
             {
-                TextElement->Text[TextElement->Index+1] = 0;
+                TextElement->Text[TextElement->TextIndex+1] = 0;
             }
             TextElement->AccentMode = 0;
             TextElement->CurrentAccent = 0;
@@ -695,17 +722,57 @@ internal void ClearAccentKey(ui_element *TextElement)
     }
 }
 
+s32 GetCountOfSkippableBytes(u8 *Bytes, s32 Offset)
+{
+    s32 SkippableBytes = 0;
+    s32 I = Offset;
+
+    while (I > 0)
+    {
+        u8 Char = Bytes[I];
+
+        if (Is_Utf8_Tail_Byte(Char))
+        {
+            SkippableBytes += 1;
+        }
+        else if (SkippableBytes == 1 && Is_Utf8_Header_Byte2(Char))
+        {
+            SkippableBytes += 1;
+            break;
+        }
+        else if (SkippableBytes == 2 && Is_Utf8_Header_Byte3(Char))
+        {
+            SkippableBytes += 1;
+            break;
+        }
+        else if (SkippableBytes == 3 && Is_Utf8_Header_Byte4(Char))
+        {
+            SkippableBytes += 1;
+            break;
+        }
+        else
+        {
+            SkippableBytes += 1;
+            break;
+        }
+
+        I -= 1;
+    }
+
+    return SkippableBytes;
+}
+
 void HandleKey(ui *Ui, ui_element *TextElement, key_code Key)
 {
     if (PrintableKeys[Key])
     {
-        if (TextElement->Index + 1 < TextElement->TextSize)
+        if (TextElement->TextIndex < TextElement->TextCapacity)
         {
             if (TextElement->AccentMode)
             {
                 unsigned char SecondByte = 0;
 
-                if (TextElement->Index + 2 < TextElement->TextSize)
+                if (TextElement->TextIndex + 1 < TextElement->TextCapacity)
                 {
                     if (TextElement->CurrentAccent == accent_Acute)
                     {
@@ -732,9 +799,10 @@ void HandleKey(ui *Ui, ui_element *TextElement, key_code Key)
                                 SecondByte += 32;
                             }
 
-                            TextElement->Text[TextElement->Index] = 0xC3;
-                            TextElement->Text[TextElement->Index+1] = SecondByte;
-                            TextElement->Index += 2;
+                            TextElement->Text[TextElement->TextIndex] = 0xC3;
+                            TextElement->Text[TextElement->TextIndex+1] = SecondByte;
+                            TextElement->TextIndex += 2;
+                            TextElement->TextSize += 2;
                         }
                     }
                     else if (TextElement->CurrentAccent == accent_Tilde && Key == KEY_N)
@@ -746,9 +814,10 @@ void HandleKey(ui *Ui, ui_element *TextElement, key_code Key)
                             SecondByte += 32;
                         }
 
-                        TextElement->Text[TextElement->Index] = 0xC3;
-                        TextElement->Text[TextElement->Index+1] = SecondByte;
-                        TextElement->Index += 2;
+                        TextElement->Text[TextElement->TextIndex] = 0xC3;
+                        TextElement->Text[TextElement->TextIndex+1] = SecondByte;
+                        TextElement->TextIndex += 2;
+                        TextElement->TextSize += 2;
                     }
                     else
                     {
@@ -765,23 +834,24 @@ void HandleKey(ui *Ui, ui_element *TextElement, key_code Key)
                 {
                 case KEY_E:
                 {
-                    if (TextElement->Index + 2 < TextElement->TextSize)
+                    if (TextElement->TextIndex + 1 < TextElement->TextCapacity)
                     {
                         /* NOTE: Acute accent '´' */
-                        TextElement->Text[TextElement->Index] = 0xC2;
-                        TextElement->Text[TextElement->Index+1] = 0xB4;
+                        TextElement->Text[TextElement->TextIndex] = 0xC2;
+                        TextElement->Text[TextElement->TextIndex+1] = 0xB4;
                         TextElement->AccentMode = 1;
                         TextElement->CurrentAccent = accent_Acute;
+                        /* TextElement->TextSize += 2; */
                     }
                 } break;
                 case KEY_N:
                 {
-                    if (TextElement->Index + 2 < TextElement->TextSize)
+                    if (TextElement->TextIndex + 1 < TextElement->TextCapacity)
                     {
                         /* NOTE: Tilde '˜' */
                         /* TextElement->Text[TextElement->Index] = '~'; */
-                        TextElement->Text[TextElement->Index] = 0xCB;
-                        TextElement->Text[TextElement->Index+1] = 0x9C;
+                        TextElement->Text[TextElement->TextIndex] = 0xCB;
+                        TextElement->Text[TextElement->TextIndex+1] = 0x9C;
                         TextElement->AccentMode = 1;
                         TextElement->CurrentAccent = accent_Tilde;
                     }
@@ -789,20 +859,21 @@ void HandleKey(ui *Ui, ui_element *TextElement, key_code Key)
                 case KEY_SLASH:
                 {
                     if (Get_Flag(Ui->ModifierFlags, modifier_key_Shift) &&
-                        TextElement->Index + 2 < TextElement->TextSize)
+                        TextElement->TextIndex + 1 < TextElement->TextCapacity)
                     {
                         /* NOTE: Inverted question mark '¿' */
-                        TextElement->Text[TextElement->Index] = 0xC2;
-                        TextElement->Text[TextElement->Index+1] = 0xBF;
-                        TextElement->Index = TextElement->Index + 2;
+                        TextElement->Text[TextElement->TextIndex] = 0xC2;
+                        TextElement->Text[TextElement->TextIndex+1] = 0xBF;
+                        TextElement->TextIndex = TextElement->TextIndex + 2;
                     }
                 } break;
                 }
             }
             else if (Get_Flag(Ui->ModifierFlags, modifier_key_Shift) && Key == KEY_SLASH)
             {
-                TextElement->Text[TextElement->Index] = '?';
-                TextElement->Index = TextElement->Index + 1;
+                TextElement->Text[TextElement->TextIndex] = '?';
+                TextElement->TextIndex += 1;
+                TextElement->TextSize += 1;
             }
             else
             {
@@ -811,8 +882,9 @@ void HandleKey(ui *Ui, ui_element *TextElement, key_code Key)
                     Key += 32;
                 }
 
-                TextElement->Text[TextElement->Index] = Key;
-                TextElement->Index = TextElement->Index + 1;
+                TextElement->Text[TextElement->TextIndex] = Key;
+                TextElement->TextIndex += 1;
+                TextElement->TextSize += 1;
             }
         }
     }
@@ -828,53 +900,45 @@ void HandleKey(ui *Ui, ui_element *TextElement, key_code Key)
             }
             else
             {
-                int TailBytesSkipped = 0;
+                s32 SkippableBytes = GetCountOfSkippableBytes(TextElement->Text, TextElement->TextIndex);
+                s32 BytesToEnd = TextElement->TextCapacity - TextElement->TextIndex;
+                s32 StartOfCopy = TextElement->TextIndex - SkippableBytes;
+                s32 StartOfZero = TextElement->TextCapacity - SkippableBytes;
 
-                for (;;)
+                for (s32 Offset = 0; Offset < BytesToEnd; ++Offset)
                 {
-                    if (TextElement->Index > 0)
-                    {
-                        TextElement->Index = TextElement->Index - 1;
-                    }
-
-                    if (TextElement->Index < 0)
-                    {
-                        break;
-                    }
-
-                    char Char = TextElement->Text[TextElement->Index];
-
-                    if (Is_Utf8_Tail_Byte(Char))
-                    {
-                        TextElement->Text[TextElement->Index] = 0;
-                        TailBytesSkipped += 1;
-                    }
-                    else if (TailBytesSkipped == 1 && Is_Utf8_Header_Byte2(Char))
-                    {
-                        if (TextElement->Index < 0) break;
-                        TextElement->Text[TextElement->Index] = 0;
-                        break;
-                    }
-                    else if (TailBytesSkipped == 2 && Is_Utf8_Header_Byte3(Char))
-                    {
-                        if (TextElement->Index < 0) break;
-                        TextElement->Text[TextElement->Index] = 0;
-                        break;
-                    }
-                    else if (TailBytesSkipped == 3 && Is_Utf8_Header_Byte4(Char))
-                    {
-                        if (TextElement->Index < 0) break;
-                        TextElement->Text[TextElement->Index] = 0;
-                        break;
-                    }
-                    else
-                    {
-                        /* NOTE: Delete an ASCII character. */
-                        TextElement->Text[TextElement->Index] = 0;
-                        break;
-                    }
+                    s32 I = StartOfCopy + Offset;
+                    TextElement->Text[I] = TextElement->Text[I + SkippableBytes];
                 }
+
+                for (s32 I = StartOfZero; I < TextElement->TextCapacity; ++I)
+                {
+                    TextElement->Text[I] = 0;
+                }
+
+                TextElement->TextIndex -= SkippableBytes;
+                TextElement->TextSize -= SkippableBytes;
             }
+        } break;
+        case KEY_RIGHT:
+        {
+            if (TextElement->TextIndex < TextElement->TextSize)
+            {
+                TextElement->TextIndex += 1;
+            }
+        } break;
+        case KEY_UP:
+        {
+        } break;
+        case KEY_LEFT:
+        {
+            if (TextElement->TextIndex > 0)
+            {
+                TextElement->TextIndex -= 1;
+            }
+        } break;
+        case KEY_DOWN:
+        {
         } break;
         }
     }

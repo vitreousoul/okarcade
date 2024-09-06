@@ -19,6 +19,7 @@
 
 #include "../lib/raylib.h"
 
+#include "../lib/ryn_macro.h"
 #include "../lib/ryn_memory.h"
 #include "../lib/ryn_string.h"
 
@@ -35,10 +36,6 @@
 #define Kilobyte (1024)
 #define Megabyte (1024*1024)
 #define Gigabyte (1024*1024*1024)
-
-#define ref_struct(name)\
-    typedef struct name name;\
-    struct name
 
 typedef enum
 {
@@ -728,10 +725,12 @@ int main(void)
     Assert(sizeof(game) < MaxArenaSize);
 
     ryn_memory_arena Arena = ryn_memory_CreateArena(sizeof(game));
+    ryn_memory_arena UiArena = ryn_memory_CreateArena(1*Megabyte);
 
     game *Game = ryn_memory_PushStruct(&Arena, game);
     world *World = &Game->World;
     Game->FrameArena = ryn_memory_CreateArena(Megabyte);
+    Game->Ui.Arena = UiArena;
 
     InitWindow(Screen_Width, Screen_Height, "Influence");
     SetTargetFPS(60);
