@@ -92,7 +92,7 @@ global_variable tokenizer_state TokenDoneTable[tokenizer_state__Count] = {
     [tokenizer_state_Identifier] = tokenizer_state_Begin,
 };
 
-global_variable tokenizer_state TheTable[tokenizer_state__Count][256];
+global_variable u8 TheTable[tokenizer_state__Count][256];
 
 void SetupTheTable(void)
 {
@@ -180,6 +180,79 @@ token *Tokenize(ryn_memory_arena *Arena, ryn_string Source)
     return HeadToken.Next;
 }
 
+ref_struct(char_map)
+{
+    char_map *Next;
+    s32 Column;
+};
+
+internal void DebugPrintEquivalenceClasses(ryn_memory_arena *Arena, u8 *Table, s32 Rows, s32 Columns)
+{
+    char_map *FirstCharMap = 0;
+    char_map *CurrentCharMap = 0;
+
+    for (s32 C = 0; C < Columns; ++C)
+    {
+        if (FirstCharMap == 0)
+        {
+            FirstCharMap = ryn_memory_PushZeroStruct(Arena, char_map);
+            FirstCharMap->Column = C;
+        }
+        else
+        {
+            CurrentCharMap = FirstCharMap;
+            b32 Match;
+
+            while (CurrentCharMap)
+            {
+                Match = 1;
+
+                for (s32 R = 0; R < Rows; ++R)
+                {
+                    s32 TestC = CurrentCharMap->Column;
+                    s32 Index = C + Columns * R;
+                    s32 TestIndex = TestC + Columns * R;
+
+                    if (Table[Index] != Table[TestIndex])
+                    {
+                        Match = 0;
+                        break;
+                    }
+                }
+
+                if (Match)
+                {
+                    break;
+                }
+
+                CurrentCharMap = CurrentCharMap->Next;
+            }
+
+            if (!Match)
+            {
+                char_map *NewCharMap = ryn_memory_PushZeroStruct(Arena, char_map);
+                NewCharMap->Column = C;
+
+                NewCharMap->Next = FirstCharMap;
+                FirstCharMap = NewCharMap;
+            }
+        }
+    }
+
+    CurrentCharMap = FirstCharMap;
+    while (CurrentCharMap)
+    {
+        for (s32 R = 0; R < Rows; ++R)
+        {
+            s32 Index = Columns * R + CurrentCharMap->Column;
+            printf("%d ", Table[Index]);
+        }
+        printf("\n");
+
+        CurrentCharMap = CurrentCharMap->Next;
+    }
+}
+
 int main(void)
 {
     SetupTheTable();
@@ -195,6 +268,33 @@ int main(void)
     }
 
     printf("sizeof(TheTable) %lu\n", sizeof(TheTable));
+
+    { /* NOTE: Print the table. */
+        for (s32 C = 0; C < 256; ++C)
+        {
+            if (SingleTokenCharTable[C])
+            {
+                printf("  %c:  ", C);
+            }
+            else
+            {
+                printf("%3d:  ", C);
+            }
+
+            for (s32 S = 0; S < tokenizer_state__Count; ++S)
+            {
+                printf("%d ", TheTable[S][C]);
+            }
+            printf("\n");
+        }
+    }
+
+    printf("\n\nEquivalence Classes\n");
+    s32 Rows = tokenizer_state__Count;
+    s32 Columns = 256;
+    DebugPrintEquivalenceClasses(&Arena, (u8 *)TheTable, Rows, Columns);
+
+    printf("sizeof(char_map) %lu\n", sizeof(char_map));
 
     return 0;
 }
