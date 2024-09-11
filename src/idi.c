@@ -14,6 +14,8 @@
     X(Begin)\
     X(Space)\
     X(Digit)\
+    X(BaseDigit)\
+    X(BinaryDigitValue)\
     X(IdentifierStart)\
     X(IdentifierRest)\
     X(Done)
@@ -52,13 +54,14 @@ typedef enum
     SingleCharTokenList\
     X(Space, 256)\
     X(Digit, 257)\
-    X(Identifier, 258)
+    X(BinaryDigit, 258)\
+    X(Identifier, 259)
 
 
 #define token_type_All_XList\
     X(_Null, 0)\
     token_type_Valid_XList\
-    X(__Error, 259)
+    X(__Error, 500)
 
 typedef enum
 {
@@ -98,6 +101,7 @@ typedef struct
 global_variable token_type StateToTypeTable[tokenizer_state__Count] = {
     [tokenizer_state_Space]      = token_type_Space,
     [tokenizer_state_Digit]      = token_type_Digit,
+    [tokenizer_state_BinaryDigitValue] = token_type_BinaryDigit,
     [tokenizer_state_IdentifierStart] = token_type_Identifier,
     [tokenizer_state_IdentifierRest] = token_type_Identifier,
 };
@@ -105,6 +109,7 @@ global_variable token_type StateToTypeTable[tokenizer_state__Count] = {
 global_variable tokenizer_state TokenDoneTable[tokenizer_state__Count] = {
     [tokenizer_state_Space]      = tokenizer_state_Begin,
     [tokenizer_state_Digit]      = tokenizer_state_Begin,
+    [tokenizer_state_BinaryDigitValue] = tokenizer_state_Begin,
     [tokenizer_state_IdentifierStart] = tokenizer_state_Begin,
     [tokenizer_state_IdentifierRest] = tokenizer_state_Begin,
 };
@@ -164,6 +169,7 @@ void SetupTheTable(void)
 #define X(_name, value)\
     TheTable[Begin][value] = Done;\
     TheTable[Digit][value] = Done;\
+    TheTable[BinaryDigitValue][value] = Done;\
     TheTable[IdentifierStart][value] = Done;\
     TheTable[IdentifierRest][value] = Done;
     SingleCharTokenList;
@@ -173,6 +179,7 @@ void SetupTheTable(void)
     TheTable[Begin][value] = Space;\
     TheTable[Space][value] = Space;\
     TheTable[Digit][value] = Done;\
+    TheTable[BinaryDigitValue][value] = Done;\
     TheTable[IdentifierStart][value] = Done;\
     TheTable[IdentifierRest][value] = Done;
     SpaceCharList;
@@ -198,6 +205,12 @@ void SetupTheTable(void)
         TheTable[IdentifierRest][I] = IdentifierRest;
         TheTable[IdentifierRest][I-32] = IdentifierRest;
     }
+
+    TheTable[Begin]['0'] = BaseDigit;
+
+    TheTable[BaseDigit]['b'] = BinaryDigitValue;
+    TheTable[BinaryDigitValue]['0'] = BinaryDigitValue;
+    TheTable[BinaryDigitValue]['1'] = BinaryDigitValue;
 }
 
 token *Tokenize(ryn_memory_arena *Arena, ryn_string Source)
@@ -259,6 +272,14 @@ token *Tokenize(ryn_memory_arena *Arena, ryn_string Source)
     } while (!EndOfSource &&
              CurrentToken != 0 &&
              State != tokenizer_state__Error);
+
+    if (State == tokenizer_state__Error)
+    {
+        /* NOTE: Give a zero-token first, which signals an error, but include the tokens that were parsed during the process. */
+        token *ErrorToken = ryn_memory_PushZeroStruct(Arena, token);
+        ErrorToken->Next = HeadToken.Next;
+        HeadToken.Next = ErrorToken;
+    }
 
     return HeadToken.Next;
 }
@@ -373,14 +394,16 @@ internal void TestTokenizer(ryn_memory_arena Arena)
 
 #define T(token_type) {token_type,0,{}}
     test_case TestCases[] = {
-        {
-            ryn_string_CreateString("( 123 + abc)- (as3fj / 423)"),
-            {T(OpenParenthesis), T(Space), T(Digit), T(Space), T(Cross), T(Space), T(Identifier), T(CloseParenthesis), T(Dash), T(Space), T(OpenParenthesis), T(Identifier), T(Space), T(ForwardSlash), T(Space), T(Digit), T(CloseParenthesis)}
-        },
-        {
-            ryn_string_CreateString("bar = (3*4)^x"),
-            {T(Identifier), T(Space), T(Equal), T(Space), T(OpenParenthesis), T(Digit), T(Star), T(Digit), T(CloseParenthesis), T(Carrot), T(Identifier)}
-        }
+        {ryn_string_CreateString("( 123 + abc)- (as3fj / 423)"),
+         {T(OpenParenthesis), T(Space), T(Digit), T(Space), T(Cross), T(Space), T(Identifier), T(CloseParenthesis), T(Dash), T(Space), T(OpenParenthesis), T(Identifier), T(Space), T(ForwardSlash), T(Space), T(Digit), T(CloseParenthesis)}},
+        {ryn_string_CreateString("bar = (3*4)^x"),
+         {T(Identifier), T(Space), T(Equal), T(Space), T(OpenParenthesis), T(Digit), T(Star), T(Digit), T(CloseParenthesis), T(Carrot), T(Identifier)}},
+        {ryn_string_CreateString("bar = 0b010110"),
+         {T(Identifier), T(Space), T(Equal), T(Space), T(BinaryDigit)}},
+        {ryn_string_CreateString("bar= 0b010110"),
+         {T(Identifier), T(Equal), T(Space), T(BinaryDigit)}},
+        {ryn_string_CreateString("bar =0b010110"),
+         {T(Identifier), T(Space), T(Equal), T(BinaryDigit)}},
     };
 #undef T
 
@@ -400,6 +423,7 @@ internal void TestTokenizer(ryn_memory_arena Arena)
         printf("[%d] \"%s\"\n", I, TestCase.Source.Bytes);
 
         token *Token = Tokenize(&Arena, TestCase.Source);
+        printf("tokenize result %d\n", Token->Type);
 
         s32 TestTokenCount = ArrayCount(TestCase.Tokens);
         b32 Matches = 1;
@@ -416,7 +440,9 @@ internal void TestTokenizer(ryn_memory_arena Arena)
                 printf("%s ", GetTokenTypeString(Token->Type).Bytes);
             }
 
-            if (TestTokenIndex >= TestTokenCount || Token->Type != TestCase.Tokens[TestTokenIndex].Type)
+            if (TestTokenIndex >= TestTokenCount ||
+                Token->Type == 0 ||
+                Token->Type != TestCase.Tokens[TestTokenIndex].Type)
             {
                 Matches = 0;
                 break;
