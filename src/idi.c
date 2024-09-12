@@ -194,7 +194,7 @@ void SetupTheTable(void)
     for (u32 I = 0; I < ArrayCount(AcceptingStates); ++I)
     {
         tokenizer_state AcceptingState = AcceptingStates[I];
-        printf("AcceptingState %d %s\n", AcceptingStates[I], GetTokenizerStateString(AcceptingStates[I]).Bytes);
+
 #define X(_name, value)\
         TheTable[AcceptingState][value] = Done;
         SingleCharTokenList;
