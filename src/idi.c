@@ -10,18 +10,23 @@
 
 #define End_Of_Source_Char 0
 
-#define tokenizer_state_NonError_XList\
-    X(Begin)\
+#define tokenizer_state_Accepting_XList\
     X(Space)\
     X(Digit)\
-    X(BaseDigit)\
     X(BinaryDigitValue)\
     X(HexDigitValue)\
     X(IdentifierStart)\
     X(IdentifierRest)\
+    X(StringEnd)\
+    X(Equal)\
+    X(DoubleEqual)
+
+#define tokenizer_state_NonError_XList\
+    X(Begin)\
+    tokenizer_state_Accepting_XList\
+    X(BaseDigit)\
     X(String)\
     X(StringEscape)\
-    X(StringEnd)\
     X(Done)
 
 #define tokenizer_state_XList\
@@ -51,8 +56,7 @@ typedef enum
     X(Star,             '*')\
     X(ForwardSlash,     '/')\
     X(Cross,            '+')\
-    X(Dash,             '-')\
-    X(Equal,            '=')
+    X(Dash,             '-')
 
 #define token_type_Valid_XList\
     SingleCharTokenList\
@@ -60,8 +64,9 @@ typedef enum
     X(Digit, 257)\
     X(BinaryDigit, 258)\
     X(Identifier, 259)\
-    X(String, 260)
-
+    X(String, 260)\
+    X(Equal, 261)\
+    X(DoubleEqual, 262)
 
 #define token_type_All_XList\
     X(_Null, 0)\
@@ -110,6 +115,8 @@ global_variable token_type StateToTypeTable[tokenizer_state__Count] = {
     [tokenizer_state_IdentifierStart] = token_type_Identifier,
     [tokenizer_state_IdentifierRest] = token_type_Identifier,
     [tokenizer_state_StringEnd] = token_type_String,
+    [tokenizer_state_Equal] = token_type_Equal,
+    [tokenizer_state_DoubleEqual] = token_type_DoubleEqual,
 };
 
 global_variable tokenizer_state TokenDoneTable[tokenizer_state__Count] = {
@@ -119,6 +126,15 @@ global_variable tokenizer_state TokenDoneTable[tokenizer_state__Count] = {
     [tokenizer_state_IdentifierStart] = tokenizer_state_Begin,
     [tokenizer_state_IdentifierRest] = tokenizer_state_Begin,
     [tokenizer_state_StringEnd] = tokenizer_state_Begin,
+    [tokenizer_state_Equal] = tokenizer_state_Begin,
+    [tokenizer_state_DoubleEqual] = tokenizer_state_Begin,
+};
+
+global_variable tokenizer_state AcceptingStates[] = {
+#define X(name)\
+    tokenizer_state_##name,
+    tokenizer_state_Accepting_XList
+#undef X
 };
 
 global_variable u8 TheTable[tokenizer_state__Count][256];
@@ -166,6 +182,7 @@ void SetupTheTable(void)
     for (s32 I = 0; I < 256; ++I)
     {
         TheTable[Space][I] = Done;
+        TheTable[Equal][I] = Done;
         TheTable[String][I] = String;
     }
 
@@ -174,22 +191,31 @@ void SetupTheTable(void)
         TheTable[I][End_Of_Source_Char] = Done;
     }
 
+    for (u32 I = 0; I < ArrayCount(AcceptingStates); ++I)
+    {
+        tokenizer_state AcceptingState = AcceptingStates[I];
+        printf("AcceptingState %d %s\n", AcceptingStates[I], GetTokenizerStateString(AcceptingStates[I]).Bytes);
 #define X(_name, value)\
-    TheTable[Begin][value] = Done;\
-    TheTable[Digit][value] = Done;\
-    TheTable[BinaryDigitValue][value] = Done;\
-    TheTable[IdentifierStart][value] = Done;\
-    TheTable[IdentifierRest][value] = Done;
+        TheTable[AcceptingState][value] = Done;
+        SingleCharTokenList;
+#undef X
+
+#define X(_name, value)\
+        TheTable[AcceptingState][value] = Done;
+        SpaceCharList;
+#undef X
+
+        TheTable[AcceptingState]['='] = Done;
+    }
+
+#define X(_name, value)\
+    TheTable[Begin][value] = Done;
     SingleCharTokenList;
 #undef X
 
 #define X(_name, value)\
     TheTable[Begin][value] = Space;\
-    TheTable[Space][value] = Space;\
-    TheTable[Digit][value] = Done;\
-    TheTable[BinaryDigitValue][value] = Done;\
-    TheTable[IdentifierStart][value] = Done;\
-    TheTable[IdentifierRest][value] = Done;
+    TheTable[Space][value] = Space;
     SpaceCharList;
 #undef X
 
@@ -250,6 +276,9 @@ void SetupTheTable(void)
     /* TheTable[StringEscape]['xhh'] = String; // The byte whose numerical value is given by hh… interpreted as a hexadecimal number */
     /* TheTable[StringEscape]['u'] = String; // Unicode code point below 10000 hexadecimal (added in C99)[1]: 26  */
     /* TheTable[StringEscape]['U'] = String; // Unicode code point where h is a hexadecimal digit */
+
+    TheTable[Begin]['='] = Equal;
+    TheTable[Equal]['='] = DoubleEqual;
 }
 
 token *Tokenize(ryn_memory_arena *Arena, ryn_string Source)
@@ -329,8 +358,9 @@ ref_struct(char_map)
     s32 Column;
 };
 
-internal void DebugPrintEquivalenceClasses(ryn_memory_arena *Arena, u8 *Table, s32 Rows, s32 Columns)
+internal s32 DebugPrintEquivalenceClasses(ryn_memory_arena *Arena, u8 *Table, s32 Rows, s32 Columns)
 {
+    s32 ClassCount = 0;
     char_map *FirstCharMap = 0;
     char_map *CurrentCharMap = 0;
 
@@ -382,18 +412,22 @@ internal void DebugPrintEquivalenceClasses(ryn_memory_arena *Arena, u8 *Table, s
         }
     }
 
-    CurrentCharMap = FirstCharMap;
-    while (CurrentCharMap)
+    for (s32 R = 0; R < Rows; ++R)
     {
-        for (s32 R = 0; R < Rows; ++R)
+        ClassCount = 0;
+        CurrentCharMap = FirstCharMap;
+        while (CurrentCharMap)
         {
             s32 Index = Columns * R + CurrentCharMap->Column;
             printf("%c ", Table[Index] == 0 ? '.' : Table[Index]+97);
-        }
-        printf("\n");
 
-        CurrentCharMap = CurrentCharMap->Next;
+            ClassCount += 1;
+            CurrentCharMap = CurrentCharMap->Next;
+        }
+        printf("   [%c %s]\n", R==0 ? '.' : R+97, GetTokenizerStateString(R).Bytes);
     }
+
+    return ClassCount;
 }
 
 internal void DebugPringTheTable(void)
@@ -447,7 +481,8 @@ internal void TestTokenizer(ryn_memory_arena Arena)
          {T(String)}},
         {ryn_string_CreateString("\"escape \t \n \r this\""),
          {T(String)}},
-
+        {ryn_string_CreateString("= == ="),
+         {T(Equal), T(Space), T(DoubleEqual), T(Space), T(Equal)}},
     };
 #undef T
 
@@ -528,10 +563,16 @@ int main(void)
     printf("\nEquivalence Classes\n");
     s32 Rows = tokenizer_state__Count;
     s32 Columns = 256;
-    DebugPrintEquivalenceClasses(&Arena, (u8 *)TheTable, Rows, Columns);
+    s32 ClassCount = DebugPrintEquivalenceClasses(&Arena, (u8 *)TheTable, Rows, Columns);
     printf("\n");
 
+    printf("StateCount = %d\n", tokenizer_state__Count);
+    printf("CharCount = %d\n", Columns);
     printf("sizeof(TheTable) %lu\n", sizeof(TheTable));
+    Assert(tokenizer_state__Count * Columns == sizeof(TheTable));
+
+    printf("EqClass Count %d\n", ClassCount);
+    printf("256 + EqClassCount*StateCount = %d\n", Columns + ClassCount*tokenizer_state__Count);
 
     return 0;
 }
