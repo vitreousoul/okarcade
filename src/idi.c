@@ -16,8 +16,12 @@
     X(Digit)\
     X(BaseDigit)\
     X(BinaryDigitValue)\
+    X(HexDigitValue)\
     X(IdentifierStart)\
     X(IdentifierRest)\
+    X(String)\
+    X(StringEscape)\
+    X(StringEnd)\
     X(Done)
 
 #define tokenizer_state_XList\
@@ -55,7 +59,8 @@ typedef enum
     X(Space, 256)\
     X(Digit, 257)\
     X(BinaryDigit, 258)\
-    X(Identifier, 259)
+    X(Identifier, 259)\
+    X(String, 260)
 
 
 #define token_type_All_XList\
@@ -104,6 +109,7 @@ global_variable token_type StateToTypeTable[tokenizer_state__Count] = {
     [tokenizer_state_BinaryDigitValue] = token_type_BinaryDigit,
     [tokenizer_state_IdentifierStart] = token_type_Identifier,
     [tokenizer_state_IdentifierRest] = token_type_Identifier,
+    [tokenizer_state_StringEnd] = token_type_String,
 };
 
 global_variable tokenizer_state TokenDoneTable[tokenizer_state__Count] = {
@@ -112,6 +118,7 @@ global_variable tokenizer_state TokenDoneTable[tokenizer_state__Count] = {
     [tokenizer_state_BinaryDigitValue] = tokenizer_state_Begin,
     [tokenizer_state_IdentifierStart] = tokenizer_state_Begin,
     [tokenizer_state_IdentifierRest] = tokenizer_state_Begin,
+    [tokenizer_state_StringEnd] = tokenizer_state_Begin,
 };
 
 global_variable u8 TheTable[tokenizer_state__Count][256];
@@ -159,6 +166,7 @@ void SetupTheTable(void)
     for (s32 I = 0; I < 256; ++I)
     {
         TheTable[Space][I] = Done;
+        TheTable[String][I] = String;
     }
 
     for (s32 I = Begin; I < tokenizer_state__Count; ++I)
@@ -204,13 +212,44 @@ void SetupTheTable(void)
 
         TheTable[IdentifierRest][I] = IdentifierRest;
         TheTable[IdentifierRest][I-32] = IdentifierRest;
+
+        TheTable[HexDigitValue][I] = HexDigitValue;
+    }
+
+    for (s32 I = 'a'; I < 'f'; ++I)
+    {
+        TheTable[HexDigitValue][I] = HexDigitValue;
     }
 
     TheTable[Begin]['0'] = BaseDigit;
 
     TheTable[BaseDigit]['b'] = BinaryDigitValue;
+    TheTable[BaseDigit]['x'] = HexDigitValue;
+
     TheTable[BinaryDigitValue]['0'] = BinaryDigitValue;
     TheTable[BinaryDigitValue]['1'] = BinaryDigitValue;
+
+    TheTable[Begin]['"'] = String;
+    TheTable[String]['\\'] = StringEscape;
+    TheTable[String]['"'] = StringEnd;
+
+
+    TheTable[StringEscape]['a'] = String; // Alert (Beep, Bell) (added in C89)[1]
+    TheTable[StringEscape]['b'] = String; // Backspace
+    TheTable[StringEscape]['e'] = String; // Escape character
+    TheTable[StringEscape]['f'] = String; // Formfeed Page Break
+    TheTable[StringEscape]['n'] = String; // Newline (Line Feed); see below
+    TheTable[StringEscape]['r'] = String; // Carriage Return
+    TheTable[StringEscape]['t'] = String; // Horizontal Tab
+    TheTable[StringEscape]['v'] = String; // Vertical Tab
+    TheTable[StringEscape]['\\'] = String; // Backslash
+    TheTable[StringEscape]['\''] = String; // Apostrophe or single quotation mark
+    TheTable[StringEscape]['"'] = String; // Double quotation mark
+    TheTable[StringEscape]['?'] = String; // Question mark (used to avoid trigraphs)
+    /* TheTable[StringEscape]['nnn'] = String; // The byte whose numerical value is given by nnn interpreted as an octal number */
+    /* TheTable[StringEscape]['xhh'] = String; // The byte whose numerical value is given by hh… interpreted as a hexadecimal number */
+    /* TheTable[StringEscape]['u'] = String; // Unicode code point below 10000 hexadecimal (added in C99)[1]: 26  */
+    /* TheTable[StringEscape]['U'] = String; // Unicode code point where h is a hexadecimal digit */
 }
 
 token *Tokenize(ryn_memory_arena *Arena, ryn_string Source)
@@ -349,7 +388,7 @@ internal void DebugPrintEquivalenceClasses(ryn_memory_arena *Arena, u8 *Table, s
         for (s32 R = 0; R < Rows; ++R)
         {
             s32 Index = Columns * R + CurrentCharMap->Column;
-            printf("%c ", Table[Index] == 0 ? '.' : Table[Index]+48);
+            printf("%c ", Table[Index] == 0 ? '.' : Table[Index]+97);
         }
         printf("\n");
 
@@ -404,18 +443,23 @@ internal void TestTokenizer(ryn_memory_arena Arena)
          {T(Identifier), T(Equal), T(Space), T(BinaryDigit)}},
         {ryn_string_CreateString("bar =0b010110"),
          {T(Identifier), T(Space), T(Equal), T(BinaryDigit)}},
+        {ryn_string_CreateString("\"this is a string\""),
+         {T(String)}},
+        {ryn_string_CreateString("\"escape \t \n \r this\""),
+         {T(String)}},
+
     };
 #undef T
 
     s32 TotalTestCount = ArrayCount(TestCases);
     s32 TotalPassedTests = 0;
 
-        /*
-        ryn_string_CreateString("123a56"),
-        ryn_string_CreateString("    spaceatstart"),
-        ryn_string_CreateString("spaceatend    "),
-        ryn_string_CreateString("185"),
-        */
+    /*
+      ryn_string_CreateString("123a56"),
+      ryn_string_CreateString("    spaceatstart"),
+      ryn_string_CreateString("spaceatend    "),
+      ryn_string_CreateString("185"),
+    */
 
     for (s32 I = 0; I < TotalTestCount; ++I)
     {
