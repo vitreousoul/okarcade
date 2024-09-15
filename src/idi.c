@@ -1,12 +1,19 @@
 /*
-  TODO: The tokenizer testing passes even though the tokenized result sometimes has a null token at the end.
+  TODO: Once things are more stable, rename all the confusing variable names (rows, columns, variable versions of table/class/index).
+  TODO: Setup tests against a C lexer (stb?) to begin building parse tables for lexing C.
 */
+
+#include <stdlib.h> /* NOTE: stdio and time are included because platform current requires it... */
+#include <time.h>
+
+
 #include "../lib/ryn_macro.h"
 #include "../lib/ryn_memory.h"
 #include "../lib/ryn_string.h"
 
 #include "../src/types.h"
 #include "../src/core.c"
+#include "../src/platform.h"
 
 #define End_Of_Source_Char 0
 
@@ -56,7 +63,9 @@ typedef enum
     X(Star,             '*')\
     X(ForwardSlash,     '/')\
     X(Cross,            '+')\
-    X(Dash,             '-')
+    X(Dash,             '-')\
+    X(Comma,            ',')\
+    X(Semicolon,        ';')\
 
 #define token_type_Valid_XList\
     SingleCharTokenList\
@@ -66,7 +75,9 @@ typedef enum
     X(Identifier, 259)\
     X(String, 260)\
     X(Equal, 261)\
-    X(DoubleEqual, 262)
+    X(DoubleEqual, 262)\
+    X(Comment, 263)
+
 
 #define token_type_All_XList\
     X(_Null, 0)\
@@ -88,15 +99,20 @@ global_variable b32 SingleTokenCharTable[256] = {
 #undef X
 };
 
-ref_struct(token)
+typedef struct
 {
     token_type Type;
-    token *Next;
     union
     {
         u32 Digit;
         ryn_string String;
     };
+} token;
+
+ref_struct(token_list)
+{
+    token_list *Next;
+    token Token;
 };
 
 typedef struct
@@ -129,6 +145,21 @@ global_variable tokenizer_state TokenDoneTable[tokenizer_state__Count] = {
     [tokenizer_state_Equal] = tokenizer_state_Begin,
     [tokenizer_state_DoubleEqual] = tokenizer_state_Begin,
 };
+
+ref_struct(char_set)
+{
+    char_set *Next;
+    s32 Column[256];
+    s32 ColumnIndex;
+};
+
+typedef struct
+{
+    char_set *CharSet;
+    u8 *CharClass;
+    u8 *Table;
+    s32 CharSetCount;
+} equivalent_char_result;
 
 global_variable tokenizer_state AcceptingStates[] = {
 #define X(name)\
@@ -219,7 +250,7 @@ void SetupTheTable(void)
     SpaceCharList;
 #undef X
 
-    for (s32 I = 'a'; I < 'z'; ++I)
+    for (s32 I = 'a'; I <= 'z'; ++I)
     {
         TheTable[Begin][I] = IdentifierStart;
         TheTable[Begin][I-32] = IdentifierStart;
@@ -231,18 +262,17 @@ void SetupTheTable(void)
         TheTable[IdentifierRest][I-32] = IdentifierRest;
     }
 
-    for (s32 I = '0'; I < '9'; ++I)
+    for (s32 I = '0'; I <= '9'; ++I)
     {
         TheTable[Begin][I] = Digit;
         TheTable[Digit][I] = Digit;
 
         TheTable[IdentifierRest][I] = IdentifierRest;
-        TheTable[IdentifierRest][I-32] = IdentifierRest;
 
         TheTable[HexDigitValue][I] = HexDigitValue;
     }
 
-    for (s32 I = 'a'; I < 'f'; ++I)
+    for (s32 I = 'a'; I <= 'f'; ++I)
     {
         TheTable[HexDigitValue][I] = HexDigitValue;
     }
@@ -281,14 +311,110 @@ void SetupTheTable(void)
     TheTable[Equal]['='] = DoubleEqual;
 }
 
-token *Tokenize(ryn_memory_arena *Arena, ryn_string Source)
+/* TODO: Rename rows/columns to something related to chars and tokenizer-states. */
+internal equivalent_char_result GetEquivalentChars(ryn_memory_arena *Arena, u8 *Table, s32 Rows, s32 Columns)
 {
-    token HeadToken = {};
-    token *CurrentToken = &HeadToken;
+    equivalent_char_result Result = {};
+
+    for (s32 C = 0; C < Columns; ++C)
+    {
+        if (Result.CharSet == 0)
+        {
+            Result.CharSet = ryn_memory_PushZeroStruct(Arena, char_set);
+            Result.CharSet->Column[Result.CharSet->ColumnIndex] = C;
+            Result.CharSet->ColumnIndex += 1;
+            Result.CharSetCount += 1;
+        }
+        else
+        {
+            char_set *CurrentCharSet = Result.CharSet;
+            b32 Match;
+
+            while (CurrentCharSet)
+            {
+                Match = 1;
+
+                for (s32 R = 0; R < Rows; ++R)
+                {
+                    s32 TestC = CurrentCharSet->Column[0];
+                    s32 Index = C + Columns * R;
+                    s32 TestIndex = TestC + Columns * R;
+
+                    if (Table[Index] != Table[TestIndex])
+                    {
+                        Match = 0;
+                        break;
+                    }
+                }
+
+                if (Match)
+                {
+                    CurrentCharSet->Column[CurrentCharSet->ColumnIndex] = C;
+                    CurrentCharSet->ColumnIndex += 1;
+                    break;
+                }
+
+                CurrentCharSet = CurrentCharSet->Next;
+            }
+
+            if (!Match)
+            {
+                char_set *NewCharSet = ryn_memory_PushZeroStruct(Arena, char_set);
+                NewCharSet->Column[NewCharSet->ColumnIndex] = C;
+                NewCharSet->ColumnIndex += 1;
+                Result.CharSetCount += 1;
+
+                NewCharSet->Next = Result.CharSet;
+                Result.CharSet = NewCharSet;
+            }
+        }
+    }
+
+    s32 TableSize = Result.CharSetCount*Rows;
+    Result.CharClass = ryn_memory_PushSize(Arena, Columns);
+    Result.Table = ryn_memory_PushSize(Arena, TableSize);
+
+    char_set *CurrentCharSet = Result.CharSet;
+    s32 CharSetIndex = 0;
+
+    while (CurrentCharSet)
+    {
+        Assert(CurrentCharSet->ColumnIndex > 0);
+
+        for (s32 I = 0; I < CurrentCharSet->ColumnIndex; ++I)
+        {
+            u8 Char = CurrentCharSet->Column[I];
+            Result.CharClass[Char] = CharSetIndex;
+        }
+
+        for (s32 R = 0; R < Rows; ++R)
+        {
+            s32 ClassTableIndex = CharSetIndex * Rows + R;
+            u32 Char = CurrentCharSet->Column[0];
+            tokenizer_state NextState = TheTable[R][Char];
+
+            Assert(ClassTableIndex < TableSize);
+            Result.Table[ClassTableIndex] = NextState;
+        }
+
+        CurrentCharSet = CurrentCharSet->Next;
+        CharSetIndex += 1;
+    }
+
+    Assert(CharSetIndex == Result.CharSetCount);
+
+    return Result;
+}
+
+token_list *Tokenize(ryn_memory_arena *Arena, ryn_string Source)
+{
+    token_list HeadToken = {};
+    token_list *CurrentToken = &HeadToken;
     tokenizer_state State = tokenizer_state_Begin;
     u64 I = 0;
     u8 PreviousChar = Source.Bytes[0];
     b32 EndOfSource = 0;
+    equivalent_char_result EquivalentChars = GetEquivalentChars(Arena, (u8 *)TheTable, tokenizer_state__Count, 256);
 
     do
     {
@@ -305,34 +431,41 @@ token *Tokenize(ryn_memory_arena *Arena, ryn_string Source)
         }
 
         tokenizer_state NextState = TheTable[State][Char];
+        s32 TableIndex = EquivalentChars.CharClass[Char] * tokenizer_state__Count + State;
+        tokenizer_state TestState = EquivalentChars.Table[TableIndex];
+        Assert(NextState == TestState);
 
-        if (NextState == tokenizer_state_Done)
+        if (Char && NextState == tokenizer_state_Done)
         {
-            token *NextToken = ryn_memory_PushStruct(Arena, token);
+            token_list *NextToken = ryn_memory_PushStruct(Arena, token_list);
             Assert(NextToken != 0);
 
             if (SingleTokenCharTable[PreviousChar])
             {
-                NextToken->Type = Char;
+                NextToken->Token.Type = Char;
                 NextState = tokenizer_state_Begin;
                 ++I;
             }
             else
             {
-                NextToken->Type = StateToTypeTable[State];
+                NextToken->Token.Type = StateToTypeTable[State];
                 NextState = TokenDoneTable[State];
             }
 
             CurrentToken = CurrentToken->Next = NextToken;
         }
-        else if (NextState == tokenizer_state__Error)
-        {
-            printf("Tokenizer error! char_index=%llu    %s\n", I, GetTokenizerStateString(State).Bytes);
-        }
         else
         {
             ++I;
         }
+
+#if 1
+        if (NextState == tokenizer_state__Error)
+        {
+            printf("Tokenizer error! char_index=%llu    %s\n", I, GetTokenizerStateString(State).Bytes);
+        }
+#endif
+
 
         State = NextState;
         PreviousChar = Char;
@@ -344,7 +477,7 @@ token *Tokenize(ryn_memory_arena *Arena, ryn_string Source)
     if (State == tokenizer_state__Error)
     {
         /* NOTE: Give a zero-token first, which signals an error, but include the tokens that were parsed during the process. */
-        token *ErrorToken = ryn_memory_PushZeroStruct(Arena, token);
+        token_list *ErrorToken = ryn_memory_PushZeroStruct(Arena, token_list);
         ErrorToken->Next = HeadToken.Next;
         HeadToken.Next = ErrorToken;
     }
@@ -352,85 +485,91 @@ token *Tokenize(ryn_memory_arena *Arena, ryn_string Source)
     return HeadToken.Next;
 }
 
-ref_struct(char_map)
+internal s32 DebugPrintEquivalentChars(ryn_memory_arena *Arena, u8 *Table, s32 Rows, s32 Columns)
 {
-    char_map *Next;
-    s32 Column;
-};
-
-internal s32 DebugPrintEquivalenceClasses(ryn_memory_arena *Arena, u8 *Table, s32 Rows, s32 Columns)
-{
-    s32 ClassCount = 0;
-    char_map *FirstCharMap = 0;
-    char_map *CurrentCharMap = 0;
-
-    for (s32 C = 0; C < Columns; ++C)
-    {
-        if (FirstCharMap == 0)
-        {
-            FirstCharMap = ryn_memory_PushZeroStruct(Arena, char_map);
-            FirstCharMap->Column = C;
-        }
-        else
-        {
-            CurrentCharMap = FirstCharMap;
-            b32 Match;
-
-            while (CurrentCharMap)
-            {
-                Match = 1;
-
-                for (s32 R = 0; R < Rows; ++R)
-                {
-                    s32 TestC = CurrentCharMap->Column;
-                    s32 Index = C + Columns * R;
-                    s32 TestIndex = TestC + Columns * R;
-
-                    if (Table[Index] != Table[TestIndex])
-                    {
-                        Match = 0;
-                        break;
-                    }
-                }
-
-                if (Match)
-                {
-                    break;
-                }
-
-                CurrentCharMap = CurrentCharMap->Next;
-            }
-
-            if (!Match)
-            {
-                char_map *NewCharMap = ryn_memory_PushZeroStruct(Arena, char_map);
-                NewCharMap->Column = C;
-
-                NewCharMap->Next = FirstCharMap;
-                FirstCharMap = NewCharMap;
-            }
-        }
-    }
+    s32 EquivalentCharCount = 0;
+    equivalent_char_result EquivalentChars = GetEquivalentChars(Arena, Table, Rows, Columns);
+    char_set *FirstCharSet = EquivalentChars.CharSet;
+    char_set *CurrentCharSet = FirstCharSet;
 
     for (s32 R = 0; R < Rows; ++R)
     {
-        ClassCount = 0;
-        CurrentCharMap = FirstCharMap;
-        while (CurrentCharMap)
-        {
-            s32 Index = Columns * R + CurrentCharMap->Column;
-            printf("%c ", Table[Index] == 0 ? '.' : Table[Index]+97);
+        EquivalentCharCount = 0;
+        CurrentCharSet = FirstCharSet;
 
-            ClassCount += 1;
-            CurrentCharMap = CurrentCharMap->Next;
+        while (CurrentCharSet)
+        {
+            s32 Index = Columns * R + CurrentCharSet->Column[0];
+            printf("%c  ", Table[Index] == 0 ? '.' : Table[Index]+97);
+
+            EquivalentCharCount += 1;
+            CurrentCharSet = CurrentCharSet->Next;
         }
         printf("   [%c %s]\n", R==0 ? '.' : R+97, GetTokenizerStateString(R).Bytes);
     }
 
-    return ClassCount;
+    s32 DebugPrintCount = 0;
+
+    printf("\n");
+    for (s32 I = 0; I < 256; ++I)
+    {
+        b32 SomethingPrinted = 0;
+        CurrentCharSet = FirstCharSet;
+        while (CurrentCharSet)
+        {
+            if (CurrentCharSet->ColumnIndex > I)
+            {
+                /* printf("%02x ", CurrentCharSet->Column[I]); */
+                u8 Char = CurrentCharSet->Column[I];
+
+                if (Char >= 33 && Char <= 126)
+                {
+                    printf("%c  ", Char);
+                }
+                else if (Char == 9)
+                {
+                    printf("\\t ");
+                }
+                else if (Char == 10)
+                {
+                    printf("\\n ");
+                }
+                else if (Char == 13)
+                {
+                    printf("\\r ");
+                }
+                else if (Char == 32)
+                {
+                    printf("\\s ");
+                }
+                else
+                {
+                    /* printf(".  "); */
+                    printf("%02x ", Char);
+                }
+                SomethingPrinted = 1;
+                DebugPrintCount += 1;
+            }
+            else
+            {
+                printf("   ");
+            }
+
+            CurrentCharSet = CurrentCharSet->Next;
+        }
+        printf("\n");
+
+        if (!SomethingPrinted)
+        {
+            break;
+        }
+    }
+    printf("Debug Printf Count %d\n", DebugPrintCount);
+
+    return EquivalentCharCount;
 }
 
-internal void DebugPringTheTable(void)
+internal void DebugPrintTheTable(void)
 {
     for (s32 C = 0; C < 256; ++C)
     {
@@ -451,9 +590,9 @@ internal void DebugPringTheTable(void)
     }
 }
 
-#define Max_Token_Count_For_Testing 128
+#define Max_Token_Count_For_Testing 2048
 
-internal void TestTokenizer(ryn_memory_arena Arena)
+internal void TestTokenizer(ryn_memory_arena *Arena)
 {
 #define X(name, _value)\
     token_type name = token_type_##name;
@@ -464,13 +603,14 @@ internal void TestTokenizer(ryn_memory_arena Arena)
         ryn_string Source;
         token Tokens[Max_Token_Count_For_Testing];
     } test_case;
+#define T(token_type) {token_type,{}}
 
-#define T(token_type) {token_type,0,{}}
+#if 0
     test_case TestCases[] = {
-        {ryn_string_CreateString("( 123 + abc)- (as3fj / 423)"),
+        {ryn_string_CreateString("( 193 + abc)- (as3fj / 423)"),
          {T(OpenParenthesis), T(Space), T(Digit), T(Space), T(Cross), T(Space), T(Identifier), T(CloseParenthesis), T(Dash), T(Space), T(OpenParenthesis), T(Identifier), T(Space), T(ForwardSlash), T(Space), T(Digit), T(CloseParenthesis)}},
-        {ryn_string_CreateString("bar = (3*4)^x"),
-         {T(Identifier), T(Space), T(Equal), T(Space), T(OpenParenthesis), T(Digit), T(Star), T(Digit), T(CloseParenthesis), T(Carrot), T(Identifier)}},
+        {ryn_string_CreateString("bar = (3*4)^x;"),
+         {T(Identifier), T(Space), T(Equal), T(Space), T(OpenParenthesis), T(Digit), T(Star), T(Digit), T(CloseParenthesis), T(Carrot), T(Identifier), T(Semicolon)}},
         {ryn_string_CreateString("bar = 0b010110"),
          {T(Identifier), T(Space), T(Equal), T(Space), T(BinaryDigit)}},
         {ryn_string_CreateString("bar= 0b010110"),
@@ -483,45 +623,50 @@ internal void TestTokenizer(ryn_memory_arena Arena)
          {T(String)}},
         {ryn_string_CreateString("= == ="),
          {T(Equal), T(Space), T(DoubleEqual), T(Space), T(Equal)}},
+        {ryn_string_CreateString("(foo, 234, bar)"),
+         {T(OpenParenthesis), T(Identifier), T(Comma), T(Space), T(Digit), T(Comma), T(Space), T(Identifier), T(CloseParenthesis)}},
     };
+#else
+    u8 *Source = ryn_memory_GetArenaWriteLocation(Arena);
+    ReadFileIntoAllocator(Arena, (u8 *)"../src/idi.c");
+
+    ryn_string SourceString = ryn_string_CreateString((char *)Source);
+    printf("SourceString size %llu\n\n", SourceString.Size);
+
+    test_case TestCases[1] = {};
+    TestCases[0].Source = SourceString;
+    TestCases[0].Tokens[0].Type = token_type_Comment;
+#endif
+
 #undef T
 
     s32 TotalTestCount = ArrayCount(TestCases);
     s32 TotalPassedTests = 0;
 
-    /*
-      ryn_string_CreateString("123a56"),
-      ryn_string_CreateString("    spaceatstart"),
-      ryn_string_CreateString("spaceatend    "),
-      ryn_string_CreateString("185"),
-    */
-
     for (s32 I = 0; I < TotalTestCount; ++I)
     {
         test_case TestCase = TestCases[I];
-        printf("[%d] \"%s\"\n", I, TestCase.Source.Bytes);
-
-        token *Token = Tokenize(&Arena, TestCase.Source);
-        printf("tokenize result %d\n", Token->Type);
-
+        token_list *Token = Tokenize(Arena, TestCase.Source);
         s32 TestTokenCount = ArrayCount(TestCase.Tokens);
         b32 Matches = 1;
         s32 TestTokenIndex = 0;
 
+        printf("Test #%d  \"%s\"\n", I, TestCase.Source.Bytes);
+
         while (Token)
         {
-            if (SingleTokenCharTable[Token->Type])
+            if (SingleTokenCharTable[Token->Token.Type])
             {
-                printf("%c ", Token->Type);
+                printf("%c ", Token->Token.Type);
             }
             else
             {
-                printf("%s ", GetTokenTypeString(Token->Type).Bytes);
+                printf("%s ", GetTokenTypeString(Token->Token.Type).Bytes);
             }
 
             if (TestTokenIndex >= TestTokenCount ||
-                Token->Type == 0 ||
-                Token->Type != TestCase.Tokens[TestTokenIndex].Type)
+                Token->Token.Type == 0 ||
+                Token->Token.Type != TestCase.Tokens[TestTokenIndex].Type)
             {
                 Matches = 0;
                 break;
@@ -532,7 +677,7 @@ internal void TestTokenizer(ryn_memory_arena Arena)
         }
         printf("\n");
 
-        if (Matches)
+        if (Matches && Token != 0)
         {
             printf("pass");
             TotalPassedTests += 1;
@@ -554,16 +699,15 @@ int main(void)
     ryn_memory_arena Arena = ryn_memory_CreateArena(Megabytes(1));
 
     SetupTheTable();
-    TestTokenizer(Arena);
+    TestTokenizer(&Arena);
 
 #if 0
-    DebugPringTheTable();
+    DebugPrintTheTable();
 #endif
 
-    printf("\nEquivalence Classes\n");
+    printf("\nEquivalent Chars\n");
     s32 Rows = tokenizer_state__Count;
     s32 Columns = 256;
-    s32 ClassCount = DebugPrintEquivalenceClasses(&Arena, (u8 *)TheTable, Rows, Columns);
     printf("\n");
 
     printf("StateCount = %d\n", tokenizer_state__Count);
@@ -571,8 +715,11 @@ int main(void)
     printf("sizeof(TheTable) %lu\n", sizeof(TheTable));
     Assert(tokenizer_state__Count * Columns == sizeof(TheTable));
 
-    printf("EqClass Count %d\n", ClassCount);
-    printf("256 + EqClassCount*StateCount = %d\n", Columns + ClassCount*tokenizer_state__Count);
+#if 0
+    s32 EquivalentCharCount = DebugPrintEquivalentChars(&Arena, (u8 *)TheTable, Rows, Columns);
+    printf("EqChar Count %d\n", EquivalentCharCount);
+    printf("256 + EqCharCount*StateCount = %d\n", Columns + EquivalentCharCount*tokenizer_state__Count);
+#endif
 
     return 0;
 }
