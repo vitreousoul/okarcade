@@ -196,6 +196,7 @@ u64 ReadFileIntoAllocator(ryn_memory_arena *Allocator, u8 *FilePath)
         fclose(File);
 
         BytesWritten = FileSize;
+        Allocator->Offset += BytesWritten;
     }
 
     return BytesWritten;

@@ -50,6 +50,10 @@ ryn_string ryn_string_CreateString(char *CString)
         Result.Bytes = (ryn_string_u8 *)CString;
         Result.Size = StringSize;
     }
+    else
+    {
+        printf("[Error ryn_string_CreateString] CString empty!");
+    }
 
     return Result;
 }

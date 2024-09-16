@@ -6,7 +6,6 @@
 #include <stdlib.h> /* NOTE: stdio and time are included because platform current requires it... */
 #include <time.h>
 
-
 #include "../lib/ryn_macro.h"
 #include "../lib/ryn_memory.h"
 #include "../lib/ryn_string.h"
@@ -28,16 +27,18 @@
     X(Equal, Equal)\
     X(DoubleEqual, DoubleEqual)\
     X(ForwardSlash, ForwardSlash)\
+    X(BaseDigit, Digit)\
+    X(NewlineEscape, NewlineEscape)\
     X(Comment, Comment)
 
 #define tokenizer_state_NonError_XList\
     X(Begin, Begin)\
     tokenizer_state_Accepting_XList\
-    X(BaseDigit, BaseDigit)\
     X(String, String)\
     X(StringEscape, StringEscape)\
     X(CommentBody, CommentBody)\
     X(CommentBodyCheck, CommentBodyCheck)\
+    X(TopLevelEscape, TopLevelEscape)\
     X(Done, Done)
 
 #define tokenizer_state_XList\
@@ -63,12 +64,20 @@ typedef enum
 #define SingleCharTokenList\
     X(OpenParenthesis,  '(')\
     X(CloseParenthesis, ')')\
+    X(OpenBracket,      '{')\
+    X(CloseBracket,     '}')\
+    X(OpenSquare,       '[')\
+    X(CloseSquare,      ']')\
     X(Carrot,           '^')\
     X(Star,             '*')\
     X(Cross,            '+')\
     X(Dash,             '-')\
     X(Comma,            ',')\
     X(Semicolon,        ';')\
+    X(Hash,             '#')\
+    X(LessThan,         '<')\
+    X(GreaterThan,      '>')\
+    X(Dot,              '.')
 
 #define token_type_Valid_XList\
     SingleCharTokenList\
@@ -81,7 +90,8 @@ typedef enum
     X(Equal, 262)\
     X(DoubleEqual, 263)\
     X(Comment, 264)\
-    X(ForwardSlash, 265)
+    X(ForwardSlash, 265)\
+    X(NewlineEscape, 266)
 
 
 #define token_type_All_XList\
@@ -212,9 +222,10 @@ void SetupTheTable(void)
         TheTable[Space][I] = Done;
         TheTable[Equal][I] = Done;
         TheTable[ForwardSlash][I] = Done;
+        TheTable[NewlineEscape][I] = Done;
         TheTable[String][I] = String;
-        /* TheTable[CommentBody][I] = CommentBody; */
-        /* TheTable[CommentBodyCheck][I] = CommentBody; */
+        TheTable[CommentBody][I] = CommentBody;
+        TheTable[CommentBodyCheck][I] = CommentBody;
     }
 
     for (s32 I = Begin; I < tokenizer_state__Count; ++I)
@@ -237,6 +248,7 @@ void SetupTheTable(void)
 #undef X
 
         TheTable[AcceptingState]['='] = Done;
+        TheTable[AcceptingState]['\\'] = Done;
     }
 
 #define X(_name, value)\
@@ -272,10 +284,14 @@ void SetupTheTable(void)
         TheTable[HexDigitValue][I] = HexDigitValue;
     }
 
+    TheTable[IdentifierRest]['_'] = IdentifierRest;
+
     for (s32 I = 'a'; I <= 'f'; ++I)
     {
         TheTable[HexDigitValue][I] = HexDigitValue;
     }
+
+    TheTable[Begin]['_'] = IdentifierStart;
 
     TheTable[Begin]['0'] = BaseDigit;
 
@@ -311,10 +327,13 @@ void SetupTheTable(void)
     TheTable[Equal]['='] = DoubleEqual;
 
     TheTable[Begin]['/'] = ForwardSlash;
-    /* TheTable[ForwardSlash]['*'] = CommentBody; */
+    TheTable[ForwardSlash]['*'] = CommentBody;
 
-    /* TheTable[CommentBody]['*'] = CommentBodyCheck; */
-    /* TheTable[CommentBodyCheck]['/'] = Comment; */
+    TheTable[Begin]['\\'] = TopLevelEscape;
+    TheTable[TopLevelEscape]['\n'] = NewlineEscape; /* TODO: Handle CRLF */
+
+    TheTable[CommentBody]['*'] = CommentBodyCheck;
+    TheTable[CommentBodyCheck]['/'] = Comment;
 }
 
 /* TODO: Rename rows/columns to something related to chars and tokenizer-states. */
@@ -471,6 +490,16 @@ token_list *Tokenize(ryn_memory_arena *Arena, ryn_string Source)
         if (NextState == tokenizer_state__Error)
         {
             printf("Tokenizer error! char_index=%llu    %s\n", I, GetTokenizerStateString(State).Bytes);
+            s32 Padding = 16;
+            s32 Start = I - Padding;
+            s32 End = I + Padding;
+            if (Start < 0) Start = 0;
+            if ((u32)End > Source.Size) Start = Source.Size;
+            for (s32 ErrorIndex = Start; ErrorIndex < End; ++ErrorIndex)
+            {
+                printf("%c", Source.Bytes[ErrorIndex]);
+            }
+            printf("\n");
         }
 #endif
 
@@ -614,7 +643,10 @@ internal void TestTokenizer(ryn_memory_arena *Arena)
     } test_case;
 #define T(token_type) {token_type,{}}
 
-#if 1
+    u8 *FileSource = ryn_memory_GetArenaWriteLocation(Arena);
+    ReadFileIntoAllocator(Arena, (u8 *)"../src/idi.c");
+    ryn_string FileSourceString = ryn_string_CreateString((char *)FileSource);
+
     test_case TestCases[] = {
         {ryn_string_CreateString("( 193 + abc)- (as3fj / 423)"),
          {T(OpenParenthesis), T(Space), T(Digit), T(Space), T(Cross), T(Space), T(Identifier), T(CloseParenthesis), T(Dash), T(Space), T(OpenParenthesis), T(Identifier), T(Space), T(ForwardSlash), T(Space), T(Digit), T(CloseParenthesis)}},
@@ -632,22 +664,22 @@ internal void TestTokenizer(ryn_memory_arena *Arena)
          {T(String)}},
         {ryn_string_CreateString("= == ="),
          {T(Equal), T(Space), T(DoubleEqual), T(Space), T(Equal)}},
-        {ryn_string_CreateString("(foo, 234, bar)"),
-         {T(OpenParenthesis), T(Identifier), T(Comma), T(Space), T(Digit), T(Comma), T(Space), T(Identifier), T(CloseParenthesis)}},
-        {ryn_string_CreateString("/* This is a comment * and is has stars in it */"),
+        {ryn_string_CreateString("(foo, 234, bar.baz)"),
+         {T(OpenParenthesis), T(Identifier), T(Comma), T(Space), T(Digit), T(Comma), T(Space), T(Identifier), T(Dot), T(Identifier), T(CloseParenthesis)}},
+        {ryn_string_CreateString("/* This is a comment * and is has stars ** in it */"),
          {T(Comment)}},
+        {ryn_string_CreateString("int Foo[3] = {1,2, 4};"),
+         {T(Identifier), T(Space), T(Identifier), T(OpenSquare), T(Digit), T(CloseSquare), T(Space), T(Equal), T(Space), T(OpenBracket), T(Digit), T(Comma), T(Digit), T(Comma), T(Space), T(Digit), T(CloseBracket), T(Semicolon)}},
+        {ryn_string_CreateString("#define Foo 3"),
+         {T(Hash), T(Identifier), T(Space), T(Identifier), T(Space), T(Digit)}},
+        {ryn_string_CreateString("((0xabc123<423)>3)"),
+         {T(OpenParenthesis), T(OpenParenthesis), T(HexDigit), T(LessThan), T(Digit), T(CloseParenthesis), T(GreaterThan), T(Digit), T(CloseParenthesis)}},
+        {ryn_string_CreateString("#define Foo\\\n3"),
+         {T(Hash), T(Identifier), T(Space), T(Identifier), T(NewlineEscape), T(Digit)}},
+
+
+        {FileSourceString, {T(OpenParenthesis)}},
     };
-#else
-    u8 *Source = ryn_memory_GetArenaWriteLocation(Arena);
-    ReadFileIntoAllocator(Arena, (u8 *)"../src/idi.c");
-
-    ryn_string SourceString = ryn_string_CreateString((char *)Source);
-    printf("SourceString size %llu\n\n", SourceString.Size);
-
-    test_case TestCases[1] = {};
-    TestCases[0].Source = SourceString;
-    TestCases[0].Tokens[0].Type = token_type_Comment;
-#endif
 
 #undef T
 
@@ -662,7 +694,8 @@ internal void TestTokenizer(ryn_memory_arena *Arena)
         b32 Matches = 1;
         s32 TestTokenIndex = 0;
 
-        printf("Test #%d  \"%s\"\n", I, TestCase.Source.Bytes);
+        /* printf("Test #%d  \"%s\"\n", I, TestCase.Source.Bytes); */
+        printf("Test #%d \n", I);
 
         if (Token)
         {
@@ -724,7 +757,6 @@ int main(void)
 #endif
 
     printf("\nEquivalent Chars\n");
-    s32 Rows = tokenizer_state__Count;
     s32 Columns = 256;
     printf("\n");
     printf("StateCount = %d\n", tokenizer_state__Count);
@@ -732,6 +764,7 @@ int main(void)
     Assert(tokenizer_state__Count * Columns == sizeof(TheTable));
 
 #if 0
+    s32 Rows = tokenizer_state__Count;
     s32 EquivalentCharCount = DebugPrintEquivalentChars(&Arena, (u8 *)TheTable, Rows, Columns);
     printf("EqChar Count %d\n", EquivalentCharCount);
     printf("256 + EqCharCount*StateCount = %d\n", Columns + EquivalentCharCount*tokenizer_state__Count);
