@@ -441,23 +441,25 @@ token_list *Tokenize(ryn_memory_arena *Arena, ryn_string Source)
         tokenizer_state TestState = EquivalentChars.Table[TableIndex];
         Assert(NextState == TestState);
 
-        if (Char && NextState == tokenizer_state_Done)
+        /* TODO: This seems like a lot of logic, which maybe could be pushed into the table? Or make the logic a table lookup and see which one is faster? */
+        if (NextState == tokenizer_state_Done &&
+            Char &&
+            SingleTokenCharTable[PreviousChar])
         {
-            token_list *NextToken = ryn_memory_PushStruct(Arena, token_list);
-            Assert(NextToken != 0);
-
-            if (SingleTokenCharTable[PreviousChar])
-            {
+                token_list *NextToken = ryn_memory_PushStruct(Arena, token_list);
+                Assert(NextToken != 0);
                 NextToken->Token.Type = Char;
                 NextState = tokenizer_state_Begin;
                 ++I;
-            }
-            else
-            {
-                NextToken->Token.Type = StateToTypeTable[State];
-                NextState = TokenDoneTable[State];
-            }
-
+                CurrentToken = CurrentToken->Next = NextToken;
+        }
+        else if (NextState == tokenizer_state_Done &&
+                 State != tokenizer_state_Begin)
+        {
+            token_list *NextToken = ryn_memory_PushStruct(Arena, token_list);
+            Assert(NextToken != 0);
+            NextToken->Token.Type = StateToTypeTable[State];
+            NextState = TokenDoneTable[State];
             CurrentToken = CurrentToken->Next = NextToken;
         }
         else
