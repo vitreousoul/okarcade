@@ -1,4 +1,5 @@
 /*
+  TODO: There is shared structure between string escapes and character literal escapes. We should make sure we treat characters inside a string literal as single characters inside a char literal.
   TODO: Once things are more stable, rename all the confusing variable names (rows, columns, variable versions of table/class/index).
   TODO: Setup tests against a C lexer (stb?) to begin building parse tables for lexing C.
 */
@@ -78,6 +79,26 @@ typedef enum
     X(LessThan,         '<')\
     X(GreaterThan,      '>')\
     X(Dot,              '.')
+
+#define escape_character_XList\
+    X(Alert, 'a')\
+    X(Backspace, 'b')\
+    X(EscapeCharacter, 'e')\
+    X(FormfeedPageBreak, 'f')\
+    X(Newline, 'n')\
+    X(CarriageReturn, 'r')\
+    X(HorizontalTab, 't')\
+    X(VerticalTab, 'v')\
+    X(Backslash, '\\')\
+    X(Apostrophe, '\'')\
+    X(Double, '"')\
+    X(QuestionMark, '?')
+    /* TODO: Add the following features to escape-character xlist. */
+    /* 'nnn'  The byte whose numerical value is given by nnn interpreted as an octal number */
+    /* 'xhh'  The byte whose numerical value is given by hh… interpreted as a hexadecimal number */
+    /* 'u'  Unicode code point below 10000 hexadecimal (added in C99)[1]: 26  */
+    /* 'U'  Unicode code point where h is a hexadecimal digit */
+
 
 #define token_type_Valid_XList\
     SingleCharTokenList\
@@ -219,12 +240,14 @@ void SetupTheTable(void)
 
     for (s32 I = 0; I < 256; ++I)
     {
-        TheTable[Space][I] = Done;
-        TheTable[Equal][I] = Done;
-        TheTable[ForwardSlash][I] = Done;
+        TheTable[Space        ][I] = Done;
+        TheTable[Equal        ][I] = Done;
+        TheTable[ForwardSlash ][I] = Done;
         TheTable[NewlineEscape][I] = Done;
+
         TheTable[String][I] = String;
-        TheTable[CommentBody][I] = CommentBody;
+
+        TheTable[CommentBody     ][I] = CommentBody;
         TheTable[CommentBodyCheck][I] = CommentBody;
     }
 
@@ -305,23 +328,10 @@ void SetupTheTable(void)
     TheTable[String]['\\'] = StringEscape;
     TheTable[String]['"'] = StringEnd;
 
-
-    TheTable[StringEscape]['a'] = String; // Alert (Beep, Bell) (added in C89)[1]
-    TheTable[StringEscape]['b'] = String; // Backspace
-    TheTable[StringEscape]['e'] = String; // Escape character
-    TheTable[StringEscape]['f'] = String; // Formfeed Page Break
-    TheTable[StringEscape]['n'] = String; // Newline (Line Feed); see below
-    TheTable[StringEscape]['r'] = String; // Carriage Return
-    TheTable[StringEscape]['t'] = String; // Horizontal Tab
-    TheTable[StringEscape]['v'] = String; // Vertical Tab
-    TheTable[StringEscape]['\\'] = String; // Backslash
-    TheTable[StringEscape]['\''] = String; // Apostrophe or single quotation mark
-    TheTable[StringEscape]['"'] = String; // Double quotation mark
-    TheTable[StringEscape]['?'] = String; // Question mark (used to avoid trigraphs)
-    /* TheTable[StringEscape]['nnn'] = String; // The byte whose numerical value is given by nnn interpreted as an octal number */
-    /* TheTable[StringEscape]['xhh'] = String; // The byte whose numerical value is given by hh… interpreted as a hexadecimal number */
-    /* TheTable[StringEscape]['u'] = String; // Unicode code point below 10000 hexadecimal (added in C99)[1]: 26  */
-    /* TheTable[StringEscape]['U'] = String; // Unicode code point where h is a hexadecimal digit */
+#define X(_name, value)\
+    TheTable[StringEscape][value] = String;
+    escape_character_XList;
+#undef X
 
     TheTable[Begin]['='] = Equal;
     TheTable[Equal]['='] = DoubleEqual;
@@ -660,7 +670,9 @@ internal void TestTokenizer(ryn_memory_arena *Arena)
          {T(Identifier), T(Space), T(Equal), T(BinaryDigit)}},
         {ryn_string_CreateString("\"this is a string\""),
          {T(String)}},
-        {ryn_string_CreateString("\"escape \t \n \r this\""),
+        {ryn_string_CreateString("\"string \\t with \\\\ escapes!\""),
+         {T(String)}},
+        {ryn_string_CreateString("\"escape \\t \\n \\r this\""),
          {T(String)}},
         {ryn_string_CreateString("= == ="),
          {T(Equal), T(Space), T(DoubleEqual), T(Space), T(Equal)}},
