@@ -25,6 +25,7 @@
     X(IdentifierStart, Identifier)\
     X(IdentifierRest, Identifier)\
     X(StringEnd, String)\
+    X(CharLiteralEnd, CharLiteral)\
     X(Equal, Equal)\
     X(DoubleEqual, DoubleEqual)\
     X(ForwardSlash, ForwardSlash)\
@@ -37,6 +38,8 @@
     tokenizer_state_Accepting_XList\
     X(String, String)\
     X(StringEscape, StringEscape)\
+    X(CharLiteral, CharLiteral)\
+    X(CharLiteralEscape, CharLiteralEscape)\
     X(CommentBody, CommentBody)\
     X(CommentBodyCheck, CommentBodyCheck)\
     X(TopLevelEscape, TopLevelEscape)\
@@ -74,6 +77,7 @@ typedef enum
     X(Cross,            '+')\
     X(Dash,             '-')\
     X(Comma,            ',')\
+    X(Colon,            ':')\
     X(Semicolon,        ';')\
     X(Hash,             '#')\
     X(LessThan,         '<')\
@@ -108,17 +112,19 @@ typedef enum
     X(HexDigit, 259)\
     X(Identifier, 260)\
     X(String, 261)\
-    X(Equal, 262)\
-    X(DoubleEqual, 263)\
-    X(Comment, 264)\
-    X(ForwardSlash, 265)\
-    X(NewlineEscape, 266)
+    X(CharLiteral, 262)\
+    X(Equal, 263)\
+    X(DoubleEqual, 264)\
+    X(Comment, 265)\
+    X(ForwardSlash, 266)\
+    X(NewlineEscape, 267)
 
+#define token_type_MaxValue 500
 
 #define token_type_All_XList\
     X(_Null, 0)\
     token_type_Valid_XList\
-    X(__Error, 500)
+    X(__Error, token_type_MaxValue)
 
 typedef enum
 {
@@ -128,7 +134,7 @@ typedef enum
 #undef X
 } token_type;
 
-global_variable b32 SingleTokenCharTable[256] = {
+global_variable b32 SingleTokenCharTable[token_type_MaxValue] = {
 #define X(name, literal)\
     [token_type_##name] = 1,
     SingleCharTokenList
@@ -245,7 +251,8 @@ void SetupTheTable(void)
         TheTable[ForwardSlash ][I] = Done;
         TheTable[NewlineEscape][I] = Done;
 
-        TheTable[String][I] = String;
+        TheTable[String     ][I] = String;
+        TheTable[CharLiteral][I] = CharLiteral;
 
         TheTable[CommentBody     ][I] = CommentBody;
         TheTable[CommentBodyCheck][I] = CommentBody;
@@ -303,11 +310,10 @@ void SetupTheTable(void)
         TheTable[Digit][I] = Digit;
 
         TheTable[IdentifierRest][I] = IdentifierRest;
+        TheTable[IdentifierStart][I] = IdentifierRest;
 
         TheTable[HexDigitValue][I] = HexDigitValue;
     }
-
-    TheTable[IdentifierRest]['_'] = IdentifierRest;
 
     for (s32 I = 'a'; I <= 'f'; ++I)
     {
@@ -315,6 +321,8 @@ void SetupTheTable(void)
     }
 
     TheTable[Begin]['_'] = IdentifierStart;
+    TheTable[IdentifierStart]['_'] = IdentifierRest;
+    TheTable[IdentifierRest]['_'] = IdentifierRest;
 
     TheTable[Begin]['0'] = BaseDigit;
 
@@ -328,8 +336,14 @@ void SetupTheTable(void)
     TheTable[String]['\\'] = StringEscape;
     TheTable[String]['"'] = StringEnd;
 
+    TheTable[Begin]['\''] = CharLiteral;
+    TheTable[CharLiteral]['\\'] = CharLiteralEscape;
+    TheTable[CharLiteral]['\''] = CharLiteralEnd;
+
+
 #define X(_name, value)\
-    TheTable[StringEscape][value] = String;
+    TheTable[StringEscape][value] = String;\
+    TheTable[CharLiteralEscape][value] = CharLiteral;
     escape_character_XList;
 #undef X
 
@@ -674,6 +688,8 @@ internal void TestTokenizer(ryn_memory_arena *Arena)
          {T(String)}},
         {ryn_string_CreateString("\"escape \\t \\n \\r this\""),
          {T(String)}},
+        {ryn_string_CreateString("char A = \'f\'"),
+         {T(Identifier), T(Space), T(Identifier), T(Space), T(Equal), T(Space), T(CharLiteral)}},
         {ryn_string_CreateString("= == ="),
          {T(Equal), T(Space), T(DoubleEqual), T(Space), T(Equal)}},
         {ryn_string_CreateString("(foo, 234, bar.baz)"),
@@ -688,6 +704,8 @@ internal void TestTokenizer(ryn_memory_arena *Arena)
          {T(OpenParenthesis), T(OpenParenthesis), T(HexDigit), T(LessThan), T(Digit), T(CloseParenthesis), T(GreaterThan), T(Digit), T(CloseParenthesis)}},
         {ryn_string_CreateString("#define Foo\\\n3"),
          {T(Hash), T(Identifier), T(Space), T(Identifier), T(NewlineEscape), T(Digit)}},
+        {ryn_string_CreateString("case A: x=4; break; case B: x=5;"),
+         {T(Identifier), T(Space), T(Identifier), T(Colon), T(Space), T(Identifier), T(Equal), T(Digit), T(Semicolon), T(Space), T(Identifier), T(Semicolon), T(Space), T(Identifier), T(Space), T(Identifier), T(Colon), T(Space), T(Identifier), T(Equal), T(Digit), T(Semicolon)}},
 
 
         {FileSourceString, {T(OpenParenthesis)}},
