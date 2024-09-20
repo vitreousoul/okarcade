@@ -1,7 +1,9 @@
 /*
-  TODO: There is shared structure between string escapes and character literal escapes. We should make sure we treat characters inside a string literal as single characters inside a char literal.
-  TODO: Once things are more stable, rename all the confusing variable names (rows, columns, variable versions of table/class/index).
-  TODO: Setup tests against a C lexer (stb?) to begin building parse tables for lexing C.
+  TODO:
+    [ ] Parse two-character tokens like -> != <= and so on...
+    [ ] There is shared structure between string escapes and character literal escapes. We should make sure we treat characters inside a string literal as single characters inside a char literal.
+    [ ] Once things are more stable, rename all the confusing variable names (rows, columns, variable versions of table/class/index).
+    [ ] Setup tests against a C lexer (stb?) to begin building parse tables for lexing C.
 */
 
 #include <stdlib.h> /* NOTE: stdio and time are included because platform current requires it... */
@@ -82,6 +84,10 @@ typedef enum
     X(Hash,             '#')\
     X(LessThan,         '<')\
     X(GreaterThan,      '>')\
+    X(Bang,             '!')\
+    X(Ampersand,        '&')\
+    X(Pipe,             '|')\
+    X(Question,         '?')\
     X(Dot,              '.')
 
 #define escape_character_XList\
@@ -96,7 +102,7 @@ typedef enum
     X(Backslash, '\\')\
     X(Apostrophe, '\'')\
     X(Double, '"')\
-    X(QuestionMark, '?')
+    X(Question, '?')
     /* TODO: Add the following features to escape-character xlist. */
     /* 'nnn'  The byte whose numerical value is given by nnn interpreted as an octal number */
     /* 'xhh'  The byte whose numerical value is given by hh… interpreted as a hexadecimal number */
@@ -248,6 +254,7 @@ void SetupTheTable(void)
     {
         TheTable[Space        ][I] = Done;
         TheTable[Equal        ][I] = Done;
+        TheTable[DoubleEqual  ][I] = Done;
         TheTable[ForwardSlash ][I] = Done;
         TheTable[NewlineEscape][I] = Done;
 
@@ -646,7 +653,7 @@ internal void DebugPrintTheTable(void)
 
         for (s32 S = 0; S < tokenizer_state__Count; ++S)
         {
-            printf("%d ", TheTable[S][C]);
+            printf("%2d ", TheTable[S][C]);
         }
         printf("\n");
     }
@@ -676,12 +683,13 @@ internal void TestTokenizer(ryn_memory_arena *Arena)
          {T(OpenParenthesis), T(Space), T(Digit), T(Space), T(Cross), T(Space), T(Identifier), T(CloseParenthesis), T(Dash), T(Space), T(OpenParenthesis), T(Identifier), T(Space), T(ForwardSlash), T(Space), T(Digit), T(CloseParenthesis)}},
         {ryn_string_CreateString("bar = (3*4)^x;"),
          {T(Identifier), T(Space), T(Equal), T(Space), T(OpenParenthesis), T(Digit), T(Star), T(Digit), T(CloseParenthesis), T(Carrot), T(Identifier), T(Semicolon)}},
-        {ryn_string_CreateString("bar = 0b010110"),
-         {T(Identifier), T(Space), T(Equal), T(Space), T(BinaryDigit)}},
+        {ryn_string_CreateString("bar != 0b010110"),
+         /* TODO: Parse bang then equal into NotEqual. */
+         {T(Identifier), T(Space), T(Bang), T(Equal), T(Space), T(BinaryDigit)}},
         {ryn_string_CreateString("bar= 0b010110"),
          {T(Identifier), T(Equal), T(Space), T(BinaryDigit)}},
-        {ryn_string_CreateString("bar =0b010110"),
-         {T(Identifier), T(Space), T(Equal), T(BinaryDigit)}},
+        {ryn_string_CreateString("bar ||0b010110"),
+         {T(Identifier), T(Space), T(Pipe), T(Pipe), T(BinaryDigit)}},
         {ryn_string_CreateString("\"this is a string\""),
          {T(String)}},
         {ryn_string_CreateString("\"string \\t with \\\\ escapes!\""),
@@ -692,8 +700,8 @@ internal void TestTokenizer(ryn_memory_arena *Arena)
          {T(Identifier), T(Space), T(Identifier), T(Space), T(Equal), T(Space), T(CharLiteral)}},
         {ryn_string_CreateString("= == ="),
          {T(Equal), T(Space), T(DoubleEqual), T(Space), T(Equal)}},
-        {ryn_string_CreateString("(foo, 234, bar.baz)"),
-         {T(OpenParenthesis), T(Identifier), T(Comma), T(Space), T(Digit), T(Comma), T(Space), T(Identifier), T(Dot), T(Identifier), T(CloseParenthesis)}},
+        {ryn_string_CreateString("(&foo, 234, bar.baz)"),
+         {T(OpenParenthesis), T(Ampersand), T(Identifier), T(Comma), T(Space), T(Digit), T(Comma), T(Space), T(Identifier), T(Dot), T(Identifier), T(CloseParenthesis)}},
         {ryn_string_CreateString("/* This is a comment * and is has stars ** in it */"),
          {T(Comment)}},
         {ryn_string_CreateString("int Foo[3] = {1,2, 4};"),
@@ -706,6 +714,9 @@ internal void TestTokenizer(ryn_memory_arena *Arena)
          {T(Hash), T(Identifier), T(Space), T(Identifier), T(NewlineEscape), T(Digit)}},
         {ryn_string_CreateString("case A: x=4; break; case B: x=5;"),
          {T(Identifier), T(Space), T(Identifier), T(Colon), T(Space), T(Identifier), T(Equal), T(Digit), T(Semicolon), T(Space), T(Identifier), T(Semicolon), T(Space), T(Identifier), T(Space), T(Identifier), T(Colon), T(Space), T(Identifier), T(Equal), T(Digit), T(Semicolon)}},
+        {ryn_string_CreateString("int Foo = Bar ? 3 : 2;"),
+         {T(Identifier), T(Space), T(Identifier), T(Space), T(Equal), T(Space), T(Identifier), T(Space), T(Question), T(Space), T(Digit), T(Space), T(Colon), T(Space), T(Digit), T(Semicolon)}},
+
 
 
         {FileSourceString, {T(OpenParenthesis)}},
