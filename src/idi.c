@@ -17,6 +17,8 @@
 #include "../src/core.c"
 #include "../src/platform.h"
 
+/**************************************/
+/* Types/Tables */
 #define End_Of_Source_Char 0
 
 #define tokenizer_state_Accepting_XList\
@@ -29,20 +31,30 @@
     X(StringEnd, String)\
     X(CharLiteralEnd, CharLiteral)\
     X(Equal, Equal)\
+    X(LessThan, LessThan)\
+    X(LessThanOrEqual, LessThanOrEqual)\
+    X(GreaterThan, GreaterThan)\
+    X(GreaterThanOrEqual, GreaterThanOrEqual)\
     X(DoubleEqual, DoubleEqual)\
     X(ForwardSlash, ForwardSlash)\
     X(BaseDigit, Digit)\
     X(NewlineEscape, NewlineEscape)\
     X(Comment, Comment)
 
+#define tokenizer_state_Simple_Delimited_XList\
+    X(String, String)\
+    X(CharLiteral, CharLiteral)\
+
+#define tokenizer_state_Delimited_XList\
+    tokenizer_state_Simple_Delimited_XList\
+    X(CommentBody, CommentBody)
+
 #define tokenizer_state_NonError_XList\
     X(Begin, Begin)\
     tokenizer_state_Accepting_XList\
-    X(String, String)\
+    tokenizer_state_Delimited_XList\
     X(StringEscape, StringEscape)\
-    X(CharLiteral, CharLiteral)\
     X(CharLiteralEscape, CharLiteralEscape)\
-    X(CommentBody, CommentBody)\
     X(CommentBodyCheck, CommentBodyCheck)\
     X(TopLevelEscape, TopLevelEscape)\
     X(Done, Done)
@@ -82,8 +94,6 @@ typedef enum
     X(Colon,            ':')\
     X(Semicolon,        ';')\
     X(Hash,             '#')\
-    X(LessThan,         '<')\
-    X(GreaterThan,      '>')\
     X(Bang,             '!')\
     X(Ampersand,        '&')\
     X(Pipe,             '|')\
@@ -123,7 +133,12 @@ typedef enum
     X(DoubleEqual, 264)\
     X(Comment, 265)\
     X(ForwardSlash, 266)\
-    X(NewlineEscape, 267)
+    X(NewlineEscape, 267)\
+    X(LessThan, 268)\
+    X(LessThanOrEqual, 269)\
+    X(GreaterThan, 270)\
+    X(GreaterThanOrEqual, 271)
+
 
 #define token_type_MaxValue 500
 
@@ -208,8 +223,51 @@ global_variable tokenizer_state AcceptingStates[] = {
 #undef X
 };
 
-global_variable u8 TheTable[tokenizer_state__Count][256];
+global_variable tokenizer_state DelimitedStates[] = {
+#define X(name, _typename)\
+    tokenizer_state_##name,
+    tokenizer_state_Delimited_XList
+#undef X
+};
 
+
+/**************************************/
+/* Globals */
+global_variable u8 TheTable[tokenizer_state__Count][256];
+global_variable u8 TheDebugTable[tokenizer_state__Count][256];
+
+
+/**************************************/
+/* Functions */
+internal void CopyTheTableToTheDebugTable(void)
+{
+    for (s32 Row = 0; Row < tokenizer_state__Count; ++Row)
+    {
+        for (s32 Col = 0; Col < 256; ++Col)
+        {
+            TheDebugTable[Row][Col] = TheTable[Row][Col];
+        }
+    }
+}
+
+internal b32 CheckIfTheTableAndTheDebugTableMatch(void)
+{
+    b32 Match = 1;
+
+    for (s32 Row = 0; Row < tokenizer_state__Count; ++Row)
+    {
+        for (s32 Col = 0; Col < 256; ++Col)
+        {
+            if (TheDebugTable[Row][Col] != TheTable[Row][Col])
+            {
+                Match = 0;
+                break;
+            }
+        }
+    }
+
+    return Match;
+}
 
 internal ryn_string GetTokenTypeString(token_type TokenType)
 {
@@ -252,40 +310,24 @@ void SetupTheTable(void)
 
     for (s32 I = 0; I < 256; ++I)
     {
-        TheTable[Space        ][I] = Done;
-        TheTable[Equal        ][I] = Done;
-        TheTable[DoubleEqual  ][I] = Done;
-        TheTable[ForwardSlash ][I] = Done;
-        TheTable[NewlineEscape][I] = Done;
+        for (u32 AcceptIndex = 0; AcceptIndex < ArrayCount(AcceptingStates); ++AcceptIndex)
+        {
+            tokenizer_state AcceptingState = AcceptingStates[AcceptIndex];
+            TheTable[AcceptingState][I] = Done;
+        }
 
-        TheTable[String     ][I] = String;
-        TheTable[CharLiteral][I] = CharLiteral;
+        for (u32 DelimitedIndex = 0; DelimitedIndex < ArrayCount(DelimitedStates); ++DelimitedIndex)
+        {
+            tokenizer_state DelimitedState = DelimitedStates[DelimitedIndex];
+            TheTable[DelimitedState][I] = DelimitedState;
+        }
 
-        TheTable[CommentBody     ][I] = CommentBody;
         TheTable[CommentBodyCheck][I] = CommentBody;
     }
 
     for (s32 I = Begin; I < tokenizer_state__Count; ++I)
     {
         TheTable[I][End_Of_Source_Char] = Done;
-    }
-
-    for (u32 I = 0; I < ArrayCount(AcceptingStates); ++I)
-    {
-        tokenizer_state AcceptingState = AcceptingStates[I];
-
-#define X(_name, value)\
-        TheTable[AcceptingState][value] = Done;
-        SingleCharTokenList;
-#undef X
-
-#define X(_name, value)\
-        TheTable[AcceptingState][value] = Done;
-        SpaceCharList;
-#undef X
-
-        TheTable[AcceptingState]['='] = Done;
-        TheTable[AcceptingState]['\\'] = Done;
     }
 
 #define X(_name, value)\
@@ -339,14 +381,15 @@ void SetupTheTable(void)
     TheTable[BinaryDigitValue]['0'] = BinaryDigitValue;
     TheTable[BinaryDigitValue]['1'] = BinaryDigitValue;
 
-    TheTable[Begin]['"'] = String;
-    TheTable[String]['\\'] = StringEscape;
-    TheTable[String]['"'] = StringEnd;
+    { /* Delimited strings */
+        TheTable[Begin]['"'] = String;
+        TheTable[String]['\\'] = StringEscape;
+        TheTable[String]['"'] = StringEnd;
 
-    TheTable[Begin]['\''] = CharLiteral;
-    TheTable[CharLiteral]['\\'] = CharLiteralEscape;
-    TheTable[CharLiteral]['\''] = CharLiteralEnd;
-
+        TheTable[Begin]['\''] = CharLiteral;
+        TheTable[CharLiteral]['\\'] = CharLiteralEscape;
+        TheTable[CharLiteral]['\''] = CharLiteralEnd;
+    }
 
 #define X(_name, value)\
     TheTable[StringEscape][value] = String;\
@@ -356,15 +399,18 @@ void SetupTheTable(void)
 
     TheTable[Begin]['='] = Equal;
     TheTable[Equal]['='] = DoubleEqual;
+    TheTable[LessThan]['='] = LessThanOrEqual;
+    TheTable[GreaterThan]['='] = GreaterThanOrEqual;
+    TheTable[Begin]['<'] = LessThan;
+    TheTable[Begin]['>'] = GreaterThan;
 
     TheTable[Begin]['/'] = ForwardSlash;
     TheTable[ForwardSlash]['*'] = CommentBody;
+    TheTable[CommentBody]['*'] = CommentBodyCheck;
+    TheTable[CommentBodyCheck]['/'] = Comment;
 
     TheTable[Begin]['\\'] = TopLevelEscape;
     TheTable[TopLevelEscape]['\n'] = NewlineEscape; /* TODO: Handle CRLF */
-
-    TheTable[CommentBody]['*'] = CommentBodyCheck;
-    TheTable[CommentBodyCheck]['/'] = Comment;
 }
 
 /* TODO: Rename rows/columns to something related to chars and tokenizer-states. */
@@ -376,6 +422,7 @@ internal equivalent_char_result GetEquivalentChars(ryn_memory_arena *Arena, u8 *
     {
         if (Result.CharSet == 0)
         {
+            /* The first char-set is always an equivalent char, so we always instantly add the first char-set. */
             Result.CharSet = ryn_memory_PushZeroStruct(Arena, char_set);
             Result.CharSet->Column[Result.CharSet->ColumnIndex] = C;
             Result.CharSet->ColumnIndex += 1;
@@ -383,6 +430,7 @@ internal equivalent_char_result GetEquivalentChars(ryn_memory_arena *Arena, u8 *
         }
         else
         {
+            /* Check if the char-set already exists, if not, add it. */
             char_set *CurrentCharSet = Result.CharSet;
             b32 Match;
 
@@ -568,12 +616,12 @@ internal s32 DebugPrintEquivalentChars(ryn_memory_arena *Arena, u8 *Table, s32 R
         while (CurrentCharSet)
         {
             s32 Index = Columns * R + CurrentCharSet->Column[0];
-            printf("%c  ", Table[Index] == 0 ? '.' : Table[Index]+97);
+            if (Table[Index] != 0) { printf("%02x ", Table[Index]); } else { printf(".  "); }
 
             EquivalentCharCount += 1;
             CurrentCharSet = CurrentCharSet->Next;
         }
-        printf("   [%c %s]\n", R==0 ? '.' : R+97, GetTokenizerStateString(R).Bytes);
+        printf("   [%02x %s]\n", R==0 ? '.' : R, GetTokenizerStateString(R).Bytes);
     }
 
     s32 DebugPrintCount = 0;
@@ -698,8 +746,8 @@ internal void TestTokenizer(ryn_memory_arena *Arena)
          {T(String)}},
         {ryn_string_CreateString("char A = \'f\'"),
          {T(Identifier), T(Space), T(Identifier), T(Space), T(Equal), T(Space), T(CharLiteral)}},
-        {ryn_string_CreateString("= == ="),
-         {T(Equal), T(Space), T(DoubleEqual), T(Space), T(Equal)}},
+        {ryn_string_CreateString("= >= == <="),
+         {T(Equal), T(Space), T(GreaterThanOrEqual), T(Space), T(DoubleEqual), T(Space), T(LessThanOrEqual)}},
         {ryn_string_CreateString("(&foo, 234, bar.baz)"),
          {T(OpenParenthesis), T(Ampersand), T(Identifier), T(Comma), T(Space), T(Digit), T(Comma), T(Space), T(Identifier), T(Dot), T(Identifier), T(CloseParenthesis)}},
         {ryn_string_CreateString("/* This is a comment * and is has stars ** in it */"),
