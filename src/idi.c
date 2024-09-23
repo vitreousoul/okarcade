@@ -35,11 +35,15 @@
     X(LessThanOrEqual, LessThanOrEqual)\
     X(GreaterThan, GreaterThan)\
     X(GreaterThanOrEqual, GreaterThanOrEqual)\
+    X(Not, Not)\
     X(DoubleEqual, DoubleEqual)\
     X(ForwardSlash, ForwardSlash)\
     X(BaseDigit, Digit)\
     X(NewlineEscape, NewlineEscape)\
-    X(Comment, Comment)
+    X(Arrow, Arrow)\
+    X(NotEqual, NotEqual)\
+    X(Comment, Comment)\
+    X(Dash, Dash)
 
 #define tokenizer_state_Simple_Delimited_XList\
     X(String, String)\
@@ -89,12 +93,10 @@ typedef enum
     X(Carrot,           '^')\
     X(Star,             '*')\
     X(Cross,            '+')\
-    X(Dash,             '-')\
     X(Comma,            ',')\
     X(Colon,            ':')\
     X(Semicolon,        ';')\
     X(Hash,             '#')\
-    X(Bang,             '!')\
     X(Ampersand,        '&')\
     X(Pipe,             '|')\
     X(Question,         '?')\
@@ -137,7 +139,11 @@ typedef enum
     X(LessThan, 268)\
     X(LessThanOrEqual, 269)\
     X(GreaterThan, 270)\
-    X(GreaterThanOrEqual, 271)
+    X(GreaterThanOrEqual, 271)\
+    X(NotEqual, 272)\
+    X(Arrow, 273)\
+    X(Not, 274)\
+    X(Dash, 275)
 
 
 #define token_type_MaxValue 500
@@ -343,14 +349,14 @@ void SetupTheTable(void)
 
     for (s32 I = 'a'; I <= 'z'; ++I)
     {
-        TheTable[Begin][I] = IdentifierStart;
-        TheTable[Begin][I-32] = IdentifierStart;
+        TheTable[Begin][I   ]           = IdentifierStart;
+        TheTable[Begin][I-32]           = IdentifierStart;
 
-        TheTable[IdentifierStart][I] = IdentifierRest;
+        TheTable[IdentifierStart][I   ] = IdentifierRest;
         TheTable[IdentifierStart][I-32] = IdentifierRest;
 
-        TheTable[IdentifierRest][I] = IdentifierRest;
-        TheTable[IdentifierRest][I-32] = IdentifierRest;
+        TheTable[IdentifierRest][I   ]  = IdentifierRest;
+        TheTable[IdentifierRest][I-32]  = IdentifierRest;
     }
 
     for (s32 I = '0'; I <= '9'; ++I)
@@ -403,6 +409,10 @@ void SetupTheTable(void)
     TheTable[GreaterThan]['='] = GreaterThanOrEqual;
     TheTable[Begin]['<'] = LessThan;
     TheTable[Begin]['>'] = GreaterThan;
+    TheTable[Begin]['!'] = Not;
+    TheTable[Not]['='] = NotEqual;
+    TheTable[Begin]['-'] = Dash;
+    TheTable[Dash]['>'] = Arrow;
 
     TheTable[Begin]['/'] = ForwardSlash;
     TheTable[ForwardSlash]['*'] = CommentBody;
@@ -536,8 +546,11 @@ token_list *Tokenize(ryn_memory_arena *Arena, ryn_string Source)
 
         tokenizer_state NextState = TheTable[State][Char];
         s32 TableIndex = EquivalentChars.CharClass[Char] * tokenizer_state__Count + State;
-        tokenizer_state TestState = EquivalentChars.Table[TableIndex];
-        Assert(NextState == TestState);
+
+        { /* Make sure that the equivalent-char table behaves the same as the original table. */
+            tokenizer_state TestState = EquivalentChars.Table[TableIndex];
+            Assert(NextState == TestState);
+        }
 
         /* TODO: This seems like a lot of logic, which maybe could be pushed into the table? Or make the logic a table lookup and see which one is faster? */
         if (NextState == tokenizer_state_Done &&
@@ -732,8 +745,7 @@ internal void TestTokenizer(ryn_memory_arena *Arena)
         {ryn_string_CreateString("bar = (3*4)^x;"),
          {T(Identifier), T(Space), T(Equal), T(Space), T(OpenParenthesis), T(Digit), T(Star), T(Digit), T(CloseParenthesis), T(Carrot), T(Identifier), T(Semicolon)}},
         {ryn_string_CreateString("bar != 0b010110"),
-         /* TODO: Parse bang then equal into NotEqual. */
-         {T(Identifier), T(Space), T(Bang), T(Equal), T(Space), T(BinaryDigit)}},
+         {T(Identifier), T(Space), T(NotEqual), T(Space), T(BinaryDigit)}},
         {ryn_string_CreateString("bar= 0b010110"),
          {T(Identifier), T(Equal), T(Space), T(BinaryDigit)}},
         {ryn_string_CreateString("bar ||0b010110"),
@@ -764,8 +776,10 @@ internal void TestTokenizer(ryn_memory_arena *Arena)
          {T(Identifier), T(Space), T(Identifier), T(Colon), T(Space), T(Identifier), T(Equal), T(Digit), T(Semicolon), T(Space), T(Identifier), T(Semicolon), T(Space), T(Identifier), T(Space), T(Identifier), T(Colon), T(Space), T(Identifier), T(Equal), T(Digit), T(Semicolon)}},
         {ryn_string_CreateString("int Foo = Bar ? 3 : 2;"),
          {T(Identifier), T(Space), T(Identifier), T(Space), T(Equal), T(Space), T(Identifier), T(Space), T(Question), T(Space), T(Digit), T(Space), T(Colon), T(Space), T(Digit), T(Semicolon)}},
-
-
+        {ryn_string_CreateString("A->Size != B->Size"),
+         {T(Identifier), T(Arrow), T(Identifier), T(Space), T(NotEqual), T(Space), T(Identifier), T(Arrow), T(Identifier)}},
+        {ryn_string_CreateString("!Foo != Bar"),
+         {T(Not), T(Identifier), T(Space), T(NotEqual), T(Space), T(Identifier)}},
 
         {FileSourceString, {T(OpenParenthesis)}},
     };
