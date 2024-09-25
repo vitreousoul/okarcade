@@ -43,7 +43,8 @@
     X(Arrow, Arrow)\
     X(NotEqual, NotEqual)\
     X(Comment, Comment)\
-    X(Dash, Dash)
+    X(Dash, Dash)\
+    X(Newline, Newline)
 
 #define tokenizer_state_Simple_Delimited_XList\
     X(String, String)\
@@ -80,7 +81,6 @@ typedef enum
 #define SpaceCharList\
     X(Space,   ' ')\
     X(Tab,     '\t')\
-    X(Newline, '\n')\
     X(Return,  '\r')
 
 #define SingleCharTokenList\
@@ -124,26 +124,27 @@ typedef enum
 
 #define token_type_Valid_XList\
     SingleCharTokenList\
-    X(Space, 256)\
-    X(Digit, 257)\
-    X(BinaryDigit, 258)\
-    X(HexDigit, 259)\
-    X(Identifier, 260)\
-    X(String, 261)\
-    X(CharLiteral, 262)\
-    X(Equal, 263)\
-    X(DoubleEqual, 264)\
-    X(Comment, 265)\
-    X(ForwardSlash, 266)\
-    X(NewlineEscape, 267)\
-    X(LessThan, 268)\
-    X(LessThanOrEqual, 269)\
-    X(GreaterThan, 270)\
-    X(GreaterThanOrEqual, 271)\
-    X(NotEqual, 272)\
-    X(Arrow, 273)\
-    X(Not, 274)\
-    X(Dash, 275)
+    X(Space,               256)\
+    X(Digit,               257)\
+    X(BinaryDigit,         258)\
+    X(HexDigit,            259)\
+    X(Identifier,          260)\
+    X(String,              261)\
+    X(CharLiteral,         262)\
+    X(Equal,               263)\
+    X(DoubleEqual,         264)\
+    X(Comment,             265)\
+    X(ForwardSlash,        266)\
+    X(NewlineEscape,       267)\
+    X(LessThan,            268)\
+    X(LessThanOrEqual,     269)\
+    X(GreaterThan,         270)\
+    X(GreaterThanOrEqual,  271)\
+    X(NotEqual,            272)\
+    X(Arrow,               273)\
+    X(Not,                 274)\
+    X(Dash,                275)\
+    X(Newline,             276)
 
 
 #define token_type_MaxValue 500
@@ -349,14 +350,14 @@ void SetupTheTable(void)
 
     for (s32 I = 'a'; I <= 'z'; ++I)
     {
-        TheTable[Begin][I   ]           = IdentifierStart;
-        TheTable[Begin][I-32]           = IdentifierStart;
+        TheTable[Begin][I] = IdentifierStart;
+        TheTable[Begin][I-32] = IdentifierStart;
 
-        TheTable[IdentifierStart][I   ] = IdentifierRest;
+        TheTable[IdentifierStart][I] = IdentifierRest;
         TheTable[IdentifierStart][I-32] = IdentifierRest;
 
-        TheTable[IdentifierRest][I   ]  = IdentifierRest;
-        TheTable[IdentifierRest][I-32]  = IdentifierRest;
+        TheTable[IdentifierRest][I] = IdentifierRest;
+        TheTable[IdentifierRest][I-32] = IdentifierRest;
     }
 
     for (s32 I = '0'; I <= '9'; ++I)
@@ -421,6 +422,7 @@ void SetupTheTable(void)
 
     TheTable[Begin]['\\'] = TopLevelEscape;
     TheTable[TopLevelEscape]['\n'] = NewlineEscape; /* TODO: Handle CRLF */
+    TheTable[Begin]['\n'] = Newline;
 }
 
 /* TODO: Rename rows/columns to something related to chars and tokenizer-states. */
@@ -598,7 +600,6 @@ token_list *Tokenize(ryn_memory_arena *Arena, ryn_string Source)
 
         State = NextState;
         PreviousChar = Char;
-
     } while (!EndOfSource &&
              CurrentToken != 0 &&
              State != tokenizer_state__Error);
@@ -772,6 +773,8 @@ internal void TestTokenizer(ryn_memory_arena *Arena)
          {T(OpenParenthesis), T(OpenParenthesis), T(HexDigit), T(LessThan), T(Digit), T(CloseParenthesis), T(GreaterThan), T(Digit), T(CloseParenthesis)}},
         {ryn_string_CreateString("#define Foo\\\n3"),
          {T(Hash), T(Identifier), T(Space), T(Identifier), T(NewlineEscape), T(Digit)}},
+        {ryn_string_CreateString("a=4;   \n    b=5;"),
+         {T(Identifier), T(Equal), T(Digit), T(Semicolon), T(Space), T(Newline), T(Space), T(Identifier), T(Equal), T(Digit), T(Semicolon)}},
         {ryn_string_CreateString("case A: x=4; break; case B: x=5;"),
          {T(Identifier), T(Space), T(Identifier), T(Colon), T(Space), T(Identifier), T(Equal), T(Digit), T(Semicolon), T(Space), T(Identifier), T(Semicolon), T(Space), T(Identifier), T(Space), T(Identifier), T(Colon), T(Space), T(Identifier), T(Equal), T(Digit), T(Semicolon)}},
         {ryn_string_CreateString("int Foo = Bar ? 3 : 2;"),
