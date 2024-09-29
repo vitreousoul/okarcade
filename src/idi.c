@@ -17,60 +17,83 @@
 #include "../src/core.c"
 #include "../src/platform.h"
 
+#define Test_Tokenizer 1
+#define Test_Parser    1
+
 /**************************************/
 /* Types/Tables */
 #define End_Of_Source_Char 0
 
+#define SingleCharTokenList\
+    X(OpenParenthesis,   OpenParenthesis,   '(')\
+    X(CloseParenthesis,  CloseParenthesis,  ')')\
+    X(OpenBracket,       OpenBracket,       '{')\
+    X(CloseBracket,      CloseBracket,      '}')\
+    X(OpenSquare,        OpenSquare,        '[')\
+    X(CloseSquare,       CloseSquare,       ']')\
+    X(Carrot,            Carrot,            '^')\
+    X(Star,              Star,              '*')\
+    X(Cross,             Cross,             '+')\
+    X(Comma,             Comma,             ',')\
+    X(Colon,             Colon,             ':')\
+    X(Semicolon,         Semicolon,         ';')\
+    X(Hash,              Hash,              '#')\
+    X(Ampersand,         Ampersand,         '&')\
+    X(Pipe,              Pipe,              '|')\
+    X(Question,          Question,          '?')\
+    X(Dot,               Dot,               '.')
+
 #define tokenizer_state_Accepting_XList\
-    X(Space, Space)\
-    X(Digit, Digit)\
-    X(BinaryDigitValue, BinaryDigit)\
-    X(HexDigitValue, HexDigit)\
-    X(IdentifierStart, Identifier)\
-    X(IdentifierRest, Identifier)\
-    X(StringEnd, String)\
-    X(CharLiteralEnd, CharLiteral)\
-    X(Equal, Equal)\
-    X(LessThan, LessThan)\
-    X(LessThanOrEqual, LessThanOrEqual)\
-    X(GreaterThan, GreaterThan)\
-    X(GreaterThanOrEqual, GreaterThanOrEqual)\
-    X(Not, Not)\
-    X(DoubleEqual, DoubleEqual)\
-    X(ForwardSlash, ForwardSlash)\
-    X(BaseDigit, Digit)\
-    X(NewlineEscape, NewlineEscape)\
-    X(Arrow, Arrow)\
-    X(NotEqual, NotEqual)\
-    X(Comment, Comment)\
-    X(Dash, Dash)\
-    X(Newline, Newline)
+    SingleCharTokenList\
+    X(Space,               Space,               0)\
+    X(Digit,               Digit,               0)\
+    X(BinaryDigitValue,    BinaryDigit,         0)\
+    X(HexDigitValue,       HexDigit,            0)\
+    X(IdentifierStart,     Identifier,          0)\
+    X(IdentifierRest,      Identifier,          0)\
+    X(StringEnd,           String,              0)\
+    X(CharLiteralEnd,      CharLiteral,         0)\
+    X(Equal,               Equal,               0)\
+    X(LessThan,            LessThan,            0)\
+    X(LessThanOrEqual,     LessThanOrEqual,     0)\
+    X(GreaterThan,         GreaterThan,         0)\
+    X(GreaterThanOrEqual,  GreaterThanOrEqual,  0)\
+    X(Not,                 Not,                 0)\
+    X(DoubleEqual,         DoubleEqual,         0)\
+    X(ForwardSlash,        ForwardSlash,        0)\
+    X(BaseDigit,           Digit,               0)\
+    X(NewlineEscape,       NewlineEscape,       0)\
+    X(Arrow,               Arrow,               0)\
+    X(NotEqual,            NotEqual,            0)\
+    X(Comment,             Comment,             0)\
+    X(Dash,                Dash,                0)\
+    X(Newline,             Newline,             0)
 
 #define tokenizer_state_Simple_Delimited_XList\
-    X(String, String)\
-    X(CharLiteral, CharLiteral)\
+    X(String,       String,       0)\
+    X(CharLiteral,  CharLiteral,  0)\
 
 #define tokenizer_state_Delimited_XList\
     tokenizer_state_Simple_Delimited_XList\
-    X(CommentBody, CommentBody)
+    X(CommentBody, CommentBody, 0)
 
 #define tokenizer_state_NonError_XList\
-    X(Begin, Begin)\
+    X(Begin,              Begin,              0)\
     tokenizer_state_Accepting_XList\
     tokenizer_state_Delimited_XList\
-    X(StringEscape, StringEscape)\
-    X(CharLiteralEscape, CharLiteralEscape)\
-    X(CommentBodyCheck, CommentBodyCheck)\
-    X(TopLevelEscape, TopLevelEscape)\
-    X(Done, Done)
+    X(StringEscape,       StringEscape,       0)\
+    X(CharLiteralEscape,  CharLiteralEscape,  0)\
+    X(CommentBodyCheck,   CommentBodyCheck,   0)\
+    X(TopLevelEscape,     TopLevelEscape,     0)\
+    X(Done,               Done,               0)
 
 #define tokenizer_state_XList\
-    X(_Error, _Error)\
+    X(_Error, _Error, 0)\
     tokenizer_state_NonError_XList
 
 typedef enum
 {
-#define X(name, _typename)\
+#define X(name, _typename, _literal)\
     tokenizer_state_##name,
     tokenizer_state_XList
 #undef X
@@ -78,43 +101,29 @@ typedef enum
     tokenizer_state__Count
 } tokenizer_state;
 
+typedef enum
+{
+    parser_state__Count
+} parser_state;
+
 #define SpaceCharList\
     X(Space,   ' ')\
     X(Tab,     '\t')\
     X(Return,  '\r')
 
-#define SingleCharTokenList\
-    X(OpenParenthesis,  '(')\
-    X(CloseParenthesis, ')')\
-    X(OpenBracket,      '{')\
-    X(CloseBracket,     '}')\
-    X(OpenSquare,       '[')\
-    X(CloseSquare,      ']')\
-    X(Carrot,           '^')\
-    X(Star,             '*')\
-    X(Cross,            '+')\
-    X(Comma,            ',')\
-    X(Colon,            ':')\
-    X(Semicolon,        ';')\
-    X(Hash,             '#')\
-    X(Ampersand,        '&')\
-    X(Pipe,             '|')\
-    X(Question,         '?')\
-    X(Dot,              '.')
-
 #define escape_character_XList\
-    X(Alert, 'a')\
-    X(Backspace, 'b')\
-    X(EscapeCharacter, 'e')\
-    X(FormfeedPageBreak, 'f')\
-    X(Newline, 'n')\
-    X(CarriageReturn, 'r')\
-    X(HorizontalTab, 't')\
-    X(VerticalTab, 'v')\
-    X(Backslash, '\\')\
-    X(Apostrophe, '\'')\
-    X(Double, '"')\
-    X(Question, '?')
+    X(Alert,              'a')\
+    X(Backspace,          'b')\
+    X(EscapeCharacter,    'e')\
+    X(FormfeedPageBreak,  'f')\
+    X(Newline,            'n')\
+    X(CarriageReturn,     'r')\
+    X(HorizontalTab,      't')\
+    X(VerticalTab,        'v')\
+    X(Backslash,          '\\')\
+    X(Apostrophe,         '\'')\
+    X(Double,             '"')\
+    X(Question,           '?')
     /* TODO: Add the following features to escape-character xlist. */
     /* 'nnn'  The byte whose numerical value is given by nnn interpreted as an octal number */
     /* 'xhh'  The byte whose numerical value is given by hh… interpreted as a hexadecimal number */
@@ -124,49 +133,58 @@ typedef enum
 
 #define token_type_Valid_XList\
     SingleCharTokenList\
-    X(Space,               256)\
-    X(Digit,               257)\
-    X(BinaryDigit,         258)\
-    X(HexDigit,            259)\
-    X(Identifier,          260)\
-    X(String,              261)\
-    X(CharLiteral,         262)\
-    X(Equal,               263)\
-    X(DoubleEqual,         264)\
-    X(Comment,             265)\
-    X(ForwardSlash,        266)\
-    X(NewlineEscape,       267)\
-    X(LessThan,            268)\
-    X(LessThanOrEqual,     269)\
-    X(GreaterThan,         270)\
-    X(GreaterThanOrEqual,  271)\
-    X(NotEqual,            272)\
-    X(Arrow,               273)\
-    X(Not,                 274)\
-    X(Dash,                275)\
-    X(Newline,             276)
+    X(Space,               Space,               256)\
+    X(Digit,               Digit,               257)\
+    X(BinaryDigit,         BinaryDigit,         258)\
+    X(HexDigit,            HexDigit,            259)\
+    X(Identifier,          Identifier,          260)\
+    X(String,              String,              261)\
+    X(CharLiteral,         CharLiteral,         262)\
+    X(Equal,               Equal,               263)\
+    X(DoubleEqual,         DoubleEqual,         264)\
+    X(Comment,             Comment,             265)\
+    X(ForwardSlash,        ForwardSlash,        266)\
+    X(NewlineEscape,       NewlineEscape,       267)\
+    X(LessThan,            LessThan,            268)\
+    X(LessThanOrEqual,     LessThanOrEqual,     269)\
+    X(GreaterThan,         GreaterThan,         270)\
+    X(GreaterThanOrEqual,  GreaterThanOrEqual,  271)\
+    X(NotEqual,            NotEqual,            272)\
+    X(Arrow,               Arrow,               273)\
+    X(Not,                 Not,                 274)\
+    X(Dash,                Dash,                275)\
+    X(Newline,             Newline,             276)
 
 
-#define token_type_MaxValue 500
+#define token_type_MaxValue 500 /* TODO: This number can be way less now... */
 
 #define token_type_All_XList\
-    X(_Null, 0)\
+    X(_Null, _Null, 0)\
     token_type_Valid_XList\
-    X(__Error, token_type_MaxValue)
+    X(__Error, __Error, token_type_MaxValue)
 
 typedef enum
 {
-#define X(name, literal)\
-    token_type_##name = literal,
+#define X(name, _typename, _literal)\
+    token_type_##name,
     token_type_All_XList
 #undef X
+    token_type__Count
 } token_type;
 
 global_variable b32 SingleTokenCharTable[token_type_MaxValue] = {
-#define X(name, literal)\
-    [token_type_##name] = 1,
+#define X(_name, _typename, literal)\
+    [literal] = 1,
     SingleCharTokenList
 #undef X
+};
+
+global_variable b32 SingleCharTokenStateTable[tokenizer_state__Count] = {
+#define X(_name, typename, _literal)\
+    [tokenizer_state_##typename] = 1,
+    SingleCharTokenList
+#undef X
+
 };
 
 typedef struct
@@ -195,14 +213,14 @@ typedef struct
 } tokenizer;
 
 global_variable token_type StateToTypeTable[tokenizer_state__Count] = {
-#define X(name, typename)\
+#define X(name, typename, _literal)\
     [tokenizer_state_##name] = token_type_##typename,
     tokenizer_state_Accepting_XList
 #undef X
 };
 
 global_variable tokenizer_state TokenDoneTable[tokenizer_state__Count] = {
-    #define X(name, _typename)\
+    #define X(name, _typename, _literal)\
     [tokenizer_state_##name] = tokenizer_state_Begin,
     tokenizer_state_Accepting_XList
 #undef X
@@ -224,14 +242,14 @@ typedef struct
 } equivalent_char_result;
 
 global_variable tokenizer_state AcceptingStates[] = {
-#define X(name, _typename)\
+#define X(name, _typename, _literal)\
     tokenizer_state_##name,
     tokenizer_state_Accepting_XList
 #undef X
 };
 
 global_variable tokenizer_state DelimitedStates[] = {
-#define X(name, _typename)\
+#define X(name, _typename, _literal)\
     tokenizer_state_##name,
     tokenizer_state_Delimited_XList
 #undef X
@@ -240,24 +258,25 @@ global_variable tokenizer_state DelimitedStates[] = {
 
 /**************************************/
 /* Globals */
-global_variable u8 TheTable[tokenizer_state__Count][256];
+global_variable u8 TokenizerTable[tokenizer_state__Count][256];
 global_variable u8 TheDebugTable[tokenizer_state__Count][256];
+global_variable u8 ParserTable[parser_state__Count][token_type__Count];
 
 
 /**************************************/
 /* Functions */
-internal void CopyTheTableToTheDebugTable(void)
+internal void CopyTokenizerTableToTheDebugTable(void)
 {
     for (s32 Row = 0; Row < tokenizer_state__Count; ++Row)
     {
         for (s32 Col = 0; Col < 256; ++Col)
         {
-            TheDebugTable[Row][Col] = TheTable[Row][Col];
+            TheDebugTable[Row][Col] = TokenizerTable[Row][Col];
         }
     }
 }
 
-internal b32 CheckIfTheTableAndTheDebugTableMatch(void)
+internal b32 CheckIfTokenizerTableAndTheDebugTableMatch(void)
 {
     b32 Match = 1;
 
@@ -265,7 +284,7 @@ internal b32 CheckIfTheTableAndTheDebugTableMatch(void)
     {
         for (s32 Col = 0; Col < 256; ++Col)
         {
-            if (TheDebugTable[Row][Col] != TheTable[Row][Col])
+            if (TheDebugTable[Row][Col] != TokenizerTable[Row][Col])
             {
                 Match = 0;
                 break;
@@ -282,7 +301,7 @@ internal ryn_string GetTokenTypeString(token_type TokenType)
 
     switch (TokenType)
     {
-#define X(name, _value)\
+#define X(name, _typename, _literal)\
     case token_type_##name: String = ryn_string_CreateString(#name); break;
     token_type_All_XList;
 #undef X
@@ -298,7 +317,7 @@ internal ryn_string GetTokenizerStateString(tokenizer_state TokenizerState)
 
     switch (TokenizerState)
     {
-#define X(name, _typename)\
+#define X(name, _typename, _literal)\
     case tokenizer_state_##name: String = ryn_string_CreateString(#name); break;
     tokenizer_state_XList;
 #undef X
@@ -308,9 +327,9 @@ internal ryn_string GetTokenizerStateString(tokenizer_state TokenizerState)
     return String;
 }
 
-void SetupTheTable(void)
+void SetupTokenizerTable(void)
 {
-#define X(name, _typename)\
+#define X(name, _typename, _literal)\
     tokenizer_state name = tokenizer_state_##name;
     tokenizer_state_NonError_XList;
 #undef X
@@ -320,109 +339,109 @@ void SetupTheTable(void)
         for (u32 AcceptIndex = 0; AcceptIndex < ArrayCount(AcceptingStates); ++AcceptIndex)
         {
             tokenizer_state AcceptingState = AcceptingStates[AcceptIndex];
-            TheTable[AcceptingState][I] = Done;
+            TokenizerTable[AcceptingState][I] = Done;
         }
 
         for (u32 DelimitedIndex = 0; DelimitedIndex < ArrayCount(DelimitedStates); ++DelimitedIndex)
         {
             tokenizer_state DelimitedState = DelimitedStates[DelimitedIndex];
-            TheTable[DelimitedState][I] = DelimitedState;
+            TokenizerTable[DelimitedState][I] = DelimitedState;
         }
 
-        TheTable[CommentBodyCheck][I] = CommentBody;
+        TokenizerTable[CommentBodyCheck][I] = CommentBody;
     }
 
     for (s32 I = Begin; I < tokenizer_state__Count; ++I)
     {
-        TheTable[I][End_Of_Source_Char] = Done;
+        TokenizerTable[I][End_Of_Source_Char] = Done;
     }
 
-#define X(_name, value)\
-    TheTable[Begin][value] = Done;
+#define X(_name, typename, literal)\
+    TokenizerTable[Begin][literal] = tokenizer_state_##typename;
     SingleCharTokenList;
 #undef X
 
 #define X(_name, value)\
-    TheTable[Begin][value] = Space;\
-    TheTable[Space][value] = Space;
+    TokenizerTable[Begin][value] = Space;\
+    TokenizerTable[Space][value] = Space;
     SpaceCharList;
 #undef X
 
     for (s32 I = 'a'; I <= 'z'; ++I)
     {
-        TheTable[Begin][I] = IdentifierStart;
-        TheTable[Begin][I-32] = IdentifierStart;
+        TokenizerTable[Begin][I] = IdentifierStart;
+        TokenizerTable[Begin][I-32] = IdentifierStart;
 
-        TheTable[IdentifierStart][I] = IdentifierRest;
-        TheTable[IdentifierStart][I-32] = IdentifierRest;
+        TokenizerTable[IdentifierStart][I] = IdentifierRest;
+        TokenizerTable[IdentifierStart][I-32] = IdentifierRest;
 
-        TheTable[IdentifierRest][I] = IdentifierRest;
-        TheTable[IdentifierRest][I-32] = IdentifierRest;
+        TokenizerTable[IdentifierRest][I] = IdentifierRest;
+        TokenizerTable[IdentifierRest][I-32] = IdentifierRest;
     }
 
     for (s32 I = '0'; I <= '9'; ++I)
     {
-        TheTable[Begin][I] = Digit;
-        TheTable[Digit][I] = Digit;
+        TokenizerTable[Begin][I] = Digit;
+        TokenizerTable[Digit][I] = Digit;
 
-        TheTable[IdentifierRest][I] = IdentifierRest;
-        TheTable[IdentifierStart][I] = IdentifierRest;
+        TokenizerTable[IdentifierRest][I] = IdentifierRest;
+        TokenizerTable[IdentifierStart][I] = IdentifierRest;
 
-        TheTable[HexDigitValue][I] = HexDigitValue;
+        TokenizerTable[HexDigitValue][I] = HexDigitValue;
     }
 
     for (s32 I = 'a'; I <= 'f'; ++I)
     {
-        TheTable[HexDigitValue][I] = HexDigitValue;
+        TokenizerTable[HexDigitValue][I] = HexDigitValue;
     }
 
-    TheTable[Begin]['_'] = IdentifierStart;
-    TheTable[IdentifierStart]['_'] = IdentifierRest;
-    TheTable[IdentifierRest]['_'] = IdentifierRest;
+    TokenizerTable[Begin]['_'] = IdentifierStart;
+    TokenizerTable[IdentifierStart]['_'] = IdentifierRest;
+    TokenizerTable[IdentifierRest]['_'] = IdentifierRest;
 
-    TheTable[Begin]['0'] = BaseDigit;
+    TokenizerTable[Begin]['0'] = BaseDigit;
 
-    TheTable[BaseDigit]['b'] = BinaryDigitValue;
-    TheTable[BaseDigit]['x'] = HexDigitValue;
+    TokenizerTable[BaseDigit]['b'] = BinaryDigitValue;
+    TokenizerTable[BaseDigit]['x'] = HexDigitValue;
 
-    TheTable[BinaryDigitValue]['0'] = BinaryDigitValue;
-    TheTable[BinaryDigitValue]['1'] = BinaryDigitValue;
+    TokenizerTable[BinaryDigitValue]['0'] = BinaryDigitValue;
+    TokenizerTable[BinaryDigitValue]['1'] = BinaryDigitValue;
 
     { /* Delimited strings */
-        TheTable[Begin]['"'] = String;
-        TheTable[String]['\\'] = StringEscape;
-        TheTable[String]['"'] = StringEnd;
+        TokenizerTable[Begin]['"'] = String;
+        TokenizerTable[String]['\\'] = StringEscape;
+        TokenizerTable[String]['"'] = StringEnd;
 
-        TheTable[Begin]['\''] = CharLiteral;
-        TheTable[CharLiteral]['\\'] = CharLiteralEscape;
-        TheTable[CharLiteral]['\''] = CharLiteralEnd;
+        TokenizerTable[Begin]['\''] = CharLiteral;
+        TokenizerTable[CharLiteral]['\\'] = CharLiteralEscape;
+        TokenizerTable[CharLiteral]['\''] = CharLiteralEnd;
     }
 
 #define X(_name, value)\
-    TheTable[StringEscape][value] = String;\
-    TheTable[CharLiteralEscape][value] = CharLiteral;
+    TokenizerTable[StringEscape][value] = String;\
+    TokenizerTable[CharLiteralEscape][value] = CharLiteral;
     escape_character_XList;
 #undef X
 
-    TheTable[Begin]['='] = Equal;
-    TheTable[Equal]['='] = DoubleEqual;
-    TheTable[LessThan]['='] = LessThanOrEqual;
-    TheTable[GreaterThan]['='] = GreaterThanOrEqual;
-    TheTable[Begin]['<'] = LessThan;
-    TheTable[Begin]['>'] = GreaterThan;
-    TheTable[Begin]['!'] = Not;
-    TheTable[Not]['='] = NotEqual;
-    TheTable[Begin]['-'] = Dash;
-    TheTable[Dash]['>'] = Arrow;
+    TokenizerTable[Begin]['='] = Equal;
+    TokenizerTable[Equal]['='] = DoubleEqual;
+    TokenizerTable[LessThan]['='] = LessThanOrEqual;
+    TokenizerTable[GreaterThan]['='] = GreaterThanOrEqual;
+    TokenizerTable[Begin]['<'] = LessThan;
+    TokenizerTable[Begin]['>'] = GreaterThan;
+    TokenizerTable[Begin]['!'] = Not;
+    TokenizerTable[Not]['='] = NotEqual;
+    TokenizerTable[Begin]['-'] = Dash;
+    TokenizerTable[Dash]['>'] = Arrow;
 
-    TheTable[Begin]['/'] = ForwardSlash;
-    TheTable[ForwardSlash]['*'] = CommentBody;
-    TheTable[CommentBody]['*'] = CommentBodyCheck;
-    TheTable[CommentBodyCheck]['/'] = Comment;
+    TokenizerTable[Begin]['/'] = ForwardSlash;
+    TokenizerTable[ForwardSlash]['*'] = CommentBody;
+    TokenizerTable[CommentBody]['*'] = CommentBodyCheck;
+    TokenizerTable[CommentBodyCheck]['/'] = Comment;
 
-    TheTable[Begin]['\\'] = TopLevelEscape;
-    TheTable[TopLevelEscape]['\n'] = NewlineEscape; /* TODO: Handle CRLF */
-    TheTable[Begin]['\n'] = Newline;
+    TokenizerTable[Begin]['\\'] = TopLevelEscape;
+    TokenizerTable[TopLevelEscape]['\n'] = NewlineEscape; /* TODO: Handle CRLF */
+    TokenizerTable[Begin]['\n'] = Newline;
 }
 
 /* TODO: Rename rows/columns to something related to chars and tokenizer-states. */
@@ -507,7 +526,7 @@ internal equivalent_char_result GetEquivalentChars(ryn_memory_arena *Arena, u8 *
         {
             s32 ClassTableIndex = CharSetIndex * Rows + R;
             u32 Char = CurrentCharSet->Column[0];
-            tokenizer_state NextState = TheTable[R][Char];
+            tokenizer_state NextState = TokenizerTable[R][Char];
 
             Assert(ClassTableIndex < TableSize);
             Result.Table[ClassTableIndex] = NextState;
@@ -530,7 +549,7 @@ token_list *Tokenize(ryn_memory_arena *Arena, ryn_string Source)
     u64 I = 0;
     u8 PreviousChar = Source.Bytes[0];
     b32 EndOfSource = 0;
-    equivalent_char_result EquivalentChars = GetEquivalentChars(Arena, (u8 *)TheTable, tokenizer_state__Count, 256);
+    equivalent_char_result EquivalentChars = GetEquivalentChars(Arena, (u8 *)TokenizerTable, tokenizer_state__Count, 256);
 
     do
     {
@@ -546,7 +565,7 @@ token_list *Tokenize(ryn_memory_arena *Arena, ryn_string Source)
             Char = Source.Bytes[I];
         }
 
-        tokenizer_state NextState = TheTable[State][Char];
+        tokenizer_state NextState = TokenizerTable[State][Char];
         s32 TableIndex = EquivalentChars.CharClass[Char] * tokenizer_state__Count + State;
 
         { /* Make sure that the equivalent-char table behaves the same as the original table. */
@@ -554,26 +573,21 @@ token_list *Tokenize(ryn_memory_arena *Arena, ryn_string Source)
             Assert(NextState == TestState);
         }
 
-        /* TODO: This seems like a lot of logic, which maybe could be pushed into the table? Or make the logic a table lookup and see which one is faster? */
-        if (NextState == tokenizer_state_Done &&
-            Char &&
-            SingleTokenCharTable[PreviousChar])
+        if (NextState == tokenizer_state_Done)
         {
-                token_list *NextToken = ryn_memory_PushStruct(Arena, token_list);
-                Assert(NextToken != 0);
-                NextToken->Token.Type = Char;
-                NextState = tokenizer_state_Begin;
-                ++I;
-                CurrentToken = CurrentToken->Next = NextToken;
-        }
-        else if (NextState == tokenizer_state_Done &&
-                 State != tokenizer_state_Begin)
-        {
-            token_list *NextToken = ryn_memory_PushStruct(Arena, token_list);
+            token_list *NextToken = ryn_memory_PushZeroStruct(Arena, token_list);
             Assert(NextToken != 0);
             NextToken->Token.Type = StateToTypeTable[State];
-            NextState = TokenDoneTable[State];
             CurrentToken = CurrentToken->Next = NextToken;
+
+            if (SingleTokenCharTable[PreviousChar])
+            {
+                NextState = tokenizer_state_Begin;
+            }
+            else
+            {
+                NextState = TokenDoneTable[State];
+            }
         }
         else
         {
@@ -597,7 +611,6 @@ token_list *Tokenize(ryn_memory_arena *Arena, ryn_string Source)
         }
 #endif
 
-
         State = NextState;
         PreviousChar = Char;
     } while (!EndOfSource &&
@@ -613,6 +626,10 @@ token_list *Tokenize(ryn_memory_arena *Arena, ryn_string Source)
     }
 
     return HeadToken.Next;
+}
+
+internal void Parse(token_list *FirstToken)
+{
 }
 
 internal s32 DebugPrintEquivalentChars(ryn_memory_arena *Arena, u8 *Table, s32 Rows, s32 Columns)
@@ -700,7 +717,7 @@ internal s32 DebugPrintEquivalentChars(ryn_memory_arena *Arena, u8 *Table, s32 R
     return EquivalentCharCount;
 }
 
-internal void DebugPrintTheTable(void)
+internal void DebugPrintTokenizerTable(void)
 {
     for (s32 C = 0; C < 256; ++C)
     {
@@ -715,7 +732,7 @@ internal void DebugPrintTheTable(void)
 
         for (s32 S = 0; S < tokenizer_state__Count; ++S)
         {
-            printf("%2d ", TheTable[S][C]);
+            printf("%2d ", TokenizerTable[S][C]);
         }
         printf("\n");
     }
@@ -725,7 +742,8 @@ internal void DebugPrintTheTable(void)
 
 internal void TestTokenizer(ryn_memory_arena *Arena)
 {
-#define X(name, _value)\
+    u64 OldArenaOffset = Arena->Offset;
+#define X(name, _typename, _literal)\
     token_type name = token_type_##name;
     token_type_Valid_XList;
 #undef X
@@ -794,6 +812,7 @@ internal void TestTokenizer(ryn_memory_arena *Arena)
 
     for (s32 I = 0; I < TotalTestCount; ++I)
     {
+        u64 TestArenaOffset = Arena->Offset;
         test_case TestCase = TestCases[I];
         token_list *Token = Tokenize(Arena, TestCase.Source);
         s32 TestTokenCount = ArrayCount(TestCase.Tokens);
@@ -845,21 +864,42 @@ internal void TestTokenizer(ryn_memory_arena *Arena)
         }
 
         printf("\n\n");
+        Arena->Offset = TestArenaOffset;
     }
 
     printf("(%d / %d) passed tests\n", TotalPassedTests, TotalTestCount);
     printf("%d failed\n", TotalTestCount - TotalPassedTests);
+    Arena->Offset = OldArenaOffset;
+}
+
+internal void TestParser(ryn_memory_arena *Arena)
+{
+    u8 *FileSource = ryn_memory_GetArenaWriteLocation(Arena);
+    ReadFileIntoAllocator(Arena, (u8 *)"../src/idi.c");
+    ryn_string FileSourceString = ryn_string_CreateString((char *)FileSource);
+
+    token_list *Token = Tokenize(Arena, FileSourceString);
+    while (Token)
+    {
+        Token = Token->Next;
+    }
 }
 
 int main(void)
 {
     ryn_memory_arena Arena = ryn_memory_CreateArena(Megabytes(1));
 
-    SetupTheTable();
+    SetupTokenizerTable();
+#if Test_Tokenizer
     TestTokenizer(&Arena);
+#endif
+
+#if Test_Parser
+    TestParser(&Arena);
+#endif
 
 #if 0
-    DebugPrintTheTable();
+    DebugPrintTokenizerTable();
 #endif
 
     printf("\nEquivalent Chars\n");
@@ -867,16 +907,17 @@ int main(void)
     printf("\n");
     printf("StateCount = %d\n", tokenizer_state__Count);
     printf("CharCount = %d\n", Columns);
-    Assert(tokenizer_state__Count * Columns == sizeof(TheTable));
+    Assert(tokenizer_state__Count * Columns == sizeof(TokenizerTable));
 
 #if 0
     s32 Rows = tokenizer_state__Count;
-    s32 EquivalentCharCount = DebugPrintEquivalentChars(&Arena, (u8 *)TheTable, Rows, Columns);
+    s32 EquivalentCharCount = DebugPrintEquivalentChars(&Arena, (u8 *)TokenizerTable, Rows, Columns);
     printf("EqChar Count %d\n", EquivalentCharCount);
     printf("256 + EqCharCount*StateCount = %d\n", Columns + EquivalentCharCount*tokenizer_state__Count);
 #endif
 
-    printf("sizeof(TheTable) %lu\n", sizeof(TheTable));
+    printf("sizeof(TokenizerTable) %lu\n", sizeof(TokenizerTable));
 
+    printf("token_type__Count %d\n", token_type__Count);
     return 0;
 }
