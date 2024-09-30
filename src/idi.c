@@ -179,14 +179,6 @@ global_variable b32 SingleTokenCharTable[token_type_MaxValue] = {
 #undef X
 };
 
-global_variable b32 SingleCharTokenStateTable[tokenizer_state__Count] = {
-#define X(_name, typename, _literal)\
-    [tokenizer_state_##typename] = 1,
-    SingleCharTokenList
-#undef X
-
-};
-
 typedef struct
 {
     token_type Type;
@@ -357,7 +349,7 @@ void SetupTokenizerTable(void)
     }
 
 #define X(_name, typename, literal)\
-    TokenizerTable[Begin][literal] = tokenizer_state_##typename;
+    TokenizerTable[Begin][literal] = typename;
     SingleCharTokenList;
 #undef X
 
@@ -647,12 +639,35 @@ internal s32 DebugPrintEquivalentChars(ryn_memory_arena *Arena, u8 *Table, s32 R
         while (CurrentCharSet)
         {
             s32 Index = Columns * R + CurrentCharSet->Column[0];
-            if (Table[Index] != 0) { printf("%02x ", Table[Index]); } else { printf(".  "); }
+            if (Table[Index] == tokenizer_state_Done)
+            {
+                printf("*  ");
+            }
+            else if (Table[Index] != 0)
+            {
+                printf("%02x ", Table[Index]);
+            }
+            else
+            {
+                printf(".  ");
+            }
 
             EquivalentCharCount += 1;
             CurrentCharSet = CurrentCharSet->Next;
         }
-        printf("   [%02x %s]\n", R==0 ? '.' : R, GetTokenizerStateString(R).Bytes);
+
+        if (R == tokenizer_state_Done)
+        {
+            printf("   [*  %s]\n", GetTokenizerStateString(R).Bytes);
+        }
+        else if (R != 0)
+        {
+            printf("   [%02x %s]\n", R, GetTokenizerStateString(R).Bytes);
+        }
+        else
+        {
+            printf("   [.  %s]\n", GetTokenizerStateString(R).Bytes);
+        }
     }
 
     s32 DebugPrintCount = 0;
@@ -715,27 +730,6 @@ internal s32 DebugPrintEquivalentChars(ryn_memory_arena *Arena, u8 *Table, s32 R
     Assert(DebugPrintCount == 256);
 
     return EquivalentCharCount;
-}
-
-internal void DebugPrintTokenizerTable(void)
-{
-    for (s32 C = 0; C < 256; ++C)
-    {
-        if (SingleTokenCharTable[C])
-        {
-            printf("  %c:  ", C);
-        }
-        else
-        {
-            printf("%3d:  ", C);
-        }
-
-        for (s32 S = 0; S < tokenizer_state__Count; ++S)
-        {
-            printf("%2d ", TokenizerTable[S][C]);
-        }
-        printf("\n");
-    }
 }
 
 #define Max_Token_Count_For_Testing 2048
@@ -896,10 +890,6 @@ int main(void)
 
 #if Test_Parser
     TestParser(&Arena);
-#endif
-
-#if 0
-    DebugPrintTokenizerTable();
 #endif
 
     printf("\nEquivalent Chars\n");
