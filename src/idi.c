@@ -135,31 +135,64 @@ typedef enum
     /* 'u'  Unicode code point below 10000 hexadecimal (added in C99)[1]: 26  */
     /* 'U'  Unicode code point where h is a hexadecimal digit */
 
+#define Keywords_XList\
+    X(_auto,      Auto,     256)\
+    X(_break,     Break,    257)\
+    X(_case,      Case,     258)\
+    X(_char,      Char,     259)\
+    X(_const,     Const,    260)\
+    X(_continue,  Continue, 261)\
+    X(_default,   Default,  262)\
+    X(_do,        Do,       263)\
+    X(_double,    Double,   264)\
+    X(_else,      Else,     265)\
+    X(_enum,      Enum,     266)\
+    X(_extern,    Extern,   267)\
+    X(_float,     Float,    268)\
+    X(_for,       For,      269)\
+    X(_goto,      Goto,     270)\
+    X(_if,        If,       271)\
+    X(_int,       Int,      272)\
+    X(_long,      Long,     273)\
+    X(_register,  Register, 274)\
+    X(_return,    Return,   275)\
+    X(_short,     Short,    276)\
+    X(_signed,    Signed,   277)\
+    X(_sizeof,    Sizeof,   278)\
+    X(_static,    Static,   279)\
+    X(_struct,    Struct,   280)\
+    X(_switch,    Switch,   281)\
+    X(_typedef,   Typedef,  282)\
+    X(_union,     Union,    283)\
+    X(_unsigned,  Unsigned, 284)\
+    X(_void,      Void,     285)\
+    X(_volatile,  Volatile, 286)\
+    X(_while,     While,    287)
 
 #define token_type_Valid_XList\
     SingleCharTokenList\
-    X(Space,               Space,               256)\
-    X(Digit,               Digit,               257)\
-    X(BinaryDigit,         BinaryDigit,         258)\
-    X(HexDigit,            HexDigit,            259)\
-    X(Identifier,          Identifier,          260)\
-    X(String,              String,              261)\
-    X(CharLiteral,         CharLiteral,         262)\
-    X(Equal,               Equal,               263)\
-    X(DoubleEqual,         DoubleEqual,         264)\
-    X(Comment,             Comment,             265)\
-    X(ForwardSlash,        ForwardSlash,        266)\
-    X(NewlineEscape,       NewlineEscape,       267)\
-    X(LessThan,            LessThan,            268)\
-    X(LessThanOrEqual,     LessThanOrEqual,     269)\
-    X(GreaterThan,         GreaterThan,         270)\
-    X(GreaterThanOrEqual,  GreaterThanOrEqual,  271)\
-    X(NotEqual,            NotEqual,            272)\
-    X(Arrow,               Arrow,               273)\
-    X(Not,                 Not,                 274)\
-    X(Dash,                Dash,                275)\
-    X(Newline,             Newline,             276)
-
+    Keywords_XList\
+    X(Space,               Space,               288)\
+    X(Digit,               Digit,               289)\
+    X(BinaryDigit,         BinaryDigit,         290)\
+    X(HexDigit,            HexDigit,            291)\
+    X(Identifier,          Identifier,          292)\
+    X(String,              String,              293)\
+    X(CharLiteral,         CharLiteral,         294)\
+    X(Equal,               Equal,               295)\
+    X(DoubleEqual,         DoubleEqual,         296)\
+    X(Comment,             Comment,             297)\
+    X(ForwardSlash,        ForwardSlash,        298)\
+    X(NewlineEscape,       NewlineEscape,       299)\
+    X(LessThan,            LessThan,            300)\
+    X(LessThanOrEqual,     LessThanOrEqual,     301)\
+    X(GreaterThan,         GreaterThan,         302)\
+    X(GreaterThanOrEqual,  GreaterThanOrEqual,  303)\
+    X(NotEqual,            NotEqual,            304)\
+    X(Arrow,               Arrow,               305)\
+    X(Not,                 Not,                 306)\
+    X(Dash,                Dash,                307)\
+    X(Newline,             Newline,             308)
 
 #define token_type_MaxValue 500 /* TODO: This number can be way less now... */
 
@@ -260,40 +293,6 @@ global_variable tokenizer_state DelimitedStates[] = {
 #undef X
 };
 
-#define Keywords_XList\
-    X(_auto,      token_type_Auto)\
-    X(_break,     token_type_Break)\
-    X(_case,      token_type_Case)\
-    X(_char,      token_type_Char)\
-    X(_const,     token_type_Const)\
-    X(_continue,  token_type_Continue)\
-    X(_default,   token_type_Default)\
-    X(_do,        token_type_Do)\
-    X(_double,    token_type_Double)\
-    X(_else,      token_type_Else)\
-    X(_enum,      token_type_Enum)\
-    X(_extern,    token_type_Extern)\
-    X(_float,     token_type_Float)\
-    X(_for,       token_type_For)\
-    X(_goto,      token_type_Goto)\
-    X(_if,        token_type_If)\
-    X(_int,       token_type_Int)\
-    X(_long,      token_type_Long)\
-    X(_register,  token_type_Register)\
-    X(_return,    token_type_Return)\
-    X(_short,     token_type_Short)\
-    X(_signed,    token_type_Signed)\
-    X(_sizeof,    token_type_Sizeof)\
-    X(_static,    token_type_Static)\
-    X(_struct,    token_type_Struct)\
-    X(_switch,    token_type_Switch)\
-    X(_typedef,   token_type_Typedef)\
-    X(_union,     token_type_Union)\
-    X(_unsigned,  token_type_Unsigned)\
-    X(_void,      token_type_Void)\
-    X(_volatile,  token_type_Volatile)\
-    X(_while,     token_type_While)
-
 global_variable char *DeleteMePlease[] = {
 };
 
@@ -307,7 +306,7 @@ global_variable u8 ParserTable[parser_state__Count][token_type__Count];
 #define Max_Keywords 100 /* TODO: Please get rid of Max_Keywords :( */
 /* From GNU C manual */
 global_variable char *GlobalHackedUpKeywords[] = {
-#define X(name, token_type)\
+#define X(name, _typename, _value)\
     #name,
     Keywords_XList
 #undef X
@@ -763,6 +762,7 @@ token_list *Tokenize(ryn_memory_arena *Arena, keyword_lookup *KeywordLookup, ryn
     token_list *CurrentToken = &HeadToken;
     tokenizer_state State = tokenizer_state_Begin;
     u64 I = 0;
+    u64 StartOfToken = I;
     u8 PreviousChar = Source.Bytes[0];
     b32 EndOfSource = 0;
     equivalent_char_result EquivalentChars = GetEquivalentChars(Arena, (u8 *)TokenizerTable, tokenizer_state__Count, 256);
@@ -795,6 +795,19 @@ token_list *Tokenize(ryn_memory_arena *Arena, keyword_lookup *KeywordLookup, ryn
             Assert(NextToken != 0);
             NextToken->Token.Type = StateToTypeTable[State];
             CurrentToken = CurrentToken->Next = NextToken;
+
+            if (NextToken->Token.Type == token_type_Identifier)
+            {
+                NextToken->Token.String.Bytes = Source.Bytes + StartOfToken;
+                NextToken->Token.String.Size = I - StartOfToken;
+
+                if (StringIsKeyword(KeywordLookup, NextToken->Token.String))
+                {
+                    /* TODO: overwrite token-type of identifier and set as type of the particular keyword. */
+                }
+            }
+
+            StartOfToken = I;
 
             if (SingleTokenCharTable[PreviousChar])
             {
@@ -1025,6 +1038,8 @@ internal void TestTokenizer(ryn_memory_arena *Arena, keyword_lookup *KeywordLook
          {T(Identifier), T(Arrow), T(Identifier), T(Space), T(NotEqual), T(Space), T(Identifier), T(Arrow), T(Identifier)}},
         {ryn_string_CreateString("!Foo != Bar"),
          {T(Not), T(Identifier), T(Space), T(NotEqual), T(Space), T(Identifier)}},
+        {ryn_string_CreateString("auto break case char const continue default do double else enum extern float for goto if int long register return short signed sizeof static struct switch typedef union unsigned void volatile while"),
+         {T(_auto), T(Space), T(_break), T(Space), T(_case), T(Space), T(_char), T(Space), T(_const), T(Space), T(_continue), T(Space), T(_default), T(Space), T(_do), T(Space), T(_double), T(Space), T(_else), T(Space), T(_enum), T(Space), T(_extern), T(Space), T(_float), T(Space), T(_for), T(Space), T(_goto), T(Space), T(_if), T(Space), T(_int), T(Space), T(_long), T(Space), T(_register), T(Space), T(_return), T(Space), T(_short), T(Space), T(_signed), T(Space), T(_sizeof), T(Space), T(_static), T(Space), T(_struct), T(Space), T(_switch), T(Space), T(_typedef), T(Space), T(_union), T(Space), T(_unsigned), T(Space), T(_void), T(Space), T(_volatile), T(Space), T(_while)}},
 
         {FileSourceString, {T(OpenParenthesis)}},
     };
