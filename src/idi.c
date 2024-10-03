@@ -1,6 +1,6 @@
 /*
   TODO:
-    [ ] Parse two-character tokens like -> != <= and so on...
+    [ ] When tokenizing, turn identifiers that are keywords into a specific token_type_* so that the parser doesn't have to do string comparison or other junk.
     [ ] There is shared structure between string escapes and character literal escapes. We should make sure we treat characters inside a string literal as single characters inside a char literal.
     [ ] Once things are more stable, rename all the confusing variable names (rows, columns, variable versions of table/class/index).
     [ ] Setup tests against a C lexer (stb?) to begin building parse tables for lexing C.
@@ -22,6 +22,7 @@
 
 /**************************************/
 /* Types/Tables */
+
 #define End_Of_Source_Char 0
 
 #define SingleCharTokenList\
@@ -103,6 +104,10 @@ typedef enum
 
 typedef enum
 {
+    parser_state__Error,
+    parser_state_Top,
+    parser_state_MacroStart,
+    parser_state_MacroDefinition,
     parser_state__Count
 } parser_state;
 
@@ -233,6 +238,14 @@ typedef struct
     s32 CharSetCount;
 } equivalent_char_result;
 
+ref_struct(keyword_lookup)
+{
+    keyword_lookup *Child;
+    keyword_lookup *Sibling;
+    u8 Char;
+    b32 IsTerminal;
+};
+
 global_variable tokenizer_state AcceptingStates[] = {
 #define X(name, _typename, _literal)\
     tokenizer_state_##name,
@@ -247,16 +260,86 @@ global_variable tokenizer_state DelimitedStates[] = {
 #undef X
 };
 
+#define Keywords_XList\
+    X(_auto,      token_type_Auto)\
+    X(_break,     token_type_Break)\
+    X(_case,      token_type_Case)\
+    X(_char,      token_type_Char)\
+    X(_const,     token_type_Const)\
+    X(_continue,  token_type_Continue)\
+    X(_default,   token_type_Default)\
+    X(_do,        token_type_Do)\
+    X(_double,    token_type_Double)\
+    X(_else,      token_type_Else)\
+    X(_enum,      token_type_Enum)\
+    X(_extern,    token_type_Extern)\
+    X(_float,     token_type_Float)\
+    X(_for,       token_type_For)\
+    X(_goto,      token_type_Goto)\
+    X(_if,        token_type_If)\
+    X(_int,       token_type_Int)\
+    X(_long,      token_type_Long)\
+    X(_register,  token_type_Register)\
+    X(_return,    token_type_Return)\
+    X(_short,     token_type_Short)\
+    X(_signed,    token_type_Signed)\
+    X(_sizeof,    token_type_Sizeof)\
+    X(_static,    token_type_Static)\
+    X(_struct,    token_type_Struct)\
+    X(_switch,    token_type_Switch)\
+    X(_typedef,   token_type_Typedef)\
+    X(_union,     token_type_Union)\
+    X(_unsigned,  token_type_Unsigned)\
+    X(_void,      token_type_Void)\
+    X(_volatile,  token_type_Volatile)\
+    X(_while,     token_type_While)
+
+global_variable char *DeleteMePlease[] = {
+};
 
 /**************************************/
 /* Globals */
+
 global_variable u8 TokenizerTable[tokenizer_state__Count][256];
 global_variable u8 TheDebugTable[tokenizer_state__Count][256];
 global_variable u8 ParserTable[parser_state__Count][token_type__Count];
 
+#define Max_Keywords 100 /* TODO: Please get rid of Max_Keywords :( */
+/* From GNU C manual */
+global_variable char *GlobalHackedUpKeywords[] = {
+#define X(name, token_type)\
+    #name,
+    Keywords_XList
+#undef X
+
+    /*   Here is a list of keywords recognized by ANSI C89: */
+/*
+  Here is a list of keywords recognized by ANSI C89:
+  auto break case char const continue default do double else enum extern
+  float for goto if int long register return short signed sizeof static
+  struct switch typedef union unsigned void volatile while
+
+  ISO C99 adds the following keywords:
+  inline _Bool _Complex _Imaginary
+
+  and GNU extensions add these keywords:
+  __FUNCTION__ __PRETTY_FUNCTION__ __alignof __alignof__ __asm
+  __asm__ __attribute __attribute__ __builtin_offsetof __builtin_va_arg
+  __complex __complex__ __const __extension__ __func__ __imag __imag__
+  __inline __inline__ __label__ __null __real __real__
+  __restrict __restrict__ __signed __signed__ __thread __typeof
+  __volatile __volatile__
+
+  In both ISO C99 and C89 with GNU extensions, the following is also recognized as a keyword:
+  restrict
+*/
+};
+
+ryn_string GlobalKeywordStrings[Max_Keywords] = {};
 
 /**************************************/
 /* Functions */
+
 internal void CopyTokenizerTableToTheDebugTable(void)
 {
     for (s32 Row = 0; Row < tokenizer_state__Count; ++Row)
@@ -319,7 +402,143 @@ internal ryn_string GetTokenizerStateString(tokenizer_state TokenizerState)
     return String;
 }
 
-void SetupTokenizerTable(void)
+internal keyword_lookup *BuildKeywordLookup(ryn_memory_arena *Arena)
+{
+    u32 KeywordCount = ArrayCount(GlobalHackedUpKeywords);
+    keyword_lookup *RootLookup = ryn_memory_PushZeroStruct(Arena, keyword_lookup);
+
+    for (u32 I = 0; I < KeywordCount; ++I)
+    {
+        GlobalKeywordStrings[I] = ryn_string_CreateString(GlobalHackedUpKeywords[I]);
+        GlobalKeywordStrings[I].Bytes = GlobalKeywordStrings[I].Bytes + 1;
+        GlobalKeywordStrings[I].Size -= 2; /* NOTE: Subtract 2 to ignore hacked prepended underscore and the null-terminator. */
+    }
+
+    RootLookup->Char = GlobalKeywordStrings[0].Bytes[0];
+
+    for (u32 KeywordIndex = 0; KeywordIndex < KeywordCount; ++KeywordIndex)
+    {
+        ryn_string KeywordString = GlobalKeywordStrings[KeywordIndex];
+        keyword_lookup *CurrentLookup = RootLookup;
+
+        /* TODO: This control flow for this loop feels off, especially with the mutliple places where we check if we need to set "IsTerminal". */
+        for (u32 StringIndex = 0; StringIndex < KeywordString.Size; ++StringIndex)
+        {
+            u8 Char = KeywordString.Bytes[StringIndex];
+
+            if (CurrentLookup->Char)
+            {
+                for (;;)
+                {
+                    if (CurrentLookup->Char == Char)
+                    {
+                        if (StringIndex == KeywordString.Size - 1)
+                        {
+                            CurrentLookup->IsTerminal = 1;
+                        }
+                        else if (CurrentLookup->Child)
+                        {
+                            CurrentLookup = CurrentLookup->Child;
+                        }
+                        else
+                        {
+                            CurrentLookup->Child = ryn_memory_PushZeroStruct(Arena, keyword_lookup);
+                            CurrentLookup = CurrentLookup->Child;
+                        }
+
+                        break;
+                    }
+                    else if (CurrentLookup->Sibling == 0)
+                    {
+                        CurrentLookup->Sibling = ryn_memory_PushZeroStruct(Arena, keyword_lookup);
+                        CurrentLookup->Sibling->Char = Char;
+                        CurrentLookup = CurrentLookup->Sibling;
+
+                        if (StringIndex == KeywordString.Size - 1)
+                        {
+                            CurrentLookup->IsTerminal = 1;
+                        }
+
+                        CurrentLookup->Child = ryn_memory_PushZeroStruct(Arena, keyword_lookup);
+                        CurrentLookup = CurrentLookup->Child;
+                        break;
+                    }
+                    else
+                    {
+                        CurrentLookup = CurrentLookup->Sibling;
+                    }
+                }
+            }
+            else
+            {
+                Assert(CurrentLookup->Child == 0);
+                CurrentLookup->Char = Char;
+
+                if (StringIndex == KeywordString.Size - 1)
+                {
+                    CurrentLookup->IsTerminal = 1;
+                }
+
+                CurrentLookup->Child = ryn_memory_PushZeroStruct(Arena, keyword_lookup);
+                CurrentLookup = CurrentLookup->Child;
+            }
+        }
+    }
+
+    return RootLookup;
+}
+
+internal b32 StringIsKeyword(keyword_lookup *Lookup, ryn_string String)
+{
+    b32 IsKeyword = 0;
+    keyword_lookup *CurrentLookup = Lookup;
+    u64 Size = String.Size;
+
+    if (String.Bytes && String.Bytes[Size - 1] == 0)
+    {
+        Size -= 1;
+    }
+
+    for (u32 I = 0; I < Size; ++I)
+    {
+        u8 Char = String.Bytes[I];
+        b32 ShouldBreak = 0;
+
+        while (CurrentLookup)
+        {
+            if (Char == CurrentLookup->Char)
+            {
+                if (I == Size - 1)
+                {
+                    ShouldBreak = 1;
+                }
+                else
+                {
+                    CurrentLookup = CurrentLookup->Child;
+                }
+                break;
+            }
+            else
+            {
+                CurrentLookup = CurrentLookup->Sibling;
+            }
+        }
+
+        if (ShouldBreak)
+        {
+            break;
+        }
+    }
+
+    if (CurrentLookup && CurrentLookup->IsTerminal)
+    {
+        IsKeyword = 1;
+    }
+
+    return IsKeyword;
+}
+
+internal void SetupTokenizerTable(void)
 {
 #define X(name, _typename, _literal)\
     tokenizer_state name = tokenizer_state_##name;
@@ -436,6 +655,11 @@ void SetupTokenizerTable(void)
     TokenizerTable[Begin]['\n'] = Newline;
 }
 
+internal void SetupParserTable(void)
+{
+    ParserTable[parser_state_Top][token_type_Hash] = parser_state_MacroStart;
+}
+
 /* TODO: Rename rows/columns to something related to chars and tokenizer-states. */
 internal equivalent_char_result GetEquivalentChars(ryn_memory_arena *Arena, u8 *Table, s32 Rows, s32 Columns)
 {
@@ -533,7 +757,7 @@ internal equivalent_char_result GetEquivalentChars(ryn_memory_arena *Arena, u8 *
     return Result;
 }
 
-token_list *Tokenize(ryn_memory_arena *Arena, ryn_string Source)
+token_list *Tokenize(ryn_memory_arena *Arena, keyword_lookup *KeywordLookup, ryn_string Source)
 {
     token_list HeadToken = {};
     token_list *CurrentToken = &HeadToken;
@@ -622,6 +846,12 @@ token_list *Tokenize(ryn_memory_arena *Arena, ryn_string Source)
 
 internal void Parse(token_list *FirstToken)
 {
+    token_list *Token = FirstToken;
+
+    while (Token)
+    {
+        Token = Token->Next;
+    }
 }
 
 internal s32 DebugPrintEquivalentChars(ryn_memory_arena *Arena, u8 *Table, s32 Rows, s32 Columns)
@@ -734,7 +964,7 @@ internal s32 DebugPrintEquivalentChars(ryn_memory_arena *Arena, u8 *Table, s32 R
 
 #define Max_Token_Count_For_Testing 2048
 
-internal void TestTokenizer(ryn_memory_arena *Arena)
+internal void TestTokenizer(ryn_memory_arena *Arena, keyword_lookup *KeywordLookup)
 {
     u64 OldArenaOffset = Arena->Offset;
 #define X(name, _typename, _literal)\
@@ -808,7 +1038,7 @@ internal void TestTokenizer(ryn_memory_arena *Arena)
     {
         u64 TestArenaOffset = Arena->Offset;
         test_case TestCase = TestCases[I];
-        token_list *Token = Tokenize(Arena, TestCase.Source);
+        token_list *Token = Tokenize(Arena, KeywordLookup, TestCase.Source);
         s32 TestTokenCount = ArrayCount(TestCase.Tokens);
         b32 Matches = 1;
         s32 TestTokenIndex = 0;
@@ -866,13 +1096,13 @@ internal void TestTokenizer(ryn_memory_arena *Arena)
     Arena->Offset = OldArenaOffset;
 }
 
-internal void TestParser(ryn_memory_arena *Arena)
+internal void TestParser(ryn_memory_arena *Arena, keyword_lookup *KeywordLookup)
 {
     u8 *FileSource = ryn_memory_GetArenaWriteLocation(Arena);
     ReadFileIntoAllocator(Arena, (u8 *)"../src/idi.c");
     ryn_string FileSourceString = ryn_string_CreateString((char *)FileSource);
 
-    token_list *Token = Tokenize(Arena, FileSourceString);
+    token_list *Token = Tokenize(Arena, KeywordLookup, FileSourceString);
     while (Token)
     {
         Token = Token->Next;
@@ -883,13 +1113,15 @@ int main(void)
 {
     ryn_memory_arena Arena = ryn_memory_CreateArena(Megabytes(1));
 
+    keyword_lookup *KeywordLookup = BuildKeywordLookup(&Arena);
     SetupTokenizerTable();
+
 #if Test_Tokenizer
-    TestTokenizer(&Arena);
+    TestTokenizer(&Arena, KeywordLookup);
 #endif
 
 #if Test_Parser
-    TestParser(&Arena);
+    TestParser(&Arena, KeywordLookup);
 #endif
 
     printf("\nEquivalent Chars\n");
@@ -909,5 +1141,11 @@ int main(void)
     printf("sizeof(TokenizerTable) %lu\n", sizeof(TokenizerTable));
 
     printf("token_type__Count %d\n", token_type__Count);
+
+    for (u32 I = 0; I < ArrayCount(DeleteMePlease); ++I)
+    {
+        printf("keyword: \"%s\"\n", DeleteMePlease[I]);
+    }
+
     return 0;
 }
