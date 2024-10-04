@@ -135,6 +135,26 @@ typedef enum
     /* 'u'  Unicode code point below 10000 hexadecimal (added in C99)[1]: 26  */
     /* 'U'  Unicode code point where h is a hexadecimal digit */
 
+/*
+  Here is a list of keywords recognized by ANSI C89:
+  auto break case char const continue default do double else enum extern
+  float for goto if int long register return short signed sizeof static
+  struct switch typedef union unsigned void volatile while
+
+  ISO C99 adds the following keywords:
+  inline _Bool _Complex _Imaginary
+
+  and GNU extensions add these keywords:
+  __FUNCTION__ __PRETTY_FUNCTION__ __alignof __alignof__ __asm
+  __asm__ __attribute __attribute__ __builtin_offsetof __builtin_va_arg
+  __complex __complex__ __const __extension__ __func__ __imag __imag__
+  __inline __inline__ __label__ __null __real __real__
+  __restrict __restrict__ __signed __signed__ __thread __typeof
+  __volatile __volatile__
+
+  In both ISO C99 and C89 with GNU extensions, the following is also recognized as a keyword:
+  restrict
+*/
 #define Keywords_XList\
     X(_auto,      Auto,     256)\
     X(_break,     Break,    257)\
@@ -203,8 +223,8 @@ typedef enum
 
 typedef enum
 {
-#define X(name, _typename, _literal)\
-    token_type_##name,
+#define X(_name, typename, _literal)\
+    token_type_##typename,
     token_type_All_XList
 #undef X
     token_type__Count
@@ -277,6 +297,7 @@ ref_struct(keyword_lookup)
     keyword_lookup *Sibling;
     u8 Char;
     b32 IsTerminal;
+    token_type Type;
 };
 
 global_variable tokenizer_state AcceptingStates[] = {
@@ -303,38 +324,23 @@ global_variable u8 TokenizerTable[tokenizer_state__Count][256];
 global_variable u8 TheDebugTable[tokenizer_state__Count][256];
 global_variable u8 ParserTable[parser_state__Count][token_type__Count];
 
+typedef struct
+{
+    char *CString;
+    ryn_string String;
+    token_type Type;
+} keyword;
+
 #define Max_Keywords 100 /* TODO: Please get rid of Max_Keywords :( */
 /* From GNU C manual */
-global_variable char *GlobalHackedUpKeywords[] = {
-#define X(name, _typename, _value)\
-    #name,
+global_variable keyword GlobalHackedUpKeywords[] = {
+#define X(name, typename, _value)\
+    {#name,{},token_type_##typename},
     Keywords_XList
 #undef X
-
-    /*   Here is a list of keywords recognized by ANSI C89: */
-/*
-  Here is a list of keywords recognized by ANSI C89:
-  auto break case char const continue default do double else enum extern
-  float for goto if int long register return short signed sizeof static
-  struct switch typedef union unsigned void volatile while
-
-  ISO C99 adds the following keywords:
-  inline _Bool _Complex _Imaginary
-
-  and GNU extensions add these keywords:
-  __FUNCTION__ __PRETTY_FUNCTION__ __alignof __alignof__ __asm
-  __asm__ __attribute __attribute__ __builtin_offsetof __builtin_va_arg
-  __complex __complex__ __const __extension__ __func__ __imag __imag__
-  __inline __inline__ __label__ __null __real __real__
-  __restrict __restrict__ __signed __signed__ __thread __typeof
-  __volatile __volatile__
-
-  In both ISO C99 and C89 with GNU extensions, the following is also recognized as a keyword:
-  restrict
-*/
 };
 
-ryn_string GlobalKeywordStrings[Max_Keywords] = {};
+keyword GlobalKeywordStrings[Max_Keywords] = {};
 
 /**************************************/
 /* Functions */
@@ -375,8 +381,8 @@ internal ryn_string GetTokenTypeString(token_type TokenType)
 
     switch (TokenType)
     {
-#define X(name, _typename, _literal)\
-    case token_type_##name: String = ryn_string_CreateString(#name); break;
+#define X(name, typename, _literal)\
+    case token_type_##typename: String = ryn_string_CreateString(#name); break;
     token_type_All_XList;
 #undef X
     default: String = ryn_string_CreateString("[Error]");
@@ -408,16 +414,18 @@ internal keyword_lookup *BuildKeywordLookup(ryn_memory_arena *Arena)
 
     for (u32 I = 0; I < KeywordCount; ++I)
     {
-        GlobalKeywordStrings[I] = ryn_string_CreateString(GlobalHackedUpKeywords[I]);
-        GlobalKeywordStrings[I].Bytes = GlobalKeywordStrings[I].Bytes + 1;
-        GlobalKeywordStrings[I].Size -= 2; /* NOTE: Subtract 2 to ignore hacked prepended underscore and the null-terminator. */
+        GlobalKeywordStrings[I].String = ryn_string_CreateString(GlobalHackedUpKeywords[I].CString);
+        GlobalKeywordStrings[I].String.Bytes = GlobalKeywordStrings[I].String.Bytes + 1;
+        GlobalKeywordStrings[I].String.Size -= 2; /* NOTE: Subtract 2 to ignore hacked prepended underscore and the null-terminator. */
+        GlobalKeywordStrings[I].Type = GlobalHackedUpKeywords[I].Type;
     }
 
-    RootLookup->Char = GlobalKeywordStrings[0].Bytes[0];
+    RootLookup->Char = GlobalKeywordStrings[0].String.Bytes[0];
 
     for (u32 KeywordIndex = 0; KeywordIndex < KeywordCount; ++KeywordIndex)
     {
-        ryn_string KeywordString = GlobalKeywordStrings[KeywordIndex];
+        keyword Keyword = GlobalKeywordStrings[KeywordIndex];
+        ryn_string KeywordString = GlobalKeywordStrings[KeywordIndex].String;
         keyword_lookup *CurrentLookup = RootLookup;
 
         /* TODO: This control flow for this loop feels off, especially with the mutliple places where we check if we need to set "IsTerminal". */
@@ -452,6 +460,7 @@ internal keyword_lookup *BuildKeywordLookup(ryn_memory_arena *Arena)
                         CurrentLookup->Sibling = ryn_memory_PushZeroStruct(Arena, keyword_lookup);
                         CurrentLookup->Sibling->Char = Char;
                         CurrentLookup = CurrentLookup->Sibling;
+                        CurrentLookup->Type = Keyword.Type;
 
                         if (StringIndex == KeywordString.Size - 1)
                         {
@@ -472,6 +481,7 @@ internal keyword_lookup *BuildKeywordLookup(ryn_memory_arena *Arena)
             {
                 Assert(CurrentLookup->Child == 0);
                 CurrentLookup->Char = Char;
+                CurrentLookup->Type = Keyword.Type;
 
                 if (StringIndex == KeywordString.Size - 1)
                 {
@@ -487,9 +497,9 @@ internal keyword_lookup *BuildKeywordLookup(ryn_memory_arena *Arena)
     return RootLookup;
 }
 
-internal b32 StringIsKeyword(keyword_lookup *Lookup, ryn_string String)
+internal keyword_lookup LookupKeyword(keyword_lookup *Lookup, ryn_string String)
 {
-    b32 IsKeyword = 0;
+    keyword_lookup Result = {};
     keyword_lookup *CurrentLookup = Lookup;
     u64 Size = String.Size;
 
@@ -529,12 +539,12 @@ internal b32 StringIsKeyword(keyword_lookup *Lookup, ryn_string String)
         }
     }
 
-    if (CurrentLookup && CurrentLookup->IsTerminal)
+    if (CurrentLookup)
     {
-        IsKeyword = 1;
+        Result = *CurrentLookup;
     }
 
-    return IsKeyword;
+    return Result;
 }
 
 internal void SetupTokenizerTable(void)
@@ -801,9 +811,12 @@ token_list *Tokenize(ryn_memory_arena *Arena, keyword_lookup *KeywordLookup, ryn
                 NextToken->Token.String.Bytes = Source.Bytes + StartOfToken;
                 NextToken->Token.String.Size = I - StartOfToken;
 
-                if (StringIsKeyword(KeywordLookup, NextToken->Token.String))
+                keyword_lookup Lookup = LookupKeyword(KeywordLookup, NextToken->Token.String);
+
+                if (Lookup.IsTerminal)
                 {
                     /* TODO: overwrite token-type of identifier and set as type of the particular keyword. */
+                    NextToken->Token.Type = Lookup.Type;
                 }
             }
 
@@ -980,8 +993,8 @@ internal s32 DebugPrintEquivalentChars(ryn_memory_arena *Arena, u8 *Table, s32 R
 internal void TestTokenizer(ryn_memory_arena *Arena, keyword_lookup *KeywordLookup)
 {
     u64 OldArenaOffset = Arena->Offset;
-#define X(name, _typename, _literal)\
-    token_type name = token_type_##name;
+#define X(name, typename, _literal)\
+    token_type name = token_type_##typename;
     token_type_Valid_XList;
 #undef X
 
@@ -1013,7 +1026,7 @@ internal void TestTokenizer(ryn_memory_arena *Arena, keyword_lookup *KeywordLook
         {ryn_string_CreateString("\"escape \\t \\n \\r this\""),
          {T(String)}},
         {ryn_string_CreateString("char A = \'f\'"),
-         {T(Identifier), T(Space), T(Identifier), T(Space), T(Equal), T(Space), T(CharLiteral)}},
+         {T(_char), T(Space), T(Identifier), T(Space), T(Equal), T(Space), T(CharLiteral)}},
         {ryn_string_CreateString("= >= == <="),
          {T(Equal), T(Space), T(GreaterThanOrEqual), T(Space), T(DoubleEqual), T(Space), T(LessThanOrEqual)}},
         {ryn_string_CreateString("(&foo, 234, bar.baz)"),
@@ -1021,7 +1034,7 @@ internal void TestTokenizer(ryn_memory_arena *Arena, keyword_lookup *KeywordLook
         {ryn_string_CreateString("/* This is a comment * and is has stars ** in it */"),
          {T(Comment)}},
         {ryn_string_CreateString("int Foo[3] = {1,2, 4};"),
-         {T(Identifier), T(Space), T(Identifier), T(OpenSquare), T(Digit), T(CloseSquare), T(Space), T(Equal), T(Space), T(OpenBracket), T(Digit), T(Comma), T(Digit), T(Comma), T(Space), T(Digit), T(CloseBracket), T(Semicolon)}},
+         {T(_int), T(Space), T(Identifier), T(OpenSquare), T(Digit), T(CloseSquare), T(Space), T(Equal), T(Space), T(OpenBracket), T(Digit), T(Comma), T(Digit), T(Comma), T(Space), T(Digit), T(CloseBracket), T(Semicolon)}},
         {ryn_string_CreateString("#define Foo 3"),
          {T(Hash), T(Identifier), T(Space), T(Identifier), T(Space), T(Digit)}},
         {ryn_string_CreateString("((0xabc123<423)>3)"),
@@ -1031,9 +1044,9 @@ internal void TestTokenizer(ryn_memory_arena *Arena, keyword_lookup *KeywordLook
         {ryn_string_CreateString("a=4;   \n    b=5;"),
          {T(Identifier), T(Equal), T(Digit), T(Semicolon), T(Space), T(Newline), T(Space), T(Identifier), T(Equal), T(Digit), T(Semicolon)}},
         {ryn_string_CreateString("case A: x=4; break; case B: x=5;"),
-         {T(Identifier), T(Space), T(Identifier), T(Colon), T(Space), T(Identifier), T(Equal), T(Digit), T(Semicolon), T(Space), T(Identifier), T(Semicolon), T(Space), T(Identifier), T(Space), T(Identifier), T(Colon), T(Space), T(Identifier), T(Equal), T(Digit), T(Semicolon)}},
+         {T(_case), T(Space), T(Identifier), T(Colon), T(Space), T(Identifier), T(Equal), T(Digit), T(Semicolon), T(Space), T(Identifier), T(Semicolon), T(Space), T(Identifier), T(Space), T(Identifier), T(Colon), T(Space), T(Identifier), T(Equal), T(Digit), T(Semicolon)}},
         {ryn_string_CreateString("int Foo = Bar ? 3 : 2;"),
-         {T(Identifier), T(Space), T(Identifier), T(Space), T(Equal), T(Space), T(Identifier), T(Space), T(Question), T(Space), T(Digit), T(Space), T(Colon), T(Space), T(Digit), T(Semicolon)}},
+         {T(_int), T(Space), T(Identifier), T(Space), T(Equal), T(Space), T(Identifier), T(Space), T(Question), T(Space), T(Digit), T(Space), T(Colon), T(Space), T(Digit), T(Semicolon)}},
         {ryn_string_CreateString("A->Size != B->Size"),
          {T(Identifier), T(Arrow), T(Identifier), T(Space), T(NotEqual), T(Space), T(Identifier), T(Arrow), T(Identifier)}},
         {ryn_string_CreateString("!Foo != Bar"),
