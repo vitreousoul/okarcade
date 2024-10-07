@@ -17,8 +17,9 @@
 #include "../src/core.c"
 #include "../src/platform.h"
 
-#define Test_Tokenizer 1
-#define Test_Parser    1
+#define Test_Tokenizer     1
+#define Test_Preprocessor  1
+#define Test_Parser        0
 
 /**************************************/
 /* Types/Tables */
@@ -314,8 +315,42 @@ global_variable tokenizer_state DelimitedStates[] = {
 #undef X
 };
 
-global_variable char *DeleteMePlease[] = {
-};
+/* Unimplemented preprocessor directives...
+     assert Obsolete Features
+     pragma endregion {tokens}... Pragmas
+     pragma GCC dependency Pragmas
+     pragma GCC error Pragmas
+     pragma GCC poison Pragmas
+     pragma GCC system_header System Headers
+     pragma GCC system_header Pragmas
+     pragma GCC warning Pragmas
+     pragma once Pragmas
+     pragma region {tokens}... Pragmas
+     unassert Obsolete Features
+*/
+#define PreprocessorDirectives_XList\
+    X(_define, Define)\
+    X(_elif, Elif)\
+    X(_else, Else)\
+    X(_endif, Endif)\
+    X(_error, Error)\
+    X(_ident, Ident)\
+    X(_if, If)\
+    X(_ifdef, Ifdef)\
+    X(_ifndef, Ifndef)\
+    X(_import, Import)\
+    X(_include, Include)\
+    X(_include_next, IncludeNext)\
+    X(_line, Line)\
+    X(_sccs, Sccs)\
+    X(_undef, Undef)\
+    X(_warning, Warning)
+
+
+typedef enum
+{
+    preprocessor_directive_Assert, /* #assert Obsolete Features */
+} preprocessor_directive;
 
 /**************************************/
 /* Globals */
@@ -839,7 +874,7 @@ token_list *Tokenize(ryn_memory_arena *Arena, keyword_lookup *KeywordLookup, ryn
 #if 1
         if (NextState == tokenizer_state__Error)
         {
-            printf("Tokenizer error! char_index=%llu    %s\n", I, GetTokenizerStateString(State).Bytes);
+            printf("Tokenizer error! char_index=%llu    state=%d\n", I, State);
             s32 Padding = 16;
             s32 Start = I - Padding;
             s32 End = I + Padding;
@@ -868,6 +903,45 @@ token_list *Tokenize(ryn_memory_arena *Arena, keyword_lookup *KeywordLookup, ryn
     }
 
     return HeadToken.Next;
+}
+
+internal void Preprocess(ryn_memory_arena *Arena, token_list *FirstToken)
+{
+    token_list *Node = FirstToken;
+    while (Node)
+    {
+        token Token = Node->Token;
+        u64 OldOffset = Arena->Offset;
+
+        if (Token.Type == token_type_Newline)
+        {
+            Node = Node->Next;
+
+            if (Node && Node->Next->Token.Type == token_type_Hash)
+            {
+                Node = Node->Next;
+                Token = Node->Token;
+
+                u8 *CString = ryn_memory_PushSize(Arena, Node->Token.String.Size + 1);
+                ryn_string_ToCString(Node->Token.String, CString);
+
+                /* TODO: I guess we should check if the hash token is preceded by a newline, right? Maybe we don't care.... */
+                if (Node && Node->Token.Type == token_type_Identifier)
+                {
+                    printf("Preprocessor directive \"%s\"\n", CString);
+                }
+                else
+                {
+                    printf("[Error] unknown preprocessor directive! \"%s\"\n", CString);
+                    break;
+                }
+
+            }
+        }
+
+        Node = Node->Next;
+        Arena->Offset = OldOffset;
+    }
 }
 
 internal void Parse(token_list *FirstToken)
@@ -988,6 +1062,14 @@ internal s32 DebugPrintEquivalentChars(ryn_memory_arena *Arena, u8 *Table, s32 R
     return EquivalentCharCount;
 }
 
+internal ryn_string GetIdiSource(ryn_memory_arena *Arena)
+{
+    u8 *FileSource = ryn_memory_GetArenaWriteLocation(Arena);
+    ReadFileIntoAllocator(Arena, (u8 *)"../src/idi.c");
+    ryn_string FileSourceString = ryn_string_CreateString((char *)FileSource);
+    return FileSourceString;
+}
+
 #define Max_Token_Count_For_Testing 2048
 
 internal void TestTokenizer(ryn_memory_arena *Arena, keyword_lookup *KeywordLookup)
@@ -1004,9 +1086,8 @@ internal void TestTokenizer(ryn_memory_arena *Arena, keyword_lookup *KeywordLook
     } test_case;
 #define T(token_type) {token_type,{}}
 
-    u8 *FileSource = ryn_memory_GetArenaWriteLocation(Arena);
-    ReadFileIntoAllocator(Arena, (u8 *)"../src/idi.c");
-    ryn_string FileSourceString = ryn_string_CreateString((char *)FileSource);
+
+    ryn_string FileSourceString = GetIdiSource(Arena);
 
     test_case TestCases[] = {
         {ryn_string_CreateString("( 193 + abc)- (as3fj / 423)"),
@@ -1044,7 +1125,7 @@ internal void TestTokenizer(ryn_memory_arena *Arena, keyword_lookup *KeywordLook
         {ryn_string_CreateString("a=4;   \n    b=5;"),
          {T(Identifier), T(Equal), T(Digit), T(Semicolon), T(Space), T(Newline), T(Space), T(Identifier), T(Equal), T(Digit), T(Semicolon)}},
         {ryn_string_CreateString("case A: x=4; break; case B: x=5;"),
-         {T(_case), T(Space), T(Identifier), T(Colon), T(Space), T(Identifier), T(Equal), T(Digit), T(Semicolon), T(Space), T(Identifier), T(Semicolon), T(Space), T(Identifier), T(Space), T(Identifier), T(Colon), T(Space), T(Identifier), T(Equal), T(Digit), T(Semicolon)}},
+         {T(_case), T(Space), T(Identifier), T(Colon), T(Space), T(Identifier), T(Equal), T(Digit), T(Semicolon), T(Space), T(_break), T(Semicolon), T(Space), T(_case), T(Space), T(Identifier), T(Colon), T(Space), T(Identifier), T(Equal), T(Digit), T(Semicolon)}},
         {ryn_string_CreateString("int Foo = Bar ? 3 : 2;"),
          {T(_int), T(Space), T(Identifier), T(Space), T(Equal), T(Space), T(Identifier), T(Space), T(Question), T(Space), T(Digit), T(Space), T(Colon), T(Space), T(Digit), T(Semicolon)}},
         {ryn_string_CreateString("A->Size != B->Size"),
@@ -1078,14 +1159,7 @@ internal void TestTokenizer(ryn_memory_arena *Arena, keyword_lookup *KeywordLook
         {
             while (Token)
             {
-                if (SingleTokenCharTable[Token->Token.Type])
-                {
-                    printf("%c ", Token->Token.Type);
-                }
-                else
-                {
-                    printf("%s ", GetTokenTypeString(Token->Token.Type).Bytes);
-                }
+                printf("%s ", GetTokenTypeString(Token->Token.Type).Bytes);
 
                 if (TestTokenIndex >= TestTokenCount ||
                     Token->Token.Type == 0 ||
@@ -1112,7 +1186,7 @@ internal void TestTokenizer(ryn_memory_arena *Arena, keyword_lookup *KeywordLook
         }
         else
         {
-            printf("FAIL XXXXXXXXXXXXX\n");
+            printf("FAIL XXXXXXXXXXXXX index=%d   type=%d\n", TestTokenIndex, Token ? Token->Token.Type : 9999999);
         }
 
         printf("\n\n");
@@ -1126,9 +1200,7 @@ internal void TestTokenizer(ryn_memory_arena *Arena, keyword_lookup *KeywordLook
 
 internal void TestParser(ryn_memory_arena *Arena, keyword_lookup *KeywordLookup)
 {
-    u8 *FileSource = ryn_memory_GetArenaWriteLocation(Arena);
-    ReadFileIntoAllocator(Arena, (u8 *)"../src/idi.c");
-    ryn_string FileSourceString = ryn_string_CreateString((char *)FileSource);
+    ryn_string FileSourceString = GetIdiSource(Arena);
 
     token_list *Token = Tokenize(Arena, KeywordLookup, FileSourceString);
     while (Token)
@@ -1141,15 +1213,31 @@ int main(void)
 {
     ryn_memory_arena Arena = ryn_memory_CreateArena(Megabytes(1));
 
+    ryn_string FileSourceString = GetIdiSource(&Arena);
     keyword_lookup *KeywordLookup = BuildKeywordLookup(&Arena);
+    u64 BaseOffset = Arena.Offset;
     SetupTokenizerTable();
 
 #if Test_Tokenizer
+    printf("======== Testing Tokenizer ========\n");
     TestTokenizer(&Arena, KeywordLookup);
+    printf("\n\n");
+    Arena.Offset = BaseOffset;
+#endif
+
+#if Test_Preprocessor
+    {
+        printf("======== Testing Preprocessor ========\n");
+        token_list *FirstToken = Tokenize(&Arena, KeywordLookup, FileSourceString);
+        Preprocess(&Arena, FirstToken);
+        Arena.Offset = BaseOffset;
+    }
 #endif
 
 #if Test_Parser
+    printf("======== Testing Parser ========\n");
     TestParser(&Arena, KeywordLookup);
+    Arena.Offset = BaseOffset;
 #endif
 
     printf("\nEquivalent Chars\n");
@@ -1169,11 +1257,6 @@ int main(void)
     printf("sizeof(TokenizerTable) %lu\n", sizeof(TokenizerTable));
 
     printf("token_type__Count %d\n", token_type__Count);
-
-    for (u32 I = 0; I < ArrayCount(DeleteMePlease); ++I)
-    {
-        printf("keyword: \"%s\"\n", DeleteMePlease[I]);
-    }
 
     return 0;
 }

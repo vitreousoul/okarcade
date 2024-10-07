@@ -1,3 +1,7 @@
+/*
+  TODO:
+    [ ] Allow the user to specify their own print functions, for people who don't want to use c-runtime libraries.
+*/
 #ifndef __RYN_STRING__
 #define __RYN_STRING__
 
@@ -56,6 +60,17 @@ ryn_string ryn_string_CreateString(char *CString)
     }
 
     return Result;
+}
+
+/* NOTE: Assume that CString can hold String.Size+1 bytes. */
+void ryn_string_ToCString(ryn_string String, ryn_string_u8 *CString)
+{
+    /* TODO: improve @Speed */
+    for (ryn_string_u64 I = 0; I < String.Size; ++I)
+    {
+        CString[I] = String.Bytes[I];
+    }
+    CString[String.Size] = 0;
 }
 
 #endif /* __RYN_STRING__ */

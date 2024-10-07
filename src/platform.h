@@ -180,7 +180,7 @@ u64 ReadFileIntoData(u8 *FilePath, u8 *Bytes, u64 MaxBytes)
 u64 ReadFileIntoAllocator(ryn_memory_arena *Allocator, u8 *FilePath)
 {
     u64 BytesWritten = 0;
-    u64 FileSize = GetFileSize(FilePath);
+    u64 FileSize = GetFileSize(FilePath) + 1; /* NOTE: Plus 1 for null-terminator. */
     u64 AllocatorSpace = Allocator->Capacity - Allocator->Offset;
 
     if (!FileSize)
@@ -195,6 +195,7 @@ u64 ReadFileIntoAllocator(ryn_memory_arena *Allocator, u8 *FilePath)
         fread(Data, 1, FileSize, File);
         fclose(File);
 
+        Data[FileSize - 1] = 0; /* Null-terminate just to be safe... */
         BytesWritten = FileSize;
         Allocator->Offset += BytesWritten;
     }
