@@ -190,6 +190,38 @@ typedef enum
     X(_volatile,  Volatile, 286)\
     X(_while,     While,    287)
 
+/* Unimplemented preprocessor directives...
+     assert Obsolete Features
+     pragma endregion {tokens}... Pragmas
+     pragma GCC dependency Pragmas
+     pragma GCC error Pragmas
+     pragma GCC poison Pragmas
+     pragma GCC system_header System Headers
+     pragma GCC system_header Pragmas
+     pragma GCC warning Pragmas
+     pragma once Pragmas
+     pragma region {tokens}... Pragmas
+     unassert Obsolete Features
+*/
+#define Directives_XList\
+    X(_define,        Define,       0)\
+    X(_elif,          Elif,         0)\
+    X(_else,          Else,         0)\
+    X(_endif,         Endif,        0)\
+    X(_error,         Error,        0)\
+    X(_ident,         Ident,        0)\
+    X(_if,            If,           0)\
+    X(_ifdef,         Ifdef,        0)\
+    X(_ifndef,        Ifndef,       0)\
+    X(_import,        Import,       0)\
+    X(_include,       Include,      0)\
+    X(_include_next,  IncludeNext,  0)\
+    X(_line,          Line,         0)\
+    X(_sccs,          Sccs,         0)\
+    X(_undef,         Undef,        0)\
+    X(_warning,       Warning,      0)
+
+
 #define token_type_Valid_XList\
     SingleCharTokenList\
     Keywords_XList\
@@ -230,6 +262,16 @@ typedef enum
 #undef X
     token_type__Count
 } token_type;
+
+typedef enum
+{
+    directive_type__Error,
+#define X(_name, typename, _literal)\
+    directive_type_##typename,
+    Directives_XList
+#undef X
+    directive_type__Count
+} directive_type;
 
 global_variable b32 SingleTokenCharTable[token_type_MaxValue] = {
 #define X(_name, _typename, literal)\
@@ -292,10 +334,10 @@ typedef struct
     s32 CharSetCount;
 } equivalent_char_result;
 
-ref_struct(keyword_lookup)
+ref_struct(lookup_node)
 {
-    keyword_lookup *Child;
-    keyword_lookup *Sibling;
+    lookup_node *Child;
+    lookup_node *Sibling;
     u8 Char;
     b32 IsTerminal;
     token_type Type;
@@ -315,37 +357,6 @@ global_variable tokenizer_state DelimitedStates[] = {
 #undef X
 };
 
-/* Unimplemented preprocessor directives...
-     assert Obsolete Features
-     pragma endregion {tokens}... Pragmas
-     pragma GCC dependency Pragmas
-     pragma GCC error Pragmas
-     pragma GCC poison Pragmas
-     pragma GCC system_header System Headers
-     pragma GCC system_header Pragmas
-     pragma GCC warning Pragmas
-     pragma once Pragmas
-     pragma region {tokens}... Pragmas
-     unassert Obsolete Features
-*/
-#define PreprocessorDirectives_XList\
-    X(_define, Define)\
-    X(_elif, Elif)\
-    X(_else, Else)\
-    X(_endif, Endif)\
-    X(_error, Error)\
-    X(_ident, Ident)\
-    X(_if, If)\
-    X(_ifdef, Ifdef)\
-    X(_ifndef, Ifndef)\
-    X(_import, Import)\
-    X(_include, Include)\
-    X(_include_next, IncludeNext)\
-    X(_line, Line)\
-    X(_sccs, Sccs)\
-    X(_undef, Undef)\
-    X(_warning, Warning)
-
 
 typedef enum
 {
@@ -363,7 +374,7 @@ typedef struct
 {
     char *CString;
     ryn_string String;
-    token_type Type;
+    u32 Type; /* TODO: Consider a more type-safe option here... */
 } keyword;
 
 #define Max_Keywords 100 /* TODO: Please get rid of Max_Keywords :( */
@@ -372,6 +383,13 @@ global_variable keyword GlobalHackedUpKeywords[] = {
 #define X(name, typename, _value)\
     {#name,{},token_type_##typename},
     Keywords_XList
+#undef X
+};
+
+global_variable keyword GlobalHackedUpDirectives[] = {
+#define X(name, typename, _value)\
+    {#name,{},directive_type_##typename},
+    Directives_XList
 #undef X
 };
 
@@ -442,17 +460,16 @@ internal ryn_string GetTokenizerStateString(tokenizer_state TokenizerState)
     return String;
 }
 
-internal keyword_lookup *BuildKeywordLookup(ryn_memory_arena *Arena)
+internal lookup_node *BuildLookup(ryn_memory_arena *Arena, keyword *Keywords, u32 KeywordCount)
 {
-    u32 KeywordCount = ArrayCount(GlobalHackedUpKeywords);
-    keyword_lookup *RootLookup = ryn_memory_PushZeroStruct(Arena, keyword_lookup);
+    lookup_node *RootLookup = ryn_memory_PushZeroStruct(Arena, lookup_node);
 
     for (u32 I = 0; I < KeywordCount; ++I)
     {
-        GlobalKeywordStrings[I].String = ryn_string_CreateString(GlobalHackedUpKeywords[I].CString);
+        GlobalKeywordStrings[I].String = ryn_string_CreateString(Keywords[I].CString);
         GlobalKeywordStrings[I].String.Bytes = GlobalKeywordStrings[I].String.Bytes + 1;
         GlobalKeywordStrings[I].String.Size -= 2; /* NOTE: Subtract 2 to ignore hacked prepended underscore and the null-terminator. */
-        GlobalKeywordStrings[I].Type = GlobalHackedUpKeywords[I].Type;
+        GlobalKeywordStrings[I].Type = Keywords[I].Type;
     }
 
     RootLookup->Char = GlobalKeywordStrings[0].String.Bytes[0];
@@ -461,7 +478,7 @@ internal keyword_lookup *BuildKeywordLookup(ryn_memory_arena *Arena)
     {
         keyword Keyword = GlobalKeywordStrings[KeywordIndex];
         ryn_string KeywordString = GlobalKeywordStrings[KeywordIndex].String;
-        keyword_lookup *CurrentLookup = RootLookup;
+        lookup_node *CurrentLookup = RootLookup;
 
         /* TODO: This control flow for this loop feels off, especially with the mutliple places where we check if we need to set "IsTerminal". */
         for (u32 StringIndex = 0; StringIndex < KeywordString.Size; ++StringIndex)
@@ -484,7 +501,7 @@ internal keyword_lookup *BuildKeywordLookup(ryn_memory_arena *Arena)
                         }
                         else
                         {
-                            CurrentLookup->Child = ryn_memory_PushZeroStruct(Arena, keyword_lookup);
+                            CurrentLookup->Child = ryn_memory_PushZeroStruct(Arena, lookup_node);
                             CurrentLookup = CurrentLookup->Child;
                         }
 
@@ -492,7 +509,7 @@ internal keyword_lookup *BuildKeywordLookup(ryn_memory_arena *Arena)
                     }
                     else if (CurrentLookup->Sibling == 0)
                     {
-                        CurrentLookup->Sibling = ryn_memory_PushZeroStruct(Arena, keyword_lookup);
+                        CurrentLookup->Sibling = ryn_memory_PushZeroStruct(Arena, lookup_node);
                         CurrentLookup->Sibling->Char = Char;
                         CurrentLookup = CurrentLookup->Sibling;
                         CurrentLookup->Type = Keyword.Type;
@@ -502,7 +519,7 @@ internal keyword_lookup *BuildKeywordLookup(ryn_memory_arena *Arena)
                             CurrentLookup->IsTerminal = 1;
                         }
 
-                        CurrentLookup->Child = ryn_memory_PushZeroStruct(Arena, keyword_lookup);
+                        CurrentLookup->Child = ryn_memory_PushZeroStruct(Arena, lookup_node);
                         CurrentLookup = CurrentLookup->Child;
                         break;
                     }
@@ -523,7 +540,7 @@ internal keyword_lookup *BuildKeywordLookup(ryn_memory_arena *Arena)
                     CurrentLookup->IsTerminal = 1;
                 }
 
-                CurrentLookup->Child = ryn_memory_PushZeroStruct(Arena, keyword_lookup);
+                CurrentLookup->Child = ryn_memory_PushZeroStruct(Arena, lookup_node);
                 CurrentLookup = CurrentLookup->Child;
             }
         }
@@ -532,10 +549,10 @@ internal keyword_lookup *BuildKeywordLookup(ryn_memory_arena *Arena)
     return RootLookup;
 }
 
-internal keyword_lookup LookupKeyword(keyword_lookup *Lookup, ryn_string String)
+internal lookup_node LookupString(lookup_node *Lookup, ryn_string String)
 {
-    keyword_lookup Result = {};
-    keyword_lookup *CurrentLookup = Lookup;
+    lookup_node Result = {};
+    lookup_node *CurrentLookup = Lookup;
     u64 Size = String.Size;
 
     if (String.Bytes && String.Bytes[Size - 1] == 0)
@@ -801,7 +818,7 @@ internal equivalent_char_result GetEquivalentChars(ryn_memory_arena *Arena, u8 *
     return Result;
 }
 
-token_list *Tokenize(ryn_memory_arena *Arena, keyword_lookup *KeywordLookup, ryn_string Source)
+token_list *Tokenize(ryn_memory_arena *Arena, lookup_node *KeywordLookup, ryn_string Source)
 {
     token_list HeadToken = {};
     token_list *CurrentToken = &HeadToken;
@@ -846,12 +863,12 @@ token_list *Tokenize(ryn_memory_arena *Arena, keyword_lookup *KeywordLookup, ryn
                 NextToken->Token.String.Bytes = Source.Bytes + StartOfToken;
                 NextToken->Token.String.Size = I - StartOfToken;
 
-                keyword_lookup Lookup = LookupKeyword(KeywordLookup, NextToken->Token.String);
+                lookup_node Lookup_Node = LookupString(KeywordLookup, NextToken->Token.String);
 
-                if (Lookup.IsTerminal)
+                if (Lookup_Node.IsTerminal)
                 {
                     /* TODO: overwrite token-type of identifier and set as type of the particular keyword. */
-                    NextToken->Token.Type = Lookup.Type;
+                    NextToken->Token.Type = Lookup_Node.Type;
                 }
             }
 
@@ -905,9 +922,10 @@ token_list *Tokenize(ryn_memory_arena *Arena, keyword_lookup *KeywordLookup, ryn
     return HeadToken.Next;
 }
 
-internal void Preprocess(ryn_memory_arena *Arena, token_list *FirstToken)
+internal void Preprocess(ryn_memory_arena *Arena, token_list *FirstToken, lookup_node *DirectiveLookup)
 {
     token_list *Node = FirstToken;
+
     while (Node)
     {
         token Token = Node->Token;
@@ -917,29 +935,58 @@ internal void Preprocess(ryn_memory_arena *Arena, token_list *FirstToken)
         {
             Node = Node->Next;
 
-            if (Node && Node->Next->Token.Type == token_type_Hash)
+            if (Node && Node->Next && Node->Next->Token.Type == token_type_Hash)
             {
                 Node = Node->Next;
                 Token = Node->Token;
 
-                u8 *CString = ryn_memory_PushSize(Arena, Node->Token.String.Size + 1);
-                ryn_string_ToCString(Node->Token.String, CString);
-
                 /* TODO: I guess we should check if the hash token is preceded by a newline, right? Maybe we don't care.... */
-                if (Node && Node->Token.Type == token_type_Identifier)
+                if (Node && Node->Next && Node->Next->Token.Type == token_type_Identifier)
                 {
-                    printf("Preprocessor directive \"%s\"\n", CString);
+                    Node = Node->Next;
+                    Token = Node->Token;
+                    lookup_node Lookup = LookupString(DirectiveLookup, Node->Token.String);
+                    u8 *CString = ryn_memory_PushSize(Arena, Node->Token.String.Size + 1);
+                    ryn_string_ToCString(Node->Token.String, CString);
+
+                    if (Lookup.IsTerminal)
+                    {
+                        printf("Preprocessor directive \"%s\"\n", CString);
+                    }
+                    else
+                    {
+                        printf("[Error] Unknown directive \"%s\"\n", CString);
+                    }
+                }
+                /* NOTE: Ew... */
+                else if (Node && Node->Next && Node->Next->Token.Type == token_type_If)
+                {
+                    Node = Node->Next;
+                    Token = Node->Token;
+
+                    printf("Preprocessor directive \"if\"\n");
+                }
+                /* NOTE: Gross... */
+                else if (Node && Node->Next && Node->Next->Token.Type == token_type_Else)
+                {
+                    Node = Node->Next;
+                    Token = Node->Token;
+
+                    printf("Preprocessor directive \"else\"\n");
                 }
                 else
                 {
-                    printf("[Error] unknown preprocessor directive! \"%s\"\n", CString);
-                    break;
+                    printf("[Error] expected identifier for directive name, but got token of type '%d'\n", Node->Token.Type);
+                    /* break; */
                 }
 
             }
         }
 
-        Node = Node->Next;
+        if (Node)
+        {
+            Node = Node->Next;
+        }
         Arena->Offset = OldOffset;
     }
 }
@@ -1072,7 +1119,7 @@ internal ryn_string GetIdiSource(ryn_memory_arena *Arena)
 
 #define Max_Token_Count_For_Testing 2048
 
-internal void TestTokenizer(ryn_memory_arena *Arena, keyword_lookup *KeywordLookup)
+internal void TestTokenizer(ryn_memory_arena *Arena, lookup_node *KeywordLookup)
 {
     u64 OldArenaOffset = Arena->Offset;
 #define X(name, typename, _literal)\
@@ -1198,7 +1245,7 @@ internal void TestTokenizer(ryn_memory_arena *Arena, keyword_lookup *KeywordLook
     Arena->Offset = OldArenaOffset;
 }
 
-internal void TestParser(ryn_memory_arena *Arena, keyword_lookup *KeywordLookup)
+internal void TestParser(ryn_memory_arena *Arena, lookup_node *KeywordLookup)
 {
     ryn_string FileSourceString = GetIdiSource(Arena);
 
@@ -1214,7 +1261,8 @@ int main(void)
     ryn_memory_arena Arena = ryn_memory_CreateArena(Megabytes(1));
 
     ryn_string FileSourceString = GetIdiSource(&Arena);
-    keyword_lookup *KeywordLookup = BuildKeywordLookup(&Arena);
+    lookup_node *KeywordLookup = BuildLookup(&Arena, GlobalHackedUpKeywords, ArrayCount(GlobalHackedUpKeywords));
+    lookup_node *DirectiveLookup = BuildLookup(&Arena, GlobalHackedUpDirectives, ArrayCount(GlobalHackedUpDirectives));
     u64 BaseOffset = Arena.Offset;
     SetupTokenizerTable();
 
@@ -1229,7 +1277,7 @@ int main(void)
     {
         printf("======== Testing Preprocessor ========\n");
         token_list *FirstToken = Tokenize(&Arena, KeywordLookup, FileSourceString);
-        Preprocess(&Arena, FirstToken);
+        Preprocess(&Arena, FirstToken, DirectiveLookup);
         Arena.Offset = BaseOffset;
     }
 #endif
