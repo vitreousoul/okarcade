@@ -340,7 +340,7 @@ ref_struct(lookup_node)
     lookup_node *Sibling;
     u8 Char;
     b32 IsTerminal;
-    token_type Type;
+    u32 Type; /* TODO: Consider a more type-safe option here... */
 };
 
 global_variable tokenizer_state AcceptingStates[] = {
@@ -357,11 +357,13 @@ global_variable tokenizer_state DelimitedStates[] = {
 #undef X
 };
 
-
-typedef enum
+typedef struct
 {
-    preprocessor_directive_Assert, /* #assert Obsolete Features */
-} preprocessor_directive;
+    char *CString;
+    ryn_string String;
+    u32 Type; /* TODO: Consider a more type-safe option here... */
+} keyword;
+
 
 /**************************************/
 /* Globals */
@@ -369,13 +371,6 @@ typedef enum
 global_variable u8 TokenizerTable[tokenizer_state__Count][256];
 global_variable u8 TheDebugTable[tokenizer_state__Count][256];
 global_variable u8 ParserTable[parser_state__Count][token_type__Count];
-
-typedef struct
-{
-    char *CString;
-    ryn_string String;
-    u32 Type; /* TODO: Consider a more type-safe option here... */
-} keyword;
 
 #define Max_Keywords 100 /* TODO: Please get rid of Max_Keywords :( */
 /* From GNU C manual */
@@ -437,6 +432,22 @@ internal ryn_string GetTokenTypeString(token_type TokenType)
 #define X(name, typename, _literal)\
     case token_type_##typename: String = ryn_string_CreateString(#name); break;
     token_type_All_XList;
+#undef X
+    default: String = ryn_string_CreateString("[Error]");
+    }
+
+    return String;
+}
+
+internal ryn_string GetDirectiveTypeString(directive_type DirectiveType)
+{
+    ryn_string String;
+
+    switch (DirectiveType)
+    {
+#define X(name, typename, _literal)\
+    case directive_type_##typename: String = ryn_string_CreateString(#name); break;
+    Directives_XList;
 #undef X
     default: String = ryn_string_CreateString("[Error]");
     }
@@ -925,64 +936,119 @@ token_list *Tokenize(ryn_memory_arena *Arena, lookup_node *KeywordLookup, ryn_st
 internal void Preprocess(ryn_memory_arena *Arena, token_list *FirstToken, lookup_node *DirectiveLookup)
 {
     token_list *Node = FirstToken;
+    token_list *PreviousNode = 0;
 
     while (Node)
     {
-        token Token = Node->Token;
         u64 OldOffset = Arena->Offset;
 
-        if (Token.Type == token_type_Newline)
+        if (Node && Node->Next && Node->Next->Token.Type == token_type_Hash &&
+            (!PreviousNode || PreviousNode->Token.Type == token_type_Newline))
         {
             Node = Node->Next;
+            directive_type DirectiveType = 0;
 
-            if (Node && Node->Next && Node->Next->Token.Type == token_type_Hash)
+            if (Node && Node->Next && Node->Next->Token.Type == token_type_Identifier)
             {
                 Node = Node->Next;
-                Token = Node->Token;
+                lookup_node Lookup = LookupString(DirectiveLookup, Node->Token.String);
+                u8 *CString = ryn_memory_PushSize(Arena, Node->Token.String.Size + 1);
+                ryn_string_ToCString(Node->Token.String, CString);
 
-                /* TODO: I guess we should check if the hash token is preceded by a newline, right? Maybe we don't care.... */
-                if (Node && Node->Next && Node->Next->Token.Type == token_type_Identifier)
+                if (Lookup.IsTerminal)
                 {
-                    Node = Node->Next;
-                    Token = Node->Token;
-                    lookup_node Lookup = LookupString(DirectiveLookup, Node->Token.String);
-                    u8 *CString = ryn_memory_PushSize(Arena, Node->Token.String.Size + 1);
-                    ryn_string_ToCString(Node->Token.String, CString);
-
-                    if (Lookup.IsTerminal)
-                    {
-                        printf("Preprocessor directive \"%s\"\n", CString);
-                    }
-                    else
-                    {
-                        printf("[Error] Unknown directive \"%s\"\n", CString);
-                    }
+                    DirectiveType = Lookup.Type;
                 }
-                /* NOTE: Ew... */
-                else if (Node && Node->Next && Node->Next->Token.Type == token_type_If)
-                {
-                    Node = Node->Next;
-                    Token = Node->Token;
+            }
+            /* NOTE: Ew... */
+            else if (Node && Node->Next && Node->Next->Token.Type == token_type_If)
+            {
+                Node = Node->Next;
 
-                    printf("Preprocessor directive \"if\"\n");
-                }
-                /* NOTE: Gross... */
-                else if (Node && Node->Next && Node->Next->Token.Type == token_type_Else)
-                {
-                    Node = Node->Next;
-                    Token = Node->Token;
+                DirectiveType = directive_type_If;
+            }
+            /* NOTE: Gross... */
+            else if (Node && Node->Next && Node->Next->Token.Type == token_type_Else)
+            {
+                Node = Node->Next;
 
-                    printf("Preprocessor directive \"else\"\n");
-                }
-                else
-                {
-                    printf("[Error] expected identifier for directive name, but got token of type '%d'\n", Node->Token.Type);
-                    /* break; */
-                }
+                DirectiveType = directive_type_Else;
+            }
 
+            switch (DirectiveType)
+            {
+            case directive_type_Define:
+            {
+                printf("We found a directive: Define\n");
+            } break;
+            case directive_type_Elif:
+            {
+                printf("We found a directive: Elif\n");
+            } break;
+            case directive_type_Else:
+            {
+                printf("We found a directive: Else\n");
+            } break;
+            case directive_type_Endif:
+            {
+                printf("We found a directive: Endif\n");
+            } break;
+            case directive_type_Error:
+            {
+                printf("We found a directive: Error\n");
+            } break;
+            case directive_type_Ident:
+            {
+                printf("We found a directive: Ident\n");
+            } break;
+            case directive_type_If:
+            {
+                printf("We found a directive: If\n");
+            } break;
+            case directive_type_Ifdef:
+            {
+                printf("We found a directive: Ifdef\n");
+            } break;
+            case directive_type_Ifndef:
+            {
+                printf("We found a directive: Ifndef\n");
+            } break;
+            case directive_type_Import:
+            {
+                printf("We found a directive: Import\n");
+            } break;
+            case directive_type_Include:
+            {
+                printf("We found a directive: Include\n");
+            } break;
+            case directive_type_IncludeNext:
+            {
+                printf("We found a directive: IncludeNext\n");
+            } break;
+            case directive_type_Line:
+            {
+                printf("We found a directive: Line\n");
+            } break;
+            case directive_type_Sccs:
+            {
+                printf("We found a directive: Sccs\n");
+            } break;
+            case directive_type_Undef:
+            {
+                printf("We found a directive: Undef\n");
+            } break;
+            case directive_type_Warning:
+            {
+                printf("We found a directive: Warning\n");
+            } break;
+            default:
+            {
+                printf("Unhandled directive type!\n");
+            } break;
             }
         }
 
+        PreviousNode = Node;
         if (Node)
         {
             Node = Node->Next;
