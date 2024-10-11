@@ -1,5 +1,8 @@
 /*
   ryn_memory v0.00 - Memory arena utilities. Very early in development...
+
+  TODO:
+    [ ] Implement BeginArena/EndArena functions instead of forcing the user to store arena-offsets in variables, which introduces too many un-needed names into their codebase.
 */
 #ifndef __RYN_MEMORY__
 #define __RYN_MEMORY__

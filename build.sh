@@ -32,16 +32,24 @@ fi
 
 if [ $DEBUG -eq 0 ]; then
     echo "Optimized build : $TARGET_NAME";
-    TARGET="-O2 -o dist/$TARGET_NAME.exe"
+    TARGET="-O2"
+    EXECUTABLE_FILE="-o dist/$TARGET_NAME.exe"
 elif [ $DEBUG -eq 1 ]; then
     echo "Debug build : $TARGET_NAME";
-    TARGET="-g3 -O0 -o dist/$TARGET_NAME.out"
+    TARGET="-g3 -O0"
+    EXECUTABLE_FILE="-o dist/$TARGET_NAME.out"
 fi
 
 SETTINGS="-std=c99 -Wall -Wextra -Wstrict-prototypes -Wold-style-definition -Wno-comment"
 SETTINGS="$SETTINGS -Wno-unused-function"
 SETTINGS="$SETTINGS -Wno-unused-parameter"
 # SETTINGS="$SETTINGS -Wmissing-prototypes -Wmissing-declarations"
+
+SOURCE_FILE="./src/$TARGET_NAME.c"
+
+# Save expanded macros
+# MACRO_FILE="-E -o gen/$TARGET_NAME.i"
+# $COMPILER $GRAPHICS_FRAMEWORKS $GRAPHICS_LIB $SETTINGS $SOURCE_FILE $TARGET $MACRO_FILE
 
 if [ $WEB -eq 1 ]; then
     RAYLIB_LIB="./lib/libraylibweb.a"
@@ -54,7 +62,5 @@ else
     GRAPHICS_FRAMEWORKS="-framework CoreVideo -framework IOKit -framework Cocoa -framework GLUT -framework OpenGL"
     GRAPHICS_LIB="lib/libraylib.a"
 
-    SOURCE_FILE="./src/$TARGET_NAME.c"
-
-    $COMPILER $GRAPHICS_FRAMEWORKS $GRAPHICS_LIB $SETTINGS $SOURCE_FILE $TARGET
+    $COMPILER $GRAPHICS_FRAMEWORKS $GRAPHICS_LIB $SETTINGS $SOURCE_FILE $TARGET $EXECUTABLE_FILE
 fi
