@@ -769,8 +769,9 @@ internal void GenerateBlogPages(ryn_memory_arena *TempString, pre_processor *Pre
     u8 *BlogPageTemplateFilePath = (u8 *)"../src/layout/blog.html";
     u8 *BlogListingFilePath = (u8 *)"../gen/blog_listing.html";
 
-    ryn_memory_arena FileAllocator = WalkDirectory(BlogDirectory);
-    file_list *SortedFileList = SortFileList((file_list *)FileAllocator.Data);
+    ryn_memory_arena FileArena = ryn_memory_CreateArena(Gigabytes(1));
+    file_list *FileList = WalkDirectory(&FileArena, BlogDirectory);
+    file_list *SortedFileList = SortFileList(FileList);
 
     buffer File;
     buffer BlogPageTemplate;
@@ -999,15 +1000,14 @@ internal u8 *GetFileNameFromPath(ryn_memory_arena *Allocator, u8 *Path)
     return FileName;
 }
 
-void GenerateCodePages(ryn_memory_arena *TempString)
+void GenerateCodePages(ryn_memory_arena *FileArena, ryn_memory_arena *TempString)
 {
     u8 *SourceCodePath = (u8 *)"../src";
     u8 *GenCodePagesPath = (u8 *)"../gen/code_pages";
 
-    ryn_memory_arena FileAllocator = WalkDirectory(SourceCodePath);
+    file_list *FileList = WalkDirectory(FileArena, SourceCodePath);
     ryn_memory_arena CodePage = ryn_memory_CreateArena(Gigabytes(1));
 
-    file_list *FileList = (file_list *)FileAllocator.Data;
     file_list *SortedFileList = SortFileList(FileList);
 
     { /* Print out html for file-tree */
@@ -1129,7 +1129,7 @@ void GenerateCodePages(ryn_memory_arena *TempString)
     ryn_memory_FreeArena(FileAllocator);
 }
 
-void GenerateSite(ryn_memory_arena *TempString)
+void GenerateSite(ryn_memory_arena *FileArena, ryn_memory_arena *TempString)
 {
     u8 *GenDirectory       = (u8 *)"../gen";
     u8 *CodePagesDirectory = (u8 *)"../gen/code_pages";
@@ -1183,8 +1183,7 @@ void GenerateSite(ryn_memory_arena *TempString)
     GenerateCodePages(TempString);
 
     {
-        ryn_memory_arena FileAllocator = WalkDirectory(CodePagesDirectory);
-        file_list *FileList = (file_list *)FileAllocator.Data;
+        file_list *FileList = WalkDirectory(CodePagesDirectory);
         file_list *SortedFileList = SortFileList(FileList);
 
         for (file_list *CurrentFile = SortedFileList; CurrentFile; CurrentFile = CurrentFile->Next)

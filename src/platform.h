@@ -9,22 +9,14 @@
 #define PATH_SEPARATOR '/'
 
 #include "../lib/ryn_memory.h"
-
-typedef struct
-{
-    u8 *Name;
-    buffer *Buffer;
-} file_data;
-
-struct file_list;
-
-struct file_list
-{
-    struct file_list *Next;
-    u8 Name[];
-};
+#include "../lib/ryn_string.h"
 
 typedef struct file_list file_list;
+struct file_list
+{
+    file_list *Next;
+    ryn_string Name;
+};
 
 typedef struct
 {
@@ -60,7 +52,7 @@ void WriteFileFromBuffer(u8 *FilePath, buffer *Buffer);
 void EnsureDirectoryExists(u8 *DirectoryPath);
 void EnsurePathDirectoriesExist(u8 *Path);
 
-ryn_memory_arena WalkDirectory(u8 *Path);
+file_list *WalkDirectory(ryn_memory_arena *Arena, u8 *Path);
 
 void *AllocateMemory(u64 Size)
 {
@@ -319,21 +311,16 @@ internal b32 IsWalkableFile(u8 *FileName)
 }
 
 /* TODO: pass in allocator, to give caller more control */
-ryn_memory_arena WalkDirectory(u8 *Path)
+file_list *WalkDirectory(ryn_memory_arena *Arena, u8 *Path)
 {
-    ryn_memory_arena Allocator = ryn_memory_CreateArena(Gigabytes(1));
     /* NOTE: we call the variable "Paths", but it's only every inteded to contain 1 path. */
     char *Paths[] = { (char *)Path, 0 };
     u32 FtsFlags = FTS_PHYSICAL | FTS_NOCHDIR | FTS_XDEV;
     FTS *Fts = fts_open(Paths, FtsFlags, 0);
-    file_list *PreviousFileItem = (file_list *)(Allocator.Data + Allocator.Offset);
+    file_list *PreviousFileItem = (file_list *)(Arena->Data + Arena->Offset);
+    file_list *Result = PreviousFileItem;
 
-    if (!Fts)
-    {
-        printf("Error in WalkDirectory: error calling fts_open\n");
-        return Allocator;
-    }
-    else
+    if (Fts)
     {
         FTSENT *p;
         while ((p = fts_read(Fts)) != 0)
@@ -346,13 +333,12 @@ ryn_memory_arena WalkDirectory(u8 *Path)
 
                 if (IsWalkableFile(FilePath))
                 {
-                    b32 IsFirstAllocation = Allocator.Offset == 0;
-                    s32 FilePathLength = strlen((char *)FilePath);
-                    size FileItemSize = sizeof(file_list) + FilePathLength + 1;
-                    file_list *FileItem = ryn_memory_PushSize(&Allocator, FileItemSize);
-
-                    CopyMemory(FilePath, FileItem->Name, FilePathLength);
-                    FileItem->Name[FileItemSize] = 0;
+                    b32 IsFirstAllocation = Arena->Offset == 0;
+                    file_list *FileItem = ryn_memory_PushZeroStruct(Arena, file_list);
+                    s32 FilePathLength = GetStringLength(FilePath) + 1;
+                    FileItem->Name.Bytes = PushString_(Arena, FilePath, FilePathLength);
+                    FileItem->Name.Bytes[FilePathLength-1] = 0;
+                    FileItem->Name.Size = FilePathLength;
 
                     if (IsFirstAllocation)
                     {
@@ -380,6 +366,10 @@ ryn_memory_arena WalkDirectory(u8 *Path)
 
         fts_close(Fts);
     }
+    else
+    {
+        printf("Error in WalkDirectory: error calling fts_open\n");
+    }
 
-    return Allocator;
+    return Result;
 }

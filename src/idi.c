@@ -393,6 +393,8 @@ keyword GlobalKeywordStrings[Max_Keywords] = {};
 /**************************************/
 /* Functions */
 
+#define DebugPrint(format, ...) printf(format, __VA_ARGS__)
+
 internal void CopyTokenizerTableToTheDebugTable(void)
 {
     for (s32 Row = 0; Row < tokenizer_state__Count; ++Row)
@@ -933,6 +935,21 @@ token_list *Tokenize(ryn_memory_arena *Arena, lookup_node *KeywordLookup, ryn_st
     return HeadToken.Next;
 }
 
+internal token_list *ConsumeNonNewlineSpace(token_list *Node)
+{
+    Assert(Node != 0);
+    token_list *Result = Node;
+
+    while (Result &&
+           (Result->Token.Type == token_type_Space ||
+           Result->Token.Type == token_type_NewlineEscape))
+    {
+        Result = Result->Next;
+    }
+
+    return Result;
+}
+
 internal void Preprocess(ryn_memory_arena *Arena, token_list *FirstToken, lookup_node *DirectiveLookup)
 {
     token_list *Node = FirstToken;
@@ -979,71 +996,88 @@ internal void Preprocess(ryn_memory_arena *Arena, token_list *FirstToken, lookup
             {
             case directive_type_Define:
             {
-                printf("We found a directive: Define\n");
+                printf("Please implement Define.\n");
             } break;
             case directive_type_Elif:
             {
-                printf("We found a directive: Elif\n");
+                Assert(!"Elif not implemented");
             } break;
             case directive_type_Else:
             {
-                printf("We found a directive: Else\n");
+                Assert(!"Else not implemented");
             } break;
             case directive_type_Endif:
             {
-                printf("We found a directive: Endif\n");
+                Assert(!"Endif not implemented");
             } break;
             case directive_type_Error:
             {
-                printf("We found a directive: Error\n");
+                Assert(!"Error not implemented");
             } break;
             case directive_type_Ident:
             {
-                printf("We found a directive: Ident\n");
+                Assert(!"Ident not implemented");
             } break;
             case directive_type_If:
             {
-                printf("We found a directive: If\n");
+                printf("Please implement If.\n");
             } break;
             case directive_type_Ifdef:
             {
-                printf("We found a directive: Ifdef\n");
+                Assert(!"Ifdef not implemented");
             } break;
             case directive_type_Ifndef:
             {
-                printf("We found a directive: Ifndef\n");
+                Assert(!"Ifndef not implemented");
             } break;
             case directive_type_Import:
             {
-                printf("We found a directive: Import\n");
+                Assert(!"Import not implemented");
             } break;
             case directive_type_Include:
             {
-                printf("We found a directive: Include\n");
+                Node = Node->Next;
+                /* NOTE: Idi doesn't really have an idea of #include like C does, since idi is not trying to be a full compiler (it just resembles a compiler front-end to get type information. Because of this, we just ignore #includes... */
+                Node = ConsumeNonNewlineSpace(Node);
+                if (Node->Token.Type == token_type_String)
+                {
+                    printf("string not implemented\n");
+                    /* Assert(!"Not implemented"); */
+                }
+                else if (Node->Token.Type == token_type_LessThan)
+                {
+                    printf("less-than not implemented\n");
+                    /* Assert(!"Not implemented"); */
+                }
+                else
+                {
+                    DebugPrint("Unexpected token while parsing include directive: \"%s\"\n", GetTokenTypeString(Node->Token.Type).Bytes);
+                    printf(".....   %s\n", Node->Token.String.Bytes);
+                }
             } break;
             case directive_type_IncludeNext:
             {
-                printf("We found a directive: IncludeNext\n");
+                Assert(!"IncludeNext not implemented");
             } break;
             case directive_type_Line:
             {
-                printf("We found a directive: Line\n");
+                Assert(!"Line not implemented");
             } break;
             case directive_type_Sccs:
             {
-                printf("We found a directive: Sccs\n");
+                Assert(!"Sccs not implemented");
             } break;
             case directive_type_Undef:
             {
-                printf("We found a directive: Undef\n");
+                printf("Please implement Undef.\n");
             } break;
             case directive_type_Warning:
             {
-                printf("We found a directive: Warning\n");
+                Assert(!"Warning not implemented");
             } break;
             default:
             {
-                printf("Unhandled directive type!\n");
+                Assert(!"Unhandled directive type!\n");
             } break;
             }
         }
@@ -1371,6 +1405,17 @@ int main(void)
     printf("sizeof(TokenizerTable) %lu\n", sizeof(TokenizerTable));
 
     printf("token_type__Count %d\n", token_type__Count);
+
+    { /* NOTE: Testing walk directory */
+        Arena.Offset = 0;
+        file_list *FileNode = WalkDirectory(&Arena, (u8 *)"../src");
+        while (FileNode)
+        {
+            printf("File \"%s\"\n", FileNode->Name.Bytes);
+            FileNode = FileNode->Next;
+        }
+    }
+
 
     return 0;
 }
