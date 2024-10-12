@@ -1,5 +1,6 @@
 /*
   TODO:
+    [ ] Parse preprocessor directives as entire tokens, since we can delimit them with the newline character.
     [ ] When tokenizing, turn identifiers that are keywords into a specific token_type_* so that the parser doesn't have to do string comparison or other junk.
     [ ] There is shared structure between string escapes and character literal escapes. We should make sure we treat characters inside a string literal as single characters inside a char literal.
     [ ] Once things are more stable, rename all the confusing variable names (rows, columns, variable versions of table/class/index).
@@ -39,7 +40,6 @@
     X(Comma,             Comma,             ',')\
     X(Colon,             Colon,             ':')\
     X(Semicolon,         Semicolon,         ';')\
-    X(Hash,              Hash,              '#')\
     X(Ampersand,         Ampersand,         '&')\
     X(Pipe,              Pipe,              '|')\
     X(Question,          Question,          '?')\
@@ -55,6 +55,7 @@
     X(IdentifierRest,      Identifier,          0)\
     X(StringEnd,           String,              0)\
     X(CharLiteralEnd,      CharLiteral,         0)\
+    X(Directive,           Directive,           0)\
     X(Equal,               Equal,               0)\
     X(LessThan,            LessThan,            0)\
     X(LessThanOrEqual,     LessThanOrEqual,     0)\
@@ -73,7 +74,7 @@
 
 #define tokenizer_state_Simple_Delimited_XList\
     X(String,       String,       0)\
-    X(CharLiteral,  CharLiteral,  0)\
+    X(CharLiteral,  CharLiteral,  0)
 
 #define tokenizer_state_Delimited_XList\
     tokenizer_state_Simple_Delimited_XList\
@@ -87,6 +88,7 @@
     X(CharLiteralEscape,  CharLiteralEscape,  0)\
     X(CommentBodyCheck,   CommentBodyCheck,   0)\
     X(TopLevelEscape,     TopLevelEscape,     0)\
+    X(DirectiveEscape,    DirectiveEscape,    0)\
     X(Done,               Done,               0)
 
 #define tokenizer_state_XList\
@@ -236,7 +238,7 @@ typedef enum
     X(DoubleEqual,         DoubleEqual,         296)\
     X(Comment,             Comment,             297)\
     X(ForwardSlash,        ForwardSlash,        298)\
-    X(NewlineEscape,       NewlineEscape,       299)\
+    X(NewlineEscape,       NewlineEscape,       299) /* TODO: delete newline-escape if we aren't going to use it.... */\
     X(LessThan,            LessThan,            300)\
     X(LessThanOrEqual,     LessThanOrEqual,     301)\
     X(GreaterThan,         GreaterThan,         302)\
@@ -245,7 +247,8 @@ typedef enum
     X(Arrow,               Arrow,               305)\
     X(Not,                 Not,                 306)\
     X(Dash,                Dash,                307)\
-    X(Newline,             Newline,             308)
+    X(Newline,             Newline,             308)\
+    X(Directive,           Directive,           309)
 
 #define token_type_MaxValue 500 /* TODO: This number can be way less now... */
 
@@ -370,7 +373,6 @@ typedef struct
 
 global_variable u8 TokenizerTable[tokenizer_state__Count][256];
 global_variable u8 TheDebugTable[tokenizer_state__Count][256];
-global_variable u8 ParserTable[parser_state__Count][token_type__Count];
 
 #define Max_Keywords 100 /* TODO: Please get rid of Max_Keywords :( */
 /* From GNU C manual */
@@ -632,6 +634,7 @@ internal void SetupTokenizerTable(void)
             tokenizer_state DelimitedState = DelimitedStates[DelimitedIndex];
             TokenizerTable[DelimitedState][I] = DelimitedState;
         }
+        TokenizerTable[Directive][I] = Directive;
 
         TokenizerTable[CommentBodyCheck][I] = CommentBody;
     }
@@ -700,6 +703,11 @@ internal void SetupTokenizerTable(void)
         TokenizerTable[Begin]['\''] = CharLiteral;
         TokenizerTable[CharLiteral]['\\'] = CharLiteralEscape;
         TokenizerTable[CharLiteral]['\''] = CharLiteralEnd;
+
+        TokenizerTable[Begin]['#'] = Directive;
+        TokenizerTable[Directive]['\n'] = Done;
+        TokenizerTable[Directive]['\\'] = DirectiveEscape;
+        TokenizerTable[DirectiveEscape]['\n'] = Directive;
     }
 
 #define X(_name, value)\
@@ -727,11 +735,6 @@ internal void SetupTokenizerTable(void)
     TokenizerTable[Begin]['\\'] = TopLevelEscape;
     TokenizerTable[TopLevelEscape]['\n'] = NewlineEscape; /* TODO: Handle CRLF */
     TokenizerTable[Begin]['\n'] = Newline;
-}
-
-internal void SetupParserTable(void)
-{
-    ParserTable[parser_state_Top][token_type_Hash] = parser_state_MacroStart;
 }
 
 /* TODO: Rename rows/columns to something related to chars and tokenizer-states. */
@@ -953,136 +956,16 @@ internal token_list *ConsumeNonNewlineSpace(token_list *Node)
 internal void Preprocess(ryn_memory_arena *Arena, token_list *FirstToken, lookup_node *DirectiveLookup)
 {
     token_list *Node = FirstToken;
-    token_list *PreviousNode = 0;
 
     while (Node)
     {
         u64 OldOffset = Arena->Offset;
 
-        if (Node && Node->Next && Node->Next->Token.Type == token_type_Hash &&
-            (!PreviousNode || PreviousNode->Token.Type == token_type_Newline))
+        if (Node->Token.Type == token_type_Directive)
         {
-            Node = Node->Next;
-            directive_type DirectiveType = 0;
-
-            if (Node && Node->Next && Node->Next->Token.Type == token_type_Identifier)
-            {
-                Node = Node->Next;
-                lookup_node Lookup = LookupString(DirectiveLookup, Node->Token.String);
-                u8 *CString = ryn_memory_PushSize(Arena, Node->Token.String.Size + 1);
-                ryn_string_ToCString(Node->Token.String, CString);
-
-                if (Lookup.IsTerminal)
-                {
-                    DirectiveType = Lookup.Type;
-                }
-            }
-            /* NOTE: Ew... */
-            else if (Node && Node->Next && Node->Next->Token.Type == token_type_If)
-            {
-                Node = Node->Next;
-
-                DirectiveType = directive_type_If;
-            }
-            /* NOTE: Gross... */
-            else if (Node && Node->Next && Node->Next->Token.Type == token_type_Else)
-            {
-                Node = Node->Next;
-
-                DirectiveType = directive_type_Else;
-            }
-
-            switch (DirectiveType)
-            {
-            case directive_type_Define:
-            {
-                printf("Please implement Define.\n");
-            } break;
-            case directive_type_Elif:
-            {
-                Assert(!"Elif not implemented");
-            } break;
-            case directive_type_Else:
-            {
-                Assert(!"Else not implemented");
-            } break;
-            case directive_type_Endif:
-            {
-                Assert(!"Endif not implemented");
-            } break;
-            case directive_type_Error:
-            {
-                Assert(!"Error not implemented");
-            } break;
-            case directive_type_Ident:
-            {
-                Assert(!"Ident not implemented");
-            } break;
-            case directive_type_If:
-            {
-                printf("Please implement If.\n");
-            } break;
-            case directive_type_Ifdef:
-            {
-                Assert(!"Ifdef not implemented");
-            } break;
-            case directive_type_Ifndef:
-            {
-                Assert(!"Ifndef not implemented");
-            } break;
-            case directive_type_Import:
-            {
-                Assert(!"Import not implemented");
-            } break;
-            case directive_type_Include:
-            {
-                Node = Node->Next;
-                /* NOTE: Idi doesn't really have an idea of #include like C does, since idi is not trying to be a full compiler (it just resembles a compiler front-end to get type information. Because of this, we just ignore #includes... */
-                Node = ConsumeNonNewlineSpace(Node);
-                if (Node->Token.Type == token_type_String)
-                {
-                    printf("string not implemented\n");
-                    /* Assert(!"Not implemented"); */
-                }
-                else if (Node->Token.Type == token_type_LessThan)
-                {
-                    printf("less-than not implemented\n");
-                    /* Assert(!"Not implemented"); */
-                }
-                else
-                {
-                    DebugPrint("Unexpected token while parsing include directive: \"%s\"\n", GetTokenTypeString(Node->Token.Type).Bytes);
-                    printf(".....   %s\n", Node->Token.String.Bytes);
-                }
-            } break;
-            case directive_type_IncludeNext:
-            {
-                Assert(!"IncludeNext not implemented");
-            } break;
-            case directive_type_Line:
-            {
-                Assert(!"Line not implemented");
-            } break;
-            case directive_type_Sccs:
-            {
-                Assert(!"Sccs not implemented");
-            } break;
-            case directive_type_Undef:
-            {
-                printf("Please implement Undef.\n");
-            } break;
-            case directive_type_Warning:
-            {
-                Assert(!"Warning not implemented");
-            } break;
-            default:
-            {
-                Assert(!"Unhandled directive type!\n");
-            } break;
-            }
+            /* TODO: Parse directive string. */
         }
 
-        PreviousNode = Node;
         if (Node)
         {
             Node = Node->Next;
@@ -1264,11 +1147,11 @@ internal void TestTokenizer(ryn_memory_arena *Arena, lookup_node *KeywordLookup)
         {ryn_string_CreateString("int Foo[3] = {1,2, 4};"),
          {T(_int), T(Space), T(Identifier), T(OpenSquare), T(Digit), T(CloseSquare), T(Space), T(Equal), T(Space), T(OpenBracket), T(Digit), T(Comma), T(Digit), T(Comma), T(Space), T(Digit), T(CloseBracket), T(Semicolon)}},
         {ryn_string_CreateString("#define Foo 3"),
-         {T(Hash), T(Identifier), T(Space), T(Identifier), T(Space), T(Digit)}},
+         {T(Directive)}},
         {ryn_string_CreateString("((0xabc123<423)>3)"),
          {T(OpenParenthesis), T(OpenParenthesis), T(HexDigit), T(LessThan), T(Digit), T(CloseParenthesis), T(GreaterThan), T(Digit), T(CloseParenthesis)}},
-        {ryn_string_CreateString("#define Foo\\\n3"),
-         {T(Hash), T(Identifier), T(Space), T(Identifier), T(NewlineEscape), T(Digit)}},
+        {ryn_string_CreateString("#define Foo\\\n3\n#define Bar 4"),
+         {T(Directive), T(Newline), T(Directive)}},
         {ryn_string_CreateString("a=4;   \n    b=5;"),
          {T(Identifier), T(Equal), T(Digit), T(Semicolon), T(Space), T(Newline), T(Space), T(Identifier), T(Equal), T(Digit), T(Semicolon)}},
         {ryn_string_CreateString("case A: x=4; break; case B: x=5;"),
@@ -1328,12 +1211,12 @@ internal void TestTokenizer(ryn_memory_arena *Arena, lookup_node *KeywordLookup)
 
         if (Matches)
         {
-            printf("pass");
+            printf("******** Pass ********\n");
             TotalPassedTests += 1;
         }
         else
         {
-            printf("FAIL XXXXXXXXXXXXX index=%d   type=%d\n", TestTokenIndex, Token ? Token->Token.Type : 9999999);
+            printf("******** FAIL ******** index=%d   type=%d\n", TestTokenIndex, Token ? Token->Token.Type : 9999999);
         }
 
         printf("\n\n");
@@ -1405,17 +1288,6 @@ int main(void)
     printf("sizeof(TokenizerTable) %lu\n", sizeof(TokenizerTable));
 
     printf("token_type__Count %d\n", token_type__Count);
-
-    { /* NOTE: Testing walk directory */
-        Arena.Offset = 0;
-        file_list *FileNode = WalkDirectory(&Arena, (u8 *)"../src");
-        while (FileNode)
-        {
-            printf("File \"%s\"\n", FileNode->Name.Bytes);
-            FileNode = FileNode->Next;
-        }
-    }
-
 
     return 0;
 }
