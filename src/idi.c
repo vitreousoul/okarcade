@@ -1,10 +1,7 @@
 /*
   TODO:
-    [ ] Parse preprocessor directives as entire tokens, since we can delimit them with the newline character.
-    [ ] When tokenizing, turn identifiers that are keywords into a specific token_type_* so that the parser doesn't have to do string comparison or other junk.
-    [ ] There is shared structure between string escapes and character literal escapes. We should make sure we treat characters inside a string literal as single characters inside a char literal.
     [ ] Once things are more stable, rename all the confusing variable names (rows, columns, variable versions of table/class/index).
-    [ ] Setup tests against a C lexer (stb?) to begin building parse tables for lexing C.
+    [ ] Setup tests against a C lexer (stb or cuik or something) to begin building parse tables for lexing C.
 */
 
 #include <stdlib.h> /* NOTE: stdio and time are included because platform current requires it... */
