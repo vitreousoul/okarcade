@@ -114,10 +114,14 @@ typedef enum
     parser_state__Count
 } parser_state;
 
-#define SpaceCharList\
+#define NonNewlineSpaceCharList\
     X(Space,   ' ')\
     X(Tab,     '\t')\
     X(Return,  '\r')
+
+#define SpaceCharList\
+    NonNewlineSpaceCharList\
+    X(Newline, '\n')
 
 #define escape_character_XList\
     X(Alert,              'a')\
@@ -395,7 +399,7 @@ keyword GlobalKeywordStrings[Max_Keywords] = {};
 /**************************************/
 /* Functions */
 
-#define DebugPrint(format, ...) printf(format, __VA_ARGS__)
+#define DebugPrint(format, ...) printf(format __VA_OPT__(,) __VA_ARGS__)
 
 internal void CopyTokenizerTableToTheDebugTable(void)
 {
@@ -635,6 +639,7 @@ internal void SetupTokenizerTable(void)
             TokenizerTable[DelimitedState][I] = DelimitedState;
         }
         TokenizerTable[Directive][I] = Directive;
+        TokenizerTable[DirectiveEscape][I] = Directive;
 
         TokenizerTable[CommentBodyCheck][I] = CommentBody;
     }
@@ -652,7 +657,7 @@ internal void SetupTokenizerTable(void)
 #define X(_name, value)\
     TokenizerTable[Begin][value] = Space;\
     TokenizerTable[Space][value] = Space;
-    SpaceCharList;
+    NonNewlineSpaceCharList;
 #undef X
 
     for (s32 I = 'a'; I <= 'z'; ++I)
@@ -707,7 +712,6 @@ internal void SetupTokenizerTable(void)
         TokenizerTable[Begin]['#'] = Directive;
         TokenizerTable[Directive]['\n'] = Done;
         TokenizerTable[Directive]['\\'] = DirectiveEscape;
-        TokenizerTable[DirectiveEscape]['\n'] = Directive;
     }
 
 #define X(_name, value)\
@@ -874,11 +878,12 @@ token_list *Tokenize(ryn_memory_arena *Arena, lookup_node *KeywordLookup, ryn_st
             NextToken->Token.Type = StateToTypeTable[State];
             CurrentToken = CurrentToken->Next = NextToken;
 
+            NextToken->Token.String.Bytes = Source.Bytes + StartOfToken;
+            NextToken->Token.String.Size = I - StartOfToken;
+            StartOfToken = I;
+
             if (NextToken->Token.Type == token_type_Identifier)
             {
-                NextToken->Token.String.Bytes = Source.Bytes + StartOfToken;
-                NextToken->Token.String.Size = I - StartOfToken;
-
                 lookup_node Lookup_Node = LookupString(KeywordLookup, NextToken->Token.String);
 
                 if (Lookup_Node.IsTerminal)
@@ -887,8 +892,6 @@ token_list *Tokenize(ryn_memory_arena *Arena, lookup_node *KeywordLookup, ryn_st
                     NextToken->Token.Type = Lookup_Node.Type;
                 }
             }
-
-            StartOfToken = I;
 
             if (SingleTokenCharTable[PreviousChar])
             {
@@ -953,6 +956,53 @@ internal token_list *ConsumeNonNewlineSpace(token_list *Node)
     return Result;
 }
 
+internal ryn_string GetStringUntilNextWhitespace(ryn_string String)
+{
+    ryn_string Result = {};
+    u8 SpaceCharacters[] = {
+#define X(_name, literal)\
+        literal,
+        SpaceCharList
+#undef X
+    };
+    u32 SpaceCharCount = ArrayCount(SpaceCharacters);
+    u32 I = 0;
+    b32 IsEscape = 0;
+    b32 Looping = 1;
+
+    for (; Looping && I < String.Size; ++I)
+    {
+        if (IsEscape)
+        {
+            /* NOTE: Nothing to see here... keep it movin' */
+        }
+        else
+        {
+            for (u32 J = 0; J < SpaceCharCount; ++J)
+            {
+                if (String.Bytes[I] == SpaceCharacters[J])
+                {
+                    Looping = 0;
+                    break;
+                }
+                else if (String.Bytes[I] == '\\')
+                {
+                    IsEscape = 1;
+                }
+            }
+        }
+    }
+
+    if (I > 0)
+    {
+        u32 SizeOffset = Looping ? 0 : 1;  /* NOTE: Subtract one from Size if we broke at a space character, so that we don't include the space in the identifier. If Looping is 1 then we reached the end of the string without hitting space char, so don't subtract anything from Size. */
+        Result.Size = I - SizeOffset;
+        Result.Bytes = String.Bytes;
+    }
+
+    return Result;
+}
+
 internal void Preprocess(ryn_memory_arena *Arena, token_list *FirstToken, lookup_node *DirectiveLookup)
 {
     token_list *Node = FirstToken;
@@ -964,6 +1014,41 @@ internal void Preprocess(ryn_memory_arena *Arena, token_list *FirstToken, lookup
         if (Node->Token.Type == token_type_Directive)
         {
             /* TODO: Parse directive string. */
+            ryn_string String = Node->Token.String;
+
+            if (String.Bytes[0] == '#')
+            {
+                ryn_string StartOfIdentifier = String;
+                StartOfIdentifier.Size -= 1;
+                StartOfIdentifier.Bytes = StartOfIdentifier.Bytes + 1;
+
+                ryn_string IdentifierString = GetStringUntilNextWhitespace(StartOfIdentifier);
+                u8 *CString = Arena->Data + Arena->Offset;
+                ryn_string_ToCString(IdentifierString, CString);
+                Arena->Offset += IdentifierString.Size;
+
+                lookup_node Lookup = LookupString(DirectiveLookup, IdentifierString);
+
+                if (Lookup.IsTerminal)
+                {
+                    printf("Found directive \"%s\"\n", CString);
+                }
+                else
+                {
+                    if (ryn_memory_GetArenaFreeSpace(Arena) > IdentifierString.Size)
+                    {
+                        DebugPrint("[Error] in Preprocess: unknown directive \"%s\"\n", CString);
+                    }
+                    else
+                    {
+                        DebugPrint("[Error] in Preprocess: unknown directive\n");
+                    }
+                }
+            }
+            else
+            {
+                DebugPrint("[Error] in Preprocess: Directive does not start with a hash '#'");
+            }
         }
 
         if (Node)
@@ -1164,6 +1249,8 @@ internal void TestTokenizer(ryn_memory_arena *Arena, lookup_node *KeywordLookup)
          {T(Not), T(Identifier), T(Space), T(NotEqual), T(Space), T(Identifier)}},
         {ryn_string_CreateString("auto break case char const continue default do double else enum extern float for goto if int long register return short signed sizeof static struct switch typedef union unsigned void volatile while"),
          {T(_auto), T(Space), T(_break), T(Space), T(_case), T(Space), T(_char), T(Space), T(_const), T(Space), T(_continue), T(Space), T(_default), T(Space), T(_do), T(Space), T(_double), T(Space), T(_else), T(Space), T(_enum), T(Space), T(_extern), T(Space), T(_float), T(Space), T(_for), T(Space), T(_goto), T(Space), T(_if), T(Space), T(_int), T(Space), T(_long), T(Space), T(_register), T(Space), T(_return), T(Space), T(_short), T(Space), T(_signed), T(Space), T(_sizeof), T(Space), T(_static), T(Space), T(_struct), T(Space), T(_switch), T(Space), T(_typedef), T(Space), T(_union), T(Space), T(_unsigned), T(Space), T(_void), T(Space), T(_volatile), T(Space), T(_while)}},
+        {ryn_string_CreateString("int foo=3;\\\nint bar=2;"),
+         {T(_int), T(Space), T(Identifier), T(Equal), T(Digit), T(Semicolon), T(NewlineEscape), T(_int), T(Space), T(Identifier), T(Equal), T(Digit), T(Semicolon)}},
 
         {FileSourceString, {T(OpenParenthesis)}},
     };
