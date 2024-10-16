@@ -365,7 +365,7 @@ typedef struct
 {
     char *CString;
     ryn_string String;
-    u32 Type; /* TODO: Consider a more type-safe option here... */
+    u64 Type; /* TODO: u64 so we can store either an enum or a pointer. */
 } keyword;
 
 
@@ -476,6 +476,82 @@ internal ryn_string GetTokenizerStateString(tokenizer_state TokenizerState)
     return String;
 }
 
+internal b32 AddToLookup(ryn_memory_arena *Arena, lookup_node *Lookup, keyword Keyword)
+{
+    b32 KeywordAlreadyExists = 0;
+    ryn_string KeywordString = Keyword.String;
+
+    /* TODO: This control flow for this loop feels off, especially with the mutliple places where we check if we need to set "IsTerminal". */
+    for (u32 StringIndex = 0; StringIndex < KeywordString.Size; ++StringIndex)
+    {
+        u8 Char = KeywordString.Bytes[StringIndex];
+
+        if (Lookup->Char)
+        {
+            for (;;)
+            {
+                if (Lookup->Char == Char)
+                {
+                    if (StringIndex == KeywordString.Size - 1)
+                    {
+                        KeywordAlreadyExists = Lookup->IsTerminal;
+                        Lookup->IsTerminal = 1;
+                    }
+                    else if (Lookup->Child)
+                    {
+                        Lookup = Lookup->Child;
+                    }
+                    else
+                    {
+                        Lookup->Child = ryn_memory_PushZeroStruct(Arena, lookup_node);
+                        Lookup = Lookup->Child;
+                    }
+
+                    break;
+                }
+                else if (Lookup->Sibling == 0)
+                {
+                    Lookup->Sibling = ryn_memory_PushZeroStruct(Arena, lookup_node);
+                    Lookup->Sibling->Char = Char;
+                    Lookup = Lookup->Sibling;
+                    Lookup->Type = Keyword.Type;
+
+                    if (StringIndex == KeywordString.Size - 1)
+                    {
+                        KeywordAlreadyExists = Lookup->IsTerminal;
+                        Lookup->IsTerminal = 1;
+                    }
+
+                    Lookup->Child = ryn_memory_PushZeroStruct(Arena, lookup_node);
+                    Lookup = Lookup->Child;
+                    break;
+                }
+                else
+                {
+                    Lookup = Lookup->Sibling;
+                }
+            }
+        }
+        else
+        {
+            Assert(Lookup->Child == 0);
+            Lookup->Char = Char;
+            Lookup->Type = Keyword.Type;
+
+            if (StringIndex == KeywordString.Size - 1)
+            {
+                KeywordAlreadyExists = Lookup->IsTerminal;
+                Lookup->IsTerminal = 1;
+            }
+
+            Lookup->Child = ryn_memory_PushZeroStruct(Arena, lookup_node);
+            Lookup = Lookup->Child;
+        }
+    }
+
+    return KeywordAlreadyExists;
+}
+
 internal lookup_node *BuildLookup(ryn_memory_arena *Arena, keyword *Keywords, u32 KeywordCount)
 {
     lookup_node *RootLookup = ryn_memory_PushZeroStruct(Arena, lookup_node);
@@ -493,73 +569,7 @@ internal lookup_node *BuildLookup(ryn_memory_arena *Arena, keyword *Keywords, u3
     for (u32 KeywordIndex = 0; KeywordIndex < KeywordCount; ++KeywordIndex)
     {
         keyword Keyword = GlobalKeywordStrings[KeywordIndex];
-        ryn_string KeywordString = GlobalKeywordStrings[KeywordIndex].String;
-        lookup_node *CurrentLookup = RootLookup;
-
-        /* TODO: This control flow for this loop feels off, especially with the mutliple places where we check if we need to set "IsTerminal". */
-        for (u32 StringIndex = 0; StringIndex < KeywordString.Size; ++StringIndex)
-        {
-            u8 Char = KeywordString.Bytes[StringIndex];
-
-            if (CurrentLookup->Char)
-            {
-                for (;;)
-                {
-                    if (CurrentLookup->Char == Char)
-                    {
-                        if (StringIndex == KeywordString.Size - 1)
-                        {
-                            CurrentLookup->IsTerminal = 1;
-                        }
-                        else if (CurrentLookup->Child)
-                        {
-                            CurrentLookup = CurrentLookup->Child;
-                        }
-                        else
-                        {
-                            CurrentLookup->Child = ryn_memory_PushZeroStruct(Arena, lookup_node);
-                            CurrentLookup = CurrentLookup->Child;
-                        }
-
-                        break;
-                    }
-                    else if (CurrentLookup->Sibling == 0)
-                    {
-                        CurrentLookup->Sibling = ryn_memory_PushZeroStruct(Arena, lookup_node);
-                        CurrentLookup->Sibling->Char = Char;
-                        CurrentLookup = CurrentLookup->Sibling;
-                        CurrentLookup->Type = Keyword.Type;
-
-                        if (StringIndex == KeywordString.Size - 1)
-                        {
-                            CurrentLookup->IsTerminal = 1;
-                        }
-
-                        CurrentLookup->Child = ryn_memory_PushZeroStruct(Arena, lookup_node);
-                        CurrentLookup = CurrentLookup->Child;
-                        break;
-                    }
-                    else
-                    {
-                        CurrentLookup = CurrentLookup->Sibling;
-                    }
-                }
-            }
-            else
-            {
-                Assert(CurrentLookup->Child == 0);
-                CurrentLookup->Char = Char;
-                CurrentLookup->Type = Keyword.Type;
-
-                if (StringIndex == KeywordString.Size - 1)
-                {
-                    CurrentLookup->IsTerminal = 1;
-                }
-
-                CurrentLookup->Child = ryn_memory_PushZeroStruct(Arena, lookup_node);
-                CurrentLookup = CurrentLookup->Child;
-            }
-        }
+        AddToLookup(Arena, RootLookup, Keyword);
     }
 
     return RootLookup;
@@ -953,15 +963,16 @@ internal token_list *ConsumeNonNewlineSpace(token_list *Node)
     return Result;
 }
 
+u8 SpaceCharacters[] = {
+#define X(_name, literal)\
+    literal,
+    SpaceCharList
+#undef X
+};
+
 internal ryn_string GetStringUntilNextWhitespace(ryn_string String)
 {
     ryn_string Result = {};
-    u8 SpaceCharacters[] = {
-#define X(_name, literal)\
-        literal,
-        SpaceCharList
-#undef X
-    };
     u32 SpaceCharCount = ArrayCount(SpaceCharacters);
     u32 I = 0;
     b32 IsEscape = 0;
@@ -975,16 +986,19 @@ internal ryn_string GetStringUntilNextWhitespace(ryn_string String)
         }
         else
         {
-            for (u32 J = 0; J < SpaceCharCount; ++J)
+            if (String.Bytes[I] == '\\')
             {
-                if (String.Bytes[I] == SpaceCharacters[J])
+                IsEscape = 1;
+            }
+            else
+            {
+                for (u32 J = 0; J < SpaceCharCount; ++J)
                 {
-                    Looping = 0;
-                    break;
-                }
-                else if (String.Bytes[I] == '\\')
-                {
-                    IsEscape = 1;
+                    if (String.Bytes[I] == SpaceCharacters[J])
+                    {
+                        Looping = 0;
+                        break;
+                    }
                 }
             }
         }
@@ -998,6 +1012,30 @@ internal ryn_string GetStringUntilNextWhitespace(ryn_string String)
     }
 
     return Result;
+}
+
+internal void TrimSpaceAtStart(ryn_string *String)
+{
+    for (u32 I = 0; I < String->Size; ++I)
+    {
+        b32 IsSpace = 0;
+
+        for (u32 J = 0; J < ArrayCount(SpaceCharacters); ++J)
+        {
+            if (String->Bytes[I] == SpaceCharacters[J])
+            {
+                IsSpace = 1;
+                String->Bytes += 1;
+                String->Size -= 1;
+                break;
+            }
+        }
+
+        if (!IsSpace)
+        {
+            break;
+        }
+    }
 }
 
 internal void Preprocess(ryn_memory_arena *Arena, token_list *FirstToken, lookup_node *DirectiveLookup)
@@ -1028,7 +1066,81 @@ internal void Preprocess(ryn_memory_arena *Arena, token_list *FirstToken, lookup
 
                 if (Lookup.IsTerminal)
                 {
-                    printf("Found directive \"%s\"\n", CString);
+                    switch (Lookup.Type)
+                    {
+                    case directive_type_Define:
+                    {
+                        printf("Directive type \"Define\"\n");
+                    } break;
+                    case directive_type_Elif:
+                    {
+                        printf("Directive type \"Elif\"\n");
+                    } break;
+                    case directive_type_Else:
+                    {
+                        printf("Directive type \"Else\"\n");
+                    } break;
+                    case directive_type_Endif:
+                    {
+                        printf("Directive type \"Endif\"\n");
+                    } break;
+                    case directive_type_Error:
+                    {
+                        printf("Directive type \"Error\"\n");
+                    } break;
+                    case directive_type_Ident:
+                    {
+                        printf("Directive type \"Ident\"\n");
+                    } break;
+                    case directive_type_If:
+                    {
+                        printf("Directive type \"If\"\n");
+                    } break;
+                    case directive_type_Ifdef:
+                    {
+                        printf("Directive type \"Ifdef\"\n");
+                    } break;
+                    case directive_type_Ifndef:
+                    {
+                        printf("Directive type \"Ifndef\"\n");
+                    } break;
+                    case directive_type_Import:
+                    {
+                        printf("Directive type \"Import\"\n");
+                    } break;
+                    case directive_type_Include:
+                    {
+                        printf("Directive type \"Include\"\n");
+                        /* NOTE: So far, this is the only directive that cannot be tokenized using the same tokenizer we used to call Preprocess. This is because of the angle-bracket strings for system includes... */
+                        ryn_string IncludeString;
+                        IncludeString.Size = StartOfIdentifier.Size - IdentifierString.Size;
+                        IncludeString.Bytes = StartOfIdentifier.Bytes + IdentifierString.Size;
+                        TrimSpaceAtStart(&IncludeString);
+                        /* TODO: Parse the include........ */
+                        /* ryn_string_ToCString(IncludeString, Arena->Data + Arena->Offset); */
+                        /* printf("Include text ........%s\n", Arena->Data + Arena->Offset); */
+                    } break;
+                    case directive_type_IncludeNext:
+                    {
+                        printf("Directive type \"IncludeNext\"\n");
+                    } break;
+                    case directive_type_Line:
+                    {
+                        printf("Directive type \"Line\"\n");
+                    } break;
+                    case directive_type_Sccs:
+                    {
+                        printf("Directive type \"Sccs\"\n");
+                    } break;
+                    case directive_type_Undef:
+                    {
+                        printf("Directive type \"Undef\"\n");
+                    } break;
+                    case directive_type_Warning:
+                    {
+                        printf("Directive type \"Warning\"\n");
+                    } break;
+                    }
                 }
                 else
                 {
@@ -1325,11 +1437,12 @@ internal void TestParser(ryn_memory_arena *Arena, lookup_node *KeywordLookup)
 
 int main(void)
 {
-    ryn_memory_arena Arena = ryn_memory_CreateArena(Megabytes(1));
+    ryn_memory_arena Arena = ryn_memory_CreateArena(Megabytes(500));
+    ryn_memory_arena StaticArena = ryn_memory_CreateArena(Megabytes(500));
 
     ryn_string FileSourceString = GetIdiSource(&Arena);
-    lookup_node *KeywordLookup = BuildLookup(&Arena, GlobalHackedUpKeywords, ArrayCount(GlobalHackedUpKeywords));
-    lookup_node *DirectiveLookup = BuildLookup(&Arena, GlobalHackedUpDirectives, ArrayCount(GlobalHackedUpDirectives));
+    lookup_node *KeywordLookup = BuildLookup(&StaticArena, GlobalHackedUpKeywords, ArrayCount(GlobalHackedUpKeywords));
+    lookup_node *DirectiveLookup = BuildLookup(&StaticArena, GlobalHackedUpDirectives, ArrayCount(GlobalHackedUpDirectives));
     u64 BaseOffset = Arena.Offset;
     SetupTokenizerTable();
 

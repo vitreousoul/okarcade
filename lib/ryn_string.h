@@ -62,6 +62,15 @@ ryn_string ryn_string_CreateString(char *CString)
     return Result;
 }
 
+ryn_string ryn_string_CreateStringNoNull(char *CString)
+{
+    /* NOTE: Just kidding! There is a null-terminator we just subtract the string length by 1. Just in case the string gets passed to a CRT function. */
+    ryn_string Result = ryn_string_CreateString(CString);
+    Result.Size -= 1;
+
+    return Result;
+}
+
 /* NOTE: Assume that CString can hold String.Size+1 bytes. */
 void ryn_string_ToCString(ryn_string String, ryn_string_u8 *CString)
 {
@@ -71,6 +80,24 @@ void ryn_string_ToCString(ryn_string String, ryn_string_u8 *CString)
         CString[I] = String.Bytes[I];
     }
     CString[String.Size] = 0;
+}
+
+ryn_string_u64 ryn_string_GetHash(ryn_string String)
+{
+    /* NOTE: Copy-paste Polynomial rolling hash function from geeks-for-geeks or something like that... */
+    ryn_string_u64 Hash = 0;
+    ryn_string_u64 P = 31; /* NOTE: What value should we use here? Should it be paramaterized? */
+    ryn_string_u64 Pow = 1;
+    ryn_string_u64 Mod = 1e9 + 7;
+
+    for (ryn_string_u64 I = 0; I < String.Size; I++)
+    {
+        /* NOTE: Do we really need to subtract the value of 'a' or is that only for lowercase-only-strings? */
+        Hash = (Hash + (String.Bytes[I] - 'a' + 1) * Pow) % Mod;
+        Pow = (Pow * P) % Mod;
+    }
+
+    return Hash;
 }
 
 #endif /* __RYN_STRING__ */
