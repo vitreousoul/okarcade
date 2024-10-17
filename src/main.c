@@ -87,7 +87,7 @@ internal void GenerateByteArray(ryn_memory_arena *TempArena, u8 *DestinationPath
     /* TODO: Compress the data. */
     u8 HexData[16];
 
-    file File = OpenFile(DestinationPath);
+    file File = platform_OpenFile(DestinationPath);
 
     if (!File.File)
     {

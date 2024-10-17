@@ -758,7 +758,7 @@ internal buffer GetOutputHtmlPath(ryn_memory_arena *TempString, u8 *OldRootPath,
     PushNullTerminator(TempString);
 
     Buffer.Size = TempString->Offset - BeginOffset;
-    CopyMemory(TempString->Data + BeginOffset, Buffer.Data, Buffer.Size);
+    core_CopyMemory(TempString->Data + BeginOffset, Buffer.Data, Buffer.Size);
 
     return Buffer;
 }
@@ -776,7 +776,7 @@ internal void GenerateBlogPages(ryn_memory_arena *TempString, pre_processor *Pre
     buffer File;
     buffer BlogPageTemplate;
 
-    BlogPageTemplate.Size = GetFileSize(BlogPageTemplateFilePath);
+    BlogPageTemplate.Size = platform_GetFileSize(BlogPageTemplateFilePath);
     BlogPageTemplate.Data = ryn_memory_PushSize(TempString, BlogPageTemplate.Size + 1);
 
     if (!BlogPageTemplate.Data)
@@ -794,7 +794,7 @@ internal void GenerateBlogPages(ryn_memory_arena *TempString, pre_processor *Pre
     /* write each blog page */
     for (file_list *CurrentFile = SortedFileList; CurrentFile; CurrentFile = CurrentFile->Next)
     {
-        File.Size = GetFileSize(CurrentFile->Name);
+        File.Size = platform_GetFileSize(CurrentFile->Name);
         File.Data = ryn_memory_PushSize(TempString, File.Size + 1);
 
         if (File.Data)
@@ -884,7 +884,7 @@ internal buffer EscapeHtmlString(ryn_memory_arena *TempString, u8 *HtmlString, s
             s32 Size = I - HtmlStringBegin;
             u8 *Data = ryn_memory_PushSize(TempString, Size);
 
-            CopyMemory(BeginData, Data, Size);
+            core_CopyMemory(BeginData, Data, Size);
             PushString(TempString, EscapeString);
             HtmlStringBegin = I + 1;
         }
@@ -1113,7 +1113,7 @@ void GenerateCodePages(ryn_memory_arena *FileArena, ryn_memory_arena *TempString
             buffer EscapedHtmlBuffer = EscapeHtmlString(TempString, CodePageBuffer->Data, CodePageBuffer->Size);
 
             u8 *CodePageData = ryn_memory_PushSize(&CodePage, EscapedHtmlBuffer.Size);
-            CopyMemory(EscapedHtmlBuffer.Data, CodePageData, EscapedHtmlBuffer.Size);
+            core_CopyMemory(EscapedHtmlBuffer.Data, CodePageData, EscapedHtmlBuffer.Size);
 
             PushString(&CodePage, (u8 *)"HERE" "DOC</pre></main></body></html>");
 

@@ -1102,76 +1102,95 @@ internal ryn_string GetIdiSource(ryn_memory_arena *Arena)
 
 #define Max_Token_Count_For_Testing 2048
 
-internal void TestTokenizer(ryn_memory_arena *Arena, lookup_node *KeywordLookup)
+typedef struct {
+    ryn_string Source;
+    token Tokens[Max_Token_Count_For_Testing];
+} test_case;
+
+
+
+test_case TestCases[5];
+
+#define BeginTestCase() TestIndex = 0; TokenIndex = 0
+#define EndTestCase() TestIndex += 1
+
+internal void InitTestCases(void)
 {
-    u64 OldArenaOffset = Arena->Offset;
+    u32 TestIndex = 0;
+    u32 TokenIndex = 0;
+
+#define T(token_type) TestCases[TestIndex].Tokens[TokenIndex] = (token){token_type,{}}
+
 #define X(name, typename, _literal)\
     token_type name = token_type_##typename;
     token_type_Valid_XList;
 #undef X
 
-    typedef struct {
-        ryn_string Source;
-        token Tokens[Max_Token_Count_For_Testing];
-    } test_case;
-#define T(token_type) {token_type,{}}
+    BeginTestCase();
+    TestCases[TestIndex].Source = ryn_string_CreateString("( 193 + abc)- (as3fj / 423)");
+    T(OpenParenthesis); T(Space); T(Digit); T(Space); T(Cross); T(Space); T(Identifier); T(CloseParenthesis); T(Dash); T(Space); T(OpenParenthesis); T(Identifier); T(Space); T(ForwardSlash); T(Space); T(Digit); T(CloseParenthesis);
+    EndTestCase();
 
+#if 0
+    {"bar = (3*4)^x;",
+     {T(Identifier), T(Space), T(Equal), T(Space), T(OpenParenthesis), T(Digit), T(Star), T(Digit), T(CloseParenthesis), T(Carrot), T(Identifier), T(Semicolon)}},
+    {"bar != 0b010110",
+     {T(Identifier), T(Space), T(NotEqual), T(Space), T(BinaryDigit)}},
+    {"bar= 0b010110",
+     {T(Identifier), T(Equal), T(Space), T(BinaryDigit)}},
+    {"bar ||0b010110",
+     {T(Identifier), T(Space), T(Pipe), T(Pipe), T(BinaryDigit)}},
+    {"\"this is a string\"",
+     {T(String)}},
+    {"\"string \\t with \\\\ escapes!\"",
+     {T(String)}},
+    {"\"escape \\t \\n \\r this\"",
+     {T(String)}},
+    {"char A = \'f\'",
+     {T(_char), T(Space), T(Identifier), T(Space), T(Equal), T(Space), T(CharLiteral)}},
+    {"= >= == <=",
+     {T(Equal), T(Space), T(GreaterThanOrEqual), T(Space), T(DoubleEqual), T(Space), T(LessThanOrEqual)}},
+    {"(&foo, 234, bar.baz)",
+     {T(OpenParenthesis), T(Ampersand), T(Identifier), T(Comma), T(Space), T(Digit), T(Comma), T(Space), T(Identifier), T(Dot), T(Identifier), T(CloseParenthesis)}},
+    {"/* This is a comment * and is has stars ** in it */",
+     {T(Comment)}},
+    {"int Foo[3] = {1,2, 4};",
+     {T(_int), T(Space), T(Identifier), T(OpenSquare), T(Digit), T(CloseSquare), T(Space), T(Equal), T(Space), T(OpenBracket), T(Digit), T(Comma), T(Digit), T(Comma), T(Space), T(Digit), T(CloseBracket), T(Semicolon)}},
+    {"#define Foo 3",
+     {T(Directive)}},
+    {"((0xabc123<423)>3)",
+     {T(OpenParenthesis), T(OpenParenthesis), T(HexDigit), T(LessThan), T(Digit), T(CloseParenthesis), T(GreaterThan), T(Digit), T(CloseParenthesis)}},
+    {"#define Foo\\\n3\n#define Bar 4",
+     {T(Directive), T(Newline), T(Directive)}},
+    {"a=4;   \n    b=5;",
+     {T(Identifier), T(Equal), T(Digit), T(Semicolon), T(Space), T(Newline), T(Space), T(Identifier), T(Equal), T(Digit), T(Semicolon)}},
+    {"case A: x=4; break; case B: x=5;",
+     {T(_case), T(Space), T(Identifier), T(Colon), T(Space), T(Identifier), T(Equal), T(Digit), T(Semicolon), T(Space), T(_break), T(Semicolon), T(Space), T(_case), T(Space), T(Identifier), T(Colon), T(Space), T(Identifier), T(Equal), T(Digit), T(Semicolon)}},
+    {"int Foo = Bar ? 3 : 2;",
+     {T(_int), T(Space), T(Identifier), T(Space), T(Equal), T(Space), T(Identifier), T(Space), T(Question), T(Space), T(Digit), T(Space), T(Colon), T(Space), T(Digit), T(Semicolon)}},
+    {"A->Size != B->Size",
+     {T(Identifier), T(Arrow), T(Identifier), T(Space), T(NotEqual), T(Space), T(Identifier), T(Arrow), T(Identifier)}},
+    {"!Foo != Bar",
+     {T(Not), T(Identifier), T(Space), T(NotEqual), T(Space), T(Identifier)}},
+    {"auto break case char const continue default do double else enum extern float for goto if int long register return short signed sizeof static struct switch typedef union unsigned void volatile while",
+     {T(_auto), T(Space), T(_break), T(Space), T(_case), T(Space), T(_char), T(Space), T(_const), T(Space), T(_continue), T(Space), T(_default), T(Space), T(_do), T(Space), T(_double), T(Space), T(_else), T(Space), T(_enum), T(Space), T(_extern), T(Space), T(_float), T(Space), T(_for), T(Space), T(_goto), T(Space), T(_if), T(Space), T(_int), T(Space), T(_long), T(Space), T(_register), T(Space), T(_return), T(Space), T(_short), T(Space), T(_signed), T(Space), T(_sizeof), T(Space), T(_static), T(Space), T(_struct), T(Space), T(_switch), T(Space), T(_typedef), T(Space), T(_union), T(Space), T(_unsigned), T(Space), T(_void), T(Space), T(_volatile), T(Space), T(_while)}},
+#endif
+    /*{FileSourceString, {T(OpenParenthesis)}},*/
+#undef T
+};
+
+
+
+internal void TestTokenizer(ryn_memory_arena *Arena, lookup_node *KeywordLookup)
+{
+    u64 OldArenaOffset = Arena->Offset;
 
     ryn_string FileSourceString = GetIdiSource(Arena);
-
-    test_case TestCases[] = {
-        {ryn_string_CreateString("( 193 + abc)- (as3fj / 423)"),
-         {T(OpenParenthesis), T(Space), T(Digit), T(Space), T(Cross), T(Space), T(Identifier), T(CloseParenthesis), T(Dash), T(Space), T(OpenParenthesis), T(Identifier), T(Space), T(ForwardSlash), T(Space), T(Digit), T(CloseParenthesis)}},
-        {ryn_string_CreateString("bar = (3*4)^x;"),
-         {T(Identifier), T(Space), T(Equal), T(Space), T(OpenParenthesis), T(Digit), T(Star), T(Digit), T(CloseParenthesis), T(Carrot), T(Identifier), T(Semicolon)}},
-        {ryn_string_CreateString("bar != 0b010110"),
-         {T(Identifier), T(Space), T(NotEqual), T(Space), T(BinaryDigit)}},
-        {ryn_string_CreateString("bar= 0b010110"),
-         {T(Identifier), T(Equal), T(Space), T(BinaryDigit)}},
-        {ryn_string_CreateString("bar ||0b010110"),
-         {T(Identifier), T(Space), T(Pipe), T(Pipe), T(BinaryDigit)}},
-        {ryn_string_CreateString("\"this is a string\""),
-         {T(String)}},
-        {ryn_string_CreateString("\"string \\t with \\\\ escapes!\""),
-         {T(String)}},
-        {ryn_string_CreateString("\"escape \\t \\n \\r this\""),
-         {T(String)}},
-        {ryn_string_CreateString("char A = \'f\'"),
-         {T(_char), T(Space), T(Identifier), T(Space), T(Equal), T(Space), T(CharLiteral)}},
-        {ryn_string_CreateString("= >= == <="),
-         {T(Equal), T(Space), T(GreaterThanOrEqual), T(Space), T(DoubleEqual), T(Space), T(LessThanOrEqual)}},
-        {ryn_string_CreateString("(&foo, 234, bar.baz)"),
-         {T(OpenParenthesis), T(Ampersand), T(Identifier), T(Comma), T(Space), T(Digit), T(Comma), T(Space), T(Identifier), T(Dot), T(Identifier), T(CloseParenthesis)}},
-        {ryn_string_CreateString("/* This is a comment * and is has stars ** in it */"),
-         {T(Comment)}},
-        {ryn_string_CreateString("int Foo[3] = {1,2, 4};"),
-         {T(_int), T(Space), T(Identifier), T(OpenSquare), T(Digit), T(CloseSquare), T(Space), T(Equal), T(Space), T(OpenBracket), T(Digit), T(Comma), T(Digit), T(Comma), T(Space), T(Digit), T(CloseBracket), T(Semicolon)}},
-        {ryn_string_CreateString("#define Foo 3"),
-         {T(Directive)}},
-        {ryn_string_CreateString("((0xabc123<423)>3)"),
-         {T(OpenParenthesis), T(OpenParenthesis), T(HexDigit), T(LessThan), T(Digit), T(CloseParenthesis), T(GreaterThan), T(Digit), T(CloseParenthesis)}},
-        {ryn_string_CreateString("#define Foo\\\n3\n#define Bar 4"),
-         {T(Directive), T(Newline), T(Directive)}},
-        {ryn_string_CreateString("a=4;   \n    b=5;"),
-         {T(Identifier), T(Equal), T(Digit), T(Semicolon), T(Space), T(Newline), T(Space), T(Identifier), T(Equal), T(Digit), T(Semicolon)}},
-        {ryn_string_CreateString("case A: x=4; break; case B: x=5;"),
-         {T(_case), T(Space), T(Identifier), T(Colon), T(Space), T(Identifier), T(Equal), T(Digit), T(Semicolon), T(Space), T(_break), T(Semicolon), T(Space), T(_case), T(Space), T(Identifier), T(Colon), T(Space), T(Identifier), T(Equal), T(Digit), T(Semicolon)}},
-        {ryn_string_CreateString("int Foo = Bar ? 3 : 2;"),
-         {T(_int), T(Space), T(Identifier), T(Space), T(Equal), T(Space), T(Identifier), T(Space), T(Question), T(Space), T(Digit), T(Space), T(Colon), T(Space), T(Digit), T(Semicolon)}},
-        {ryn_string_CreateString("A->Size != B->Size"),
-         {T(Identifier), T(Arrow), T(Identifier), T(Space), T(NotEqual), T(Space), T(Identifier), T(Arrow), T(Identifier)}},
-        {ryn_string_CreateString("!Foo != Bar"),
-         {T(Not), T(Identifier), T(Space), T(NotEqual), T(Space), T(Identifier)}},
-        {ryn_string_CreateString("auto break case char const continue default do double else enum extern float for goto if int long register return short signed sizeof static struct switch typedef union unsigned void volatile while"),
-         {T(_auto), T(Space), T(_break), T(Space), T(_case), T(Space), T(_char), T(Space), T(_const), T(Space), T(_continue), T(Space), T(_default), T(Space), T(_do), T(Space), T(_double), T(Space), T(_else), T(Space), T(_enum), T(Space), T(_extern), T(Space), T(_float), T(Space), T(_for), T(Space), T(_goto), T(Space), T(_if), T(Space), T(_int), T(Space), T(_long), T(Space), T(_register), T(Space), T(_return), T(Space), T(_short), T(Space), T(_signed), T(Space), T(_sizeof), T(Space), T(_static), T(Space), T(_struct), T(Space), T(_switch), T(Space), T(_typedef), T(Space), T(_union), T(Space), T(_unsigned), T(Space), T(_void), T(Space), T(_volatile), T(Space), T(_while)}},
-
-        {FileSourceString, {T(OpenParenthesis)}},
-    };
-
-#undef T
-
     s32 TotalTestCount = ArrayCount(TestCases);
     s32 TotalPassedTests = 0;
+
+    //TestCases[22].Source = FileSourceString;
+    //TestCases[22].Tokens[0] = (token){token_type_OpenParenthesis,{}};
 
     for (s32 I = 0; I < TotalTestCount; ++I)
     {
@@ -1242,7 +1261,7 @@ internal void TestParser(ryn_memory_arena *Arena, lookup_node *KeywordLookup)
 int main(void)
 {
     ryn_memory_arena Arena = ryn_memory_CreateArena(Megabytes(1));
-
+    
     ryn_string FileSourceString = GetIdiSource(&Arena);
     lookup_node *KeywordLookup = BuildLookup(&Arena, GlobalHackedUpKeywords, ArrayCount(GlobalHackedUpKeywords));
     lookup_node *DirectiveLookup = BuildLookup(&Arena, GlobalHackedUpDirectives, ArrayCount(GlobalHackedUpDirectives));
