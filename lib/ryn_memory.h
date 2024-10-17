@@ -8,14 +8,21 @@
 #define __RYN_MEMORY__
 
 #if defined(__MACH__) || defined(__APPLE__)
-#define ryn_memory_Operating_System ryn_memory_Mac
+#define ryn_memory_Mac 1
+#define ryn_memory_Operating_System 1
+#elif defined(_WIN32)
+#define ryn_memory_Windows 1
+#define ryn_memory_Operating_System 1
 #endif
 
 #ifndef ryn_memory_Operating_System
 #error Unhandled operating system.
 #endif
 
-#if ryn_memory_Operating_System == ryn_memory_Mac
+#if ryn_memory_Windows
+#include <windows.h>
+#include <memoryapi.h>
+#elif ryn_memory_Mac
 #include <sys/mman.h>
 #include "memory.h"
 #include <errno.h>
@@ -88,6 +95,7 @@ void ryn_memory_CopyMemory(ryn_memory_u8 *Source, ryn_memory_u8 *Destination, ry
     }
 }
 
+#if ryn_memory_Mac
 void *ryn_memory_AllocateVirtualMemory(ryn_memory_size Size)
 {
     /* TODO allow setting specific address for debugging with stable pointer values */
@@ -124,6 +132,13 @@ void *ryn_memory_AllocateVirtualMemory(ryn_memory_size Size)
         return Result;
     }
 }
+#elif ryn_memory_Windows
+void *ryn_memory_AllocateVirtualMemory(ryn_memory_size Size)
+{
+    void *Result = VirtualAlloc(0, Size, MEM_RESERVE, PAGE_READWRITE);
+    return Result;
+}
+#endif
 
 ryn_memory_arena ryn_memory_CreateArena(ryn_memory_u64 Size)
 {
@@ -220,10 +235,17 @@ ryn_memory_u8 *ryn_memory_GetArenaWriteLocation(ryn_memory_arena *Arena)
     return WriteLocation;
 }
 
+#if ryn_memory_Mac
 void ryn_memory_FreeArena(ryn_memory_arena Arena)
 {
     munmap(Arena.Data, Arena.Capacity);
 }
+#elif ryn_memory_Windows
+void ryn_memory_FreeArena(ryn_memory_arena Arena)
+{
+    exit(1); /* TODO: Implement this... */
+}
+#endif
 
 /* TODO: These push and pop functions have not been tested very much. We should
    write some nested use-cases to make sure push/pop work properly. */

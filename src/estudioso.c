@@ -427,10 +427,10 @@ internal u64 PrepareSaveFile(state *State)
     u8 *StringLocation = (u8 *)(SaveFileBuffer + SaveHeader.OffsetToStringData);
     u8 *StringStart = StringLocation;
 
-    CopyMemory((u8 *)State->QuizItems, SaveFileQuizItemsLocation, QuizItemSize);
+    core_CopyMemory((u8 *)State->QuizItems, SaveFileQuizItemsLocation, QuizItemSize);
 
     u8 *QuizLookupData = SaveFileBuffer + SaveHeader.OffsetToQuizItemsLookupData;
-    CopyMemory((u8 *)State->QuizItemsLookup, QuizLookupData, QuizLookupSize);
+    core_CopyMemory((u8 *)State->QuizItemsLookup, QuizLookupData, QuizLookupSize);
 
     for (u32 I = 0; I < Quiz_Item_Max; ++I)
     {
@@ -466,13 +466,13 @@ internal u64 PrepareSaveFile(state *State)
         {
             FreeSpaceForStringData -= FullLength;
 
-            CopyMemory(*Prompt, StringLocation, PromptLength);
+            core_CopyMemory(*Prompt, StringLocation, PromptLength);
             *(StringLocation + PromptLength) = 0; /* NOTE: Null terminate */
             u64 PromptOffset = (u64)StringLocation - (u64)StringStart;
             *Prompt = (u8 *)(0xffff & PromptOffset);
             StringLocation += PromptLength;
 
-            CopyMemory(*Answer, StringLocation, AnswerLength);
+            core_CopyMemory(*Answer, StringLocation, AnswerLength);
             *(StringLocation + AnswerLength) = 0; /* NOTE: Null terminate */
             u64 AnswerOffset = (u64)StringLocation - (u64)StringStart;
             *Answer = (u8 *)(0xffff & AnswerOffset);
@@ -488,7 +488,7 @@ internal u64 PrepareSaveFile(state *State)
     FileSize = StringLocation - SaveFileBuffer;
     SaveHeader.FileSize = FileSize;
 
-    CopyMemory((u8 *)&SaveHeader, SaveFileBuffer, HeaderSize);
+    core_CopyMemory((u8 *)&SaveHeader, SaveFileBuffer, HeaderSize);
 
     return FileSize;
 }
@@ -943,13 +943,13 @@ internal b32 TryToLoadSaveFile(state *State)
             if (Header->QuizItemCount)
             {
                 u64 Size = Header->QuizItemCount * sizeof(quiz_item);
-                CopyMemory(Buffer->Data + HeaderSize, (u8 *)State->QuizItems, Size);
+                core_CopyMemory(Buffer->Data + HeaderSize, (u8 *)State->QuizItems, Size);
                 State->QuizItemCount = Header->QuizItemCount;
             }
 
             {
                 u8 *QuizItemsLookupData = Buffer->Data + Header->OffsetToQuizItemsLookupData;
-                CopyMemory(QuizItemsLookupData, (u8 *)State->QuizItemsLookup, sizeof(State->QuizItemsLookup));
+                core_CopyMemory(QuizItemsLookupData, (u8 *)State->QuizItemsLookup, sizeof(State->QuizItemsLookup));
             }
 
             State->Bucket[State->BucketIndex] = Header->Bucket[0];

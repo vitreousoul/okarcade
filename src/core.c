@@ -6,6 +6,7 @@ typedef struct
 
 #define ArrayCount(a) (sizeof(a)/sizeof((a)[0]))
 
+/*
 b32 StringsEqual(u8 *StringA, u8 *StringB);
 void SetMemory(u8 *Source, u8 Value, u64 Size);
 void CopyMemory(u8 *Source, u8 *Destination, u64 Size);
@@ -13,6 +14,7 @@ void CopyMemory(u8 *Source, u8 *Destination, u64 Size);
 void CopyString(u8 *Source, u8 *Destination, s32 DestinationSize);
 
 s32 GetStringLength(u8 *String);
+*/
 
 #define LogError(s) LogError_((u8 *)s, __LINE__, __FILE__)
 internal void LogError_(u8 *Message, s32 Line, char *File)
@@ -68,7 +70,7 @@ void SetMemory(u8 *Source, u8 Value, u64 Size)
     }
 }
 
-void CopyMemory(u8 *Source, u8 *Destination, u64 Size)
+internal void core_CopyMemory(u8 *Source, u8 *Destination, u64 Size)
 {
     for (u64 I = 0; I < Size; I++)
     {
